@@ -58,7 +58,8 @@ Model = collections.namedtuple("Model", "outputs, predict_real, predict_fake, di
 def preprocess(image):
     with tf.name_scope("preprocess"):
         # [0, 1] => [-1, 1]
-        return image * 2 - 1
+        # return image * 2 - 1
+        return tf.image.per_image_standardization(image)
 
 
 def deprocess(image):
