@@ -47,13 +47,15 @@ parser.add_argument("--n_channels", type=int, default=3,
                     help="Number of channels in image.")
 parser.add_argument("--transform", action="store_true", default=False,
                     help="Whether to apply image transformations.")
+parser.add_argument("--crop_size", type=int, default=256,
+                    help="Size of cropped image chunks.")
 
 # export options
 parser.add_argument("--output_filetype", default="png", choices=["png", "jpeg"])
 a = parser.parse_args()
 
 EPS = 1e-12
-CROP_SIZE = 256
+a.crop_size = 256
 
 Examples = collections.namedtuple("Examples", "paths, inputs, targets, count, steps_per_epoch")
 Model = collections.namedtuple("Model", "outputs, predict_real, predict_fake, discrim_loss, discrim_grads_and_vars, gen_loss_GAN, gen_loss_L1, gen_grads_and_vars, train")
@@ -282,8 +284,8 @@ def load_examples():
         else:
             # break apart image pair and move to range [-1, 1]
             width = tf.shape(raw_input)[1] # [height, width, channels]
-            a_images = preprocess(raw_input[:,:width//2,:])
-            b_images = preprocess(raw_input[:,width//2:,:])
+            a_images = preprocess(raw_input[:, :width//2, :])
+            b_images = preprocess(raw_input[:, width//2:, :])
 
     if a.which_direction == "AtoB":
         inputs, targets = [a_images, b_images]
@@ -292,37 +294,30 @@ def load_examples():
     else:
         raise Exception("invalid direction")
 
-    # synchronize seed for image operations so that we do the same operations to both
-    # input and output images
+    # synchronize seed for image operations so that we do the same operations
+    # to both input and output images
     seed = random.randint(0, 2**31 - 1)
     def transform(image):
         r = image
         if a.flip:
             r = tf.image.random_flip_left_right(r, seed=seed)
 
-        # area produces a nice downscaling, but does nearest neighbor for upscaling
-        # assume we're going to be doing downscaling here
-        r = tf.image.resize_images(r, [a.scale_size, a.scale_size], method=tf.image.ResizeMethod.AREA)
-
-        offset = tf.cast(tf.floor(tf.random_uniform([2], 0, a.scale_size - CROP_SIZE + 1, seed=seed)), dtype=tf.int32)
-        if a.scale_size > CROP_SIZE:
-            r = tf.image.crop_to_bounding_box(r, offset[0], offset[1], CROP_SIZE, CROP_SIZE)
-        elif a.scale_size < CROP_SIZE:
+        # area produces a nice downscaling, but does nearest neighbor for
+        # upscaling assume we're going to be doing downscaling here
+        if a.resize:
+            r = tf.image.resize_images(r, [a.scale_size, a.scale_size],
+                                       method=tf.image.ResizeMethod.AREA)
+        offset = tf.cast(tf.floor(tf.random_uniform([2], 0, a.scale_size - a.crop_size + 1, seed=seed)), dtype=tf.int32)
+        if a.scale_size > a.crop_size:
+            r = tf.image.crop_to_bounding_box(r, offset[0], offset[1], a.crop_size, a.crop_size)
+        elif a.scale_size < a.crop_size:
             raise Exception("scale size cannot be less than crop size")
         return r
 
     with tf.name_scope("input_images"):
-        if a.transform:
-            input_images = transform(inputs)
-        else:
-            shape = inputs.get_shape().as_list()
-            input_images = tf.reshape(inputs, shape)
+        input_images = transform(inputs)
     with tf.name_scope("target_images"):
-        if a.transform:
-            target_images = transform(targets)
-        else:
-            shape = targets.get_shape().as_list()
-            target_images = tf.reshape(targets, shape)
+        target_images = transform(targets)
 
     paths_batch, inputs_batch, targets_batch = tf.train.batch(
         [paths, input_images, target_images],
@@ -572,7 +567,7 @@ def main():
                     print("loaded", key, "=", val)
                     setattr(a, key, val)
         # disable these features in test mode
-        a.scale_size = CROP_SIZE
+        a.scale_size = a.crop_size
         a.flip = False
 
     for k, v in a._get_kwargs():
@@ -593,10 +588,12 @@ def main():
         # remove alpha channel if present
         input_image = tf.cond(tf.equal(tf.shape(input_image)[2], 4), lambda: input_image[:,:,:3], lambda: input_image)
         # convert grayscale to RGB
-        input_image = tf.cond(tf.equal(tf.shape(input_image)[2], 1), lambda: tf.image.grayscale_to_rgb(input_image), lambda: input_image)
+        input_image = tf.cond(tf.equal(tf.shape(input_image)[2], 1),
+                              lambda: tf.image.grayscale_to_rgb(input_image),
+                              lambda: input_image)
 
         input_image = tf.image.convert_image_dtype(input_image, dtype=tf.float32)
-        input_image.set_shape([CROP_SIZE, CROP_SIZE, 3])
+        input_image.set_shape([a.crop_size, a.crop_size, 3])
         batch_input = tf.expand_dims(input_image, axis=0)
 
         with tf.variable_scope("generator"):
@@ -669,7 +666,7 @@ def main():
     def convert(image):
         if a.aspect_ratio != 1.0:
             # upscale to correct aspect ratio
-            size = [CROP_SIZE, int(round(CROP_SIZE * a.aspect_ratio))]
+            size = [a.crop_size, int(round(a.crop_size * a.aspect_ratio))]
             image = tf.image.resize_images(image, size=size, method=tf.image.ResizeMethod.BICUBIC)
 
         return tf.image.convert_image_dtype(image, dtype=tf.uint8, saturate=True)
