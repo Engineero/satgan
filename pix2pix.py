@@ -141,16 +141,17 @@ def batchnorm(inputs):
 
 
 def check_image(image):
-    assertion = tf.assert_equal(tf.shape(image)[-1], 3, message="image must have 3 color channels")
+    assertion = tf.assert_equal(tf.shape(image)[-1], a.n_channels,
+                                message=f"image must have {a.n_channels} color channels")
     with tf.control_dependencies([assertion]):
         image = tf.identity(image)
 
     if image.get_shape().ndims not in (3, 4):
         raise ValueError("image must be either 3 or 4 dimensions")
 
-    # make the last dimension 3 so that you can unstack the colors
+    # make the last dimension a.n_channels so that you can unstack the colors
     shape = list(image.get_shape())
-    shape[-1] = 3
+    shape[-1] = a.n_channels
     image.set_shape(shape)
     return image
 
@@ -269,7 +270,8 @@ def load_examples():
         raw_input = decode(contents)
         raw_input = tf.image.convert_image_dtype(raw_input, dtype=tf.float32)
 
-        assertion = tf.assert_equal(tf.shape(raw_input)[2], 3, message="image does not have 3 channels")
+        assertion = tf.assert_equal(tf.shape(raw_input)[2], a.n_channels,
+                                    message=f"image does not have {a.n_channels} channels")
         with tf.control_dependencies([assertion]):
             raw_input = tf.identity(raw_input)
 
@@ -585,18 +587,22 @@ def main():
         input_image = tf.image.decode_png(input_data)
 
         # remove alpha channel if present
-        input_image = tf.cond(tf.equal(tf.shape(input_image)[2], 4), lambda: input_image[:,:,:3], lambda: input_image)
+        input_image = tf.cond(tf.equal(tf.shape(input_image)[2], 4),
+                                       lambda: input_image[:,:,:3],
+                                       lambda: input_image)
         # convert grayscale to RGB
-        input_image = tf.cond(tf.equal(tf.shape(input_image)[2], 1),
-                              lambda: tf.image.grayscale_to_rgb(input_image),
-                              lambda: input_image)
+        if a.n_channels == 3:
+            input_image = tf.cond(tf.equal(tf.shape(input_image)[2], 1),
+                                  lambda: tf.image.grayscale_to_rgb(input_image),
+                                  lambda: input_image)
 
         input_image = tf.image.convert_image_dtype(input_image, dtype=tf.float32)
-        input_image.set_shape([a.crop_size, a.crop_size, 3])
+        input_image.set_shape([a.crop_size, a.crop_size, a.n_channels])
         batch_input = tf.expand_dims(input_image, axis=0)
 
         with tf.variable_scope("generator"):
-            batch_output = deprocess(create_generator(preprocess(batch_input), 3))
+            batch_output = deprocess(create_generator(preprocess(batch_input),
+                                                      a.n_channels))
 
         output_image = tf.image.convert_image_dtype(batch_output, dtype=tf.uint8)[0]
         if a.output_filetype == "png":
@@ -645,14 +651,16 @@ def main():
         if a.which_direction == "AtoB":
             # inputs is brightness, this will be handled fine as a grayscale image
             # need to augment targets and outputs with brightness
-            targets = augment(examples.targets, examples.inputs)
-            outputs = augment(model.outputs, examples.inputs)
+            if a.n_channels > 1:
+                targets = augment(examples.targets, examples.inputs)
+                outputs = augment(model.outputs, examples.inputs)
             # inputs can be deprocessed normally and handled as if they are single channel
             # grayscale images
             inputs = deprocess(examples.inputs)
         elif a.which_direction == "BtoA":
             # inputs will be color channels only, get brightness from targets
-            inputs = augment(examples.inputs, examples.targets)
+            if a.n_channels > 1:
+                inputs = augment(examples.inputs, examples.targets)
             targets = deprocess(examples.targets)
             outputs = deprocess(model.outputs)
         else:
