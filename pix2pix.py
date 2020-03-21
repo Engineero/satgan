@@ -311,12 +311,16 @@ def load_examples():
             raise Exception("scale size cannot be less than crop size")
         return r
 
-    if a.transform:
-        with tf.name_scope("input_images"):
+    with tf.name_scope("input_images"):
+        if a.transform:
             input_images = transform(inputs)
-
-        with tf.name_scope("target_images"):
+        else:
+            input_images = inputs
+    with tf.name_scope("target_images"):
+        if a.transform:
             target_images = transform(targets)
+        else:
+            target_images = targets
 
     paths_batch, inputs_batch, targets_batch = tf.train.batch([paths, input_images, target_images], batch_size=a.batch_size)
     steps_per_epoch = int(math.ceil(len(input_paths) / a.batch_size))
