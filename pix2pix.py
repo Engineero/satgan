@@ -65,7 +65,8 @@ def preprocess(image):
 def deprocess(image):
     with tf.name_scope("deprocess"):
         # [-1, 1] => [0, 1]
-        return (image + 1) / 2
+        # return (image + 1) / 2
+        return image
 
 
 def preprocess_lab(lab):
