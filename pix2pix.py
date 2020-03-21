@@ -270,8 +270,8 @@ def load_examples():
         raw_input = decode(contents)
         raw_input = tf.image.convert_image_dtype(raw_input, dtype=tf.float32)
 
-        assertion = tf.assert_equal(tf.shape(raw_input)[2], a.n_channels,
-                                    message=f"image does not have {a.n_channels} channels")
+        assertion = tf.assert_equal(tf.shape(raw_input)[2], 3,
+                                    message="image does not have 3 channels")
         with tf.control_dependencies([assertion]):
             raw_input = tf.identity(raw_input)
 
