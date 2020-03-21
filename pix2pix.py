@@ -304,9 +304,8 @@ def load_examples():
 
         # area produces a nice downscaling, but does nearest neighbor for
         # upscaling assume we're going to be doing downscaling here
-        if a.resize:
-            r = tf.image.resize_images(r, [a.scale_size, a.scale_size],
-                                       method=tf.image.ResizeMethod.AREA)
+        r = tf.image.resize_images(r, [a.scale_size, a.scale_size],
+                                   method=tf.image.ResizeMethod.AREA)
         offset = tf.cast(tf.floor(tf.random_uniform([2], 0, a.scale_size - a.crop_size + 1, seed=seed)), dtype=tf.int32)
         if a.scale_size > a.crop_size:
             r = tf.image.crop_to_bounding_box(r, offset[0], offset[1], a.crop_size, a.crop_size)
