@@ -43,6 +43,10 @@ parser.add_argument("--lr", type=float, default=0.0002, help="initial learning r
 parser.add_argument("--beta1", type=float, default=0.5, help="momentum term of adam")
 parser.add_argument("--l1_weight", type=float, default=100.0, help="weight on L1 term for generator gradient")
 parser.add_argument("--gan_weight", type=float, default=1.0, help="weight on GAN term for generator gradient")
+parser.add_argument("--n_channels", type=int, default=3,
+                    help="Number of channels in image.")
+parser.add_argument("--transform", action="store_true", default=False,
+                    help="Whether to apply image transformations.")
 
 # export options
 parser.add_argument("--output_filetype", default="png", choices=["png", "jpeg"])
@@ -267,7 +271,7 @@ def load_examples():
         with tf.control_dependencies([assertion]):
             raw_input = tf.identity(raw_input)
 
-        raw_input.set_shape([None, None, 3])
+        raw_input.set_shape([None, None, a.n_channels])
 
         if a.lab_colorization:
             # load color and brightness from image, no B image exists here
@@ -307,11 +311,12 @@ def load_examples():
             raise Exception("scale size cannot be less than crop size")
         return r
 
-    with tf.name_scope("input_images"):
-        input_images = transform(inputs)
+    if a.transform:
+        with tf.name_scope("input_images"):
+            input_images = transform(inputs)
 
-    with tf.name_scope("target_images"):
-        target_images = transform(targets)
+        with tf.name_scope("target_images"):
+            target_images = transform(targets)
 
     paths_batch, inputs_batch, targets_batch = tf.train.batch([paths, input_images, target_images], batch_size=a.batch_size)
     steps_per_epoch = int(math.ceil(len(input_paths) / a.batch_size))
