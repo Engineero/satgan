@@ -3,3 +3,6 @@ tags
 test
 models
 .idea
+experiment_files/
+gan_output/
+logfiles/
