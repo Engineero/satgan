@@ -315,14 +315,19 @@ def load_examples():
         if a.transform:
             input_images = transform(inputs)
         else:
-            input_images = inputs
+            shape = inputs.get_shape().as_list()
+            input_images = tf.reshape(inputs, shape)
     with tf.name_scope("target_images"):
         if a.transform:
             target_images = transform(targets)
         else:
-            target_images = targets
+            shape = targets.get_shape().as_list()
+            target_images = tf.reshape(targets, shape)
 
-    paths_batch, inputs_batch, targets_batch = tf.train.batch([paths, input_images, target_images], batch_size=a.batch_size)
+    paths_batch, inputs_batch, targets_batch = tf.train.batch(
+        [paths, input_images, target_images],
+        batch_size=a.batch_size
+    )
     steps_per_epoch = int(math.ceil(len(input_paths) / a.batch_size))
 
     return Examples(
