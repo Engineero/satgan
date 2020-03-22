@@ -64,7 +64,9 @@ def preprocess(image):
     with tf.name_scope("preprocess"):
         # [0, 1] => [-1, 1]
         # return image * 2 - 1
-        return tf.image.per_image_standardization(image)
+        noise = tf.random_normal(shape=tf.shape(image), mean=0.0, stddev=1.0,
+                                 dtype=tf.float32)
+        return tf.image.per_image_standardization(image) + noise
 
 
 def deprocess(image):
@@ -107,9 +109,15 @@ def gen_conv(batch_input, out_channels):
     # [batch, in_height, in_width, in_channels] => [batch, out_height, out_width, out_channels]
     initializer = tf.random_normal_initializer(0, 0.02)
     if a.separable_conv:
-        return tf.layers.separable_conv2d(batch_input, out_channels, kernel_size=4, strides=(2, 2), padding="same", depthwise_initializer=initializer, pointwise_initializer=initializer)
+        return tf.layers.separable_conv2d(batch_input, out_channels,
+                                          kernel_size=4, strides=(2, 2),
+                                          padding="same",
+                                          depthwise_initializer=initializer,
+                                          pointwise_initializer=initializer)
     else:
-        return tf.layers.conv2d(batch_input, out_channels, kernel_size=4, strides=(2, 2), padding="same", kernel_initializer=initializer)
+        return tf.layers.conv2d(batch_input, out_channels, kernel_size=4,
+                                strides=(2, 2), padding="same",
+                                kernel_initializer=initializer)
 
 
 def gen_deconv(batch_input, out_channels):
@@ -136,12 +144,19 @@ def lrelu(x, a):
 
 
 def batchnorm(inputs):
-    return tf.layers.batch_normalization(inputs, axis=3, epsilon=1e-5, momentum=0.1, training=True, gamma_initializer=tf.random_normal_initializer(1.0, 0.02))
+    return tf.layers.batch_normalization(
+        inputs,
+        axis=3,
+        epsilon=1e-5,
+        momentum=0.1,
+        training=True,
+        gamma_initializer=tf.random_normal_initializer(1.0, 0.02)
+    )
 
 
 def check_image(image):
-    assertion = tf.assert_equal(tf.shape(image)[-1], a.n_channels,
-                                message=f"image must have {a.n_channels} color channels")
+    assertion = tf.assert_equal(tf.shape(image)[-1], 3,
+                                message="image must have 3 color channels")
     with tf.control_dependencies([assertion]):
         image = tf.identity(image)
 
@@ -263,7 +278,10 @@ def load_examples():
         input_paths = sorted(input_paths)
 
     with tf.name_scope("load_images"):
-        path_queue = tf.train.string_input_producer(input_paths, shuffle=a.mode == "train")
+        path_queue = tf.train.string_input_producer(
+            input_paths,
+            shuffle=a.mode == "train"
+        )
         reader = tf.WholeFileReader()
         paths, contents = reader.read(path_queue)
         raw_input = decode(contents)
@@ -307,9 +325,18 @@ def load_examples():
         # upscaling assume we're going to be doing downscaling here
         r = tf.image.resize_images(r, [a.scale_size, a.scale_size],
                                    method=tf.image.ResizeMethod.AREA)
-        offset = tf.cast(tf.floor(tf.random_uniform([2], 0, a.scale_size - a.crop_size + 1, seed=seed)), dtype=tf.int32)
+        offset = tf.cast(tf.floor(
+            tf.random_uniform(
+                [2],
+                0,
+                a.scale_size - a.crop_size + 1,
+                seed=seed)
+            ),
+            dtype=tf.int32
+        )
         if a.scale_size > a.crop_size:
-            r = tf.image.crop_to_bounding_box(r, offset[0], offset[1], a.crop_size, a.crop_size)
+            r = tf.image.crop_to_bounding_box(r, offset[0], offset[1],
+                                              a.crop_size, a.crop_size)
         elif a.scale_size < a.crop_size:
             raise Exception("scale size cannot be less than crop size")
         return r
@@ -603,7 +630,7 @@ def main():
             batch_output = deprocess(create_generator(preprocess(batch_input),
                                                       a.n_channels))
 
-        output_image = tf.image.convert_image_dtype(batch_output, dtype=tf.uint8)[0]
+        output_image = tf.image.convert_image_dtype(batch_output, dtype=tf.uint16)[0]
         if a.output_filetype == "png":
             output_data = tf.image.encode_png(output_image)
         elif a.output_filetype == "jpeg":
@@ -673,9 +700,13 @@ def main():
         if a.aspect_ratio != 1.0:
             # upscale to correct aspect ratio
             size = [a.crop_size, int(round(a.crop_size * a.aspect_ratio))]
-            image = tf.image.resize_images(image, size=size, method=tf.image.ResizeMethod.BICUBIC)
-
-        return tf.image.convert_image_dtype(image, dtype=tf.uint8, saturate=True)
+            image = tf.image.resize_images(
+                image,
+                size=size,
+                method=tf.image.ResizeMethod.BICUBIC
+            )
+        return tf.image.convert_image_dtype(image, dtype=tf.uint16,
+                                            saturate=True)
 
     # reverse any processing on images so they can be written to disk or displayed to user
     with tf.name_scope("convert_inputs"):
@@ -706,10 +737,14 @@ def main():
         tf.summary.image("outputs", converted_outputs)
 
     with tf.name_scope("predict_real_summary"):
-        tf.summary.image("predict_real", tf.image.convert_image_dtype(model.predict_real, dtype=tf.uint8))
+        tf.summary.image("predict_real",
+                         tf.image.convert_image_dtype(model.predict_real,
+                                                      dtype=tf.uint16))
 
     with tf.name_scope("predict_fake_summary"):
-        tf.summary.image("predict_fake", tf.image.convert_image_dtype(model.predict_fake, dtype=tf.uint8))
+        tf.summary.image("predict_fake",
+                         tf.image.convert_image_dtype(model.predict_fake,
+                                                      dtype=tf.uint16))
 
     tf.summary.scalar("discriminator_loss", model.discrim_loss)
     tf.summary.scalar("generator_loss_GAN", model.gen_loss_GAN)
