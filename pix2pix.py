@@ -60,13 +60,16 @@ Examples = collections.namedtuple("Examples", "paths, inputs, targets, count, st
 Model = collections.namedtuple("Model", "outputs, predict_real, predict_fake, discrim_loss, discrim_grads_and_vars, gen_loss_GAN, gen_loss_L1, gen_grads_and_vars, train")
 
 
-def preprocess(image):
+def preprocess(image, add_noise=False):
     with tf.name_scope("preprocess"):
         # [0, 1] => [-1, 1]
         # return image * 2 - 1
-        noise = tf.random_normal(shape=tf.shape(image), mean=0.0, stddev=1.0,
-                                 dtype=tf.float32)
-        return tf.image.per_image_standardization(image) + noise
+        if add_noise:
+            noise = tf.random_normal(shape=tf.shape(image), mean=0.0,
+                                     stddev=1.0, dtype=tf.float32)
+            return tf.image.per_image_standardization(image) + noise
+        else:
+            return tf.image.per_image_standardization(image)
 
 
 def deprocess(image):
@@ -303,7 +306,7 @@ def load_examples():
         else:
             # break apart image pair and move to range [-1, 1]
             width = tf.shape(raw_input)[1] # [height, width, channels]
-            a_images = preprocess(raw_input[:, :width//2, :])
+            a_images = preprocess(raw_input[:, :width//2, :], add_noise=True)
             b_images = preprocess(raw_input[:, width//2:, :])
 
     if a.which_direction == "AtoB":
@@ -627,8 +630,10 @@ def main():
         batch_input = tf.expand_dims(input_image, axis=0)
 
         with tf.variable_scope("generator"):
-            batch_output = deprocess(create_generator(preprocess(batch_input),
-                                                      a.n_channels))
+            batch_output = deprocess(create_generator(
+                preprocess(batch_input, add_noise=True),
+                a.n_channels)
+            )
 
         output_image = tf.image.convert_image_dtype(batch_output, dtype=tf.float32)[0]
         if a.output_filetype == "png":
