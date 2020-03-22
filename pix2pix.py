@@ -728,13 +728,19 @@ def main():
 
     # summaries
     with tf.name_scope("inputs_summary"):
-        tf.summary.image("inputs", converted_inputs)
+        summary_inputs = tf.image.convert_image_dtype(converted_inputs,
+                                                      dtype=tf.float32)
+        tf.summary.image("inputs", summary_inputs)
 
     with tf.name_scope("targets_summary"):
-        tf.summary.image("targets", converted_targets)
+        summary_targets = tf.image.convert_image_dtype(converted_targets,
+                                                       dtype=tf.float32)
+        tf.summary.image("targets", summary_targets)
 
     with tf.name_scope("outputs_summary"):
-        tf.summary.image("outputs", converted_outputs)
+        summary_outputs = tf.image.convert_image_dtype(converted_outputs,
+                                                       dtype=tf.float32)
+        tf.summary.image("outputs", summary_outputs)
 
     with tf.name_scope("predict_real_summary"):
         tf.summary.image("predict_real",
