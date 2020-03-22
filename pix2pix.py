@@ -705,7 +705,7 @@ def main():
                 size=size,
                 method=tf.image.ResizeMethod.BICUBIC
             )
-        return tf.image.convert_image_dtype(image, dtype=tf.float32,
+        return tf.image.convert_image_dtype(image, dtype=tf.uint16,
                                             saturate=True)
 
     # reverse any processing on images so they can be written to disk or displayed to user
