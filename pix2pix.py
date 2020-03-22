@@ -630,7 +630,7 @@ def main():
             batch_output = deprocess(create_generator(preprocess(batch_input),
                                                       a.n_channels))
 
-        output_image = tf.image.convert_image_dtype(batch_output, dtype=tf.uint16)[0]
+        output_image = tf.image.convert_image_dtype(batch_output, dtype=tf.float32)[0]
         if a.output_filetype == "png":
             output_data = tf.image.encode_png(output_image)
         elif a.output_filetype == "jpeg":
@@ -705,7 +705,7 @@ def main():
                 size=size,
                 method=tf.image.ResizeMethod.BICUBIC
             )
-        return tf.image.convert_image_dtype(image, dtype=tf.uint16,
+        return tf.image.convert_image_dtype(image, dtype=tf.float32,
                                             saturate=True)
 
     # reverse any processing on images so they can be written to disk or displayed to user
@@ -739,12 +739,12 @@ def main():
     with tf.name_scope("predict_real_summary"):
         tf.summary.image("predict_real",
                          tf.image.convert_image_dtype(model.predict_real,
-                                                      dtype=tf.uint16))
+                                                      dtype=tf.float32))
 
     with tf.name_scope("predict_fake_summary"):
         tf.summary.image("predict_fake",
                          tf.image.convert_image_dtype(model.predict_fake,
-                                                      dtype=tf.uint16))
+                                                      dtype=tf.float32))
 
     tf.summary.scalar("discriminator_loss", model.discrim_loss)
     tf.summary.scalar("generator_loss_GAN", model.gen_loss_GAN)
