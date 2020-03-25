@@ -393,7 +393,6 @@ def google_attention(x, channels, sn=False, scope='attention'):
                                  num_channels // 2])  # [bs, h, w, C]
         o = conv(o, channels, kernel=1, stride=1, sn=sn, scope='attn_conv')
         x = gamma * o + x
-
     return x
 
 
@@ -409,7 +408,7 @@ def create_generator(generator_inputs, generator_outputs_channels):
         a.ngf * 2, # encoder_2: [batch, 128, 128, ngf] => [batch, 64, 64, ngf * 2]
         a.ngf * 4, # encoder_3: [batch, 64, 64, ngf * 2] => [batch, 32, 32, ngf * 4]
         a.ngf * 8, # encoder_4: [batch, 32, 32, ngf * 4] => [batch, 16, 16, ngf * 8]
-        a.ngf * 8, # gan_self_attention: [batch, 32, 32, ngf*4]
+        a.ngf * 8, # gan_self_attention: [batch, 16, 16, ngf*8]
         a.ngf * 8, # encoder_5: [batch, 16, 16, ngf * 8] => [batch, 8, 8, ngf * 8]
         a.ngf * 8, # encoder_6: [batch, 8, 8, ngf * 8] => [batch, 4, 4, ngf * 8]
         a.ngf * 8, # encoder_7: [batch, 4, 4, ngf * 8] => [batch, 2, 2, ngf * 8]
@@ -441,7 +440,7 @@ def create_generator(generator_inputs, generator_outputs_channels):
     num_encoder_layers = len(layers) - 1  # -1 for attention layer
     for decoder_layer, (out_channels, dropout) in enumerate(layer_specs):
         skip_layer = num_encoder_layers - decoder_layer - 1
-        if decoder_layer > 3:
+        if decoder_layer <= 3:
             skip_layer += 1  # offset for attention layer
         with tf.variable_scope("decoder_%d" % (skip_layer + 1)):
             if decoder_layer == 0:
