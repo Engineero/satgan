@@ -12,6 +12,7 @@ import random
 import collections
 import math
 import time
+from ops import conv, max_pooling, hw_flatten
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--input_dir", help="path to folder containing images")
@@ -364,6 +365,38 @@ def load_examples():
     )
 
 
+def google_attention(x, channels, sn=False, scope='attention'):
+    with tf.variable_scope(scope):
+        batch_size, height, width, num_channels = x.get_shape().as_list()
+        f = conv(x, channels // 8, kernel=1, stride=1, sn=sn,
+                 scope='f_conv')  # [bs, h, w, c']
+        f = max_pooling(f)
+
+        g = conv(x, channels // 8, kernel=1, stride=1, sn=sn,
+                 scope='g_conv')  # [bs, h, w, c']
+
+        h = conv(x, channels // 2, kernel=1, stride=1, sn=sn,
+                 scope='h_conv')  # [bs, h, w, c]
+        h = max_pooling(h)
+
+        # N = h * w
+        s = tf.matmul(hw_flatten(g), hw_flatten(f),
+                      transpose_b=True)  # # [bs, N, N]
+        beta = tf.nn.softmax(s)  # attention map
+        o = tf.matmul(beta, hw_flatten(h))  # [bs, N, C]
+        gamma = tf.get_variable("gamma", [1],
+                                initializer=tf.constant_initializer(0.0))
+
+        o = tf.reshape(o, shape=[batch_size,
+                                 height,
+                                 width,
+                                 num_channels // 2])  # [bs, h, w, C]
+        o = conv(o, channels, kernel=1, stride=1, sn=sn, scope='attn_conv')
+        x = gamma * o + x
+
+    return x
+
+
 def create_generator(generator_inputs, generator_outputs_channels):
     layers = []
 
@@ -376,19 +409,24 @@ def create_generator(generator_inputs, generator_outputs_channels):
         a.ngf * 2, # encoder_2: [batch, 128, 128, ngf] => [batch, 64, 64, ngf * 2]
         a.ngf * 4, # encoder_3: [batch, 64, 64, ngf * 2] => [batch, 32, 32, ngf * 4]
         a.ngf * 8, # encoder_4: [batch, 32, 32, ngf * 4] => [batch, 16, 16, ngf * 8]
+        a.ngf * 8, # gan_self_attention: [batch, 32, 32, ngf*4]
         a.ngf * 8, # encoder_5: [batch, 16, 16, ngf * 8] => [batch, 8, 8, ngf * 8]
         a.ngf * 8, # encoder_6: [batch, 8, 8, ngf * 8] => [batch, 4, 4, ngf * 8]
         a.ngf * 8, # encoder_7: [batch, 4, 4, ngf * 8] => [batch, 2, 2, ngf * 8]
         a.ngf * 8, # encoder_8: [batch, 2, 2, ngf * 8] => [batch, 1, 1, ngf * 8]
     ]
 
-    for out_channels in layer_specs:
-        with tf.variable_scope("encoder_%d" % (len(layers) + 1)):
-            rectified = lrelu(layers[-1], 0.2)
-            # [batch, in_height, in_width, in_channels] => [batch, in_height/2, in_width/2, out_channels]
-            convolved = gen_conv(rectified, out_channels)
-            output = batchnorm(convolved)
-            layers.append(output)
+    for layer_num, out_channels in enumerate(layer_specs):
+        if layer_num == 3:
+            output = google_attention(layers[-1], out_channels, sn=True,
+                                      scope='gen_self_attention')
+        else:
+            with tf.variable_scope("encoder_%d" % (len(layers) + 1)):
+                rectified = lrelu(layers[-1], 0.2)
+                # [batch, in_height, in_width, in_channels] => [batch, in_height/2, in_width/2, out_channels]
+                convolved = gen_conv(rectified, out_channels)
+                output = batchnorm(convolved)
+        layers.append(output)
 
     layer_specs = [
         (a.ngf * 8, 0.5),   # decoder_8: [batch, 1, 1, ngf * 8] => [batch, 2, 2, ngf * 8 * 2]
@@ -400,9 +438,11 @@ def create_generator(generator_inputs, generator_outputs_channels):
         (a.ngf, 0.0),       # decoder_2: [batch, 64, 64, ngf * 2 * 2] => [batch, 128, 128, ngf * 2]
     ]
 
-    num_encoder_layers = len(layers)
+    num_encoder_layers = len(layers) - 1  # -1 for attention layer
     for decoder_layer, (out_channels, dropout) in enumerate(layer_specs):
         skip_layer = num_encoder_layers - decoder_layer - 1
+        if decoder_layer > 3:
+            skip_layer += 1  # offset for attention layer
         with tf.variable_scope("decoder_%d" % (skip_layer + 1)):
             if decoder_layer == 0:
                 # first decoder layer doesn't have skip connections
