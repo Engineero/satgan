@@ -12,7 +12,7 @@ import random
 import collections
 import math
 import time
-from ops import conv, max_pooling, hw_flatten
+import ops
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--input_dir", help="path to folder containing images")
@@ -52,6 +52,8 @@ parser.add_argument("--transform", action="store_true", default=False,
                     help="Whether to apply image transformations.")
 parser.add_argument("--crop_size", type=int, default=256,
                     help="Size of cropped image chunks.")
+parser.add_argument("--spec_norm", action="store_true",
+                    help="If true, use spectral normalization.")
 
 # export options
 parser.add_argument("--output_filetype", default="png", choices=["png", "jpeg"])
@@ -397,100 +399,94 @@ def load_examples():
 def google_attention(x, channels, sn=False, scope='attention'):
     with tf.variable_scope(scope):
         batch_size, height, width, num_channels = x.get_shape().as_list()
-        f = conv(x, channels // 8, kernel=1, stride=1, sn=sn,
+        f = ops.conv(x, channels // 8, kernel=1, stride=1, sn=sn,
                  scope='f_conv')  # [bs, h, w, c']
-        f = max_pooling(f)
-        g = conv(x, channels // 8, kernel=1, stride=1, sn=sn,
+        f = ops.max_pooling(f)
+        g = ops.conv(x, channels // 8, kernel=1, stride=1, sn=sn,
                  scope='g_conv')  # [bs, h, w, c']
-        h = conv(x, channels // 2, kernel=1, stride=1, sn=sn,
+        h = ops.conv(x, channels // 2, kernel=1, stride=1, sn=sn,
                  scope='h_conv')  # [bs, h, w, c]
-        h = max_pooling(h)
+        h = ops.max_pooling(h)
 
         # N = h * w
-        s = tf.matmul(hw_flatten(g), hw_flatten(f),
+        s = tf.matmul(ops.hw_flatten(g), ops.hw_flatten(f),
                       transpose_b=True)  # # [bs, N, N]
         beta = tf.nn.softmax(s)  # attention map
-        o = tf.matmul(beta, hw_flatten(h))  # [bs, N, C]
+        o = tf.matmul(beta, ops.hw_flatten(h))  # [bs, N, C]
         gamma = tf.get_variable("gamma", [1],
                                 initializer=tf.constant_initializer(0.0))
         o = tf.reshape(o, shape=[batch_size,
                                  height,
                                  width,
                                  num_channels // 2])  # [bs, h, w, C]
-        o = conv(o, channels, kernel=1, stride=1, sn=sn, scope='attn_conv')
+        o = ops.conv(o, channels, kernel=1, stride=1, sn=sn, scope='attn_conv')
         x = gamma * o + x
     return x
 
 
-def create_generator(generator_inputs, generator_outputs_channels):
+def create_generator(generator_inputs, generator_outputs_channels,
+                     spec_norm=False):
     layers = []
 
     # encoder_1: [batch, 256, 256, in_channels] => [batch, 128, 128, ngf]
-    with tf.variable_scope("encoder_1"):
-        output = gen_conv(generator_inputs, a.ngf)
-        layers.append(output)
+    output = ops.down_resblock(generator_inputs, a.ngf, sn=spec_norm,
+                               scope='resblock_0')
+    layers.append(output)
 
     layer_specs = [
         a.ngf * 2, # encoder_2: [batch, 128, 128, ngf] => [batch, 64, 64, ngf * 2]
         a.ngf * 4, # encoder_3: [batch, 64, 64, ngf * 2] => [batch, 32, 32, ngf * 4]
         a.ngf * 8, # encoder_4: [batch, 32, 32, ngf * 4] => [batch, 16, 16, ngf * 8]
-        a.ngf * 8, # gan_self_attention: [batch, 16, 16, ngf*8]
         a.ngf * 8, # encoder_5: [batch, 16, 16, ngf * 8] => [batch, 8, 8, ngf * 8]
         a.ngf * 8, # encoder_6: [batch, 8, 8, ngf * 8] => [batch, 4, 4, ngf * 8]
         a.ngf * 8, # encoder_7: [batch, 4, 4, ngf * 8] => [batch, 2, 2, ngf * 8]
         a.ngf * 8, # encoder_8: [batch, 2, 2, ngf * 8] => [batch, 1, 1, ngf * 8]
     ]
 
-    for layer_num, out_channels in enumerate(layer_specs):
-        if layer_num == 3:
-            output = google_attention(layers[-1], out_channels, sn=True,
-                                      scope='gen_self_attention')
-        else:
-            with tf.variable_scope("encoder_%d" % (len(layers) + 1)):
-                rectified = lrelu(layers[-1], 0.2)
-                # [batch, in_height, in_width, in_channels] => [batch, in_height/2, in_width/2, out_channels]
-                convolved = gen_conv(rectified, out_channels)
-                output = batchnorm(convolved)
+    for out_channels in layer_specs:
+        # [batch, in_height, in_width, in_channels] => [batch, in_height/2, in_width/2, out_channels]
+        output = ops.down_resblock(layers[-1], out_channels,
+                                   sn=spec_norm,
+                                   scope=f'down_resblock_{len(layers) + 1}')
         layers.append(output)
 
     layer_specs = [
-        (a.ngf * 8, 0.5),   # decoder_8: [batch, 1, 1, ngf * 8] => [batch, 2, 2, ngf * 8 * 2]
-        (a.ngf * 8, 0.5),   # decoder_7: [batch, 2, 2, ngf * 8 * 2] => [batch, 4, 4, ngf * 8 * 2]
-        (a.ngf * 8, 0.5),   # decoder_6: [batch, 4, 4, ngf * 8 * 2] => [batch, 8, 8, ngf * 8 * 2]
-        (a.ngf * 8, 0.0),   # decoder_5: [batch, 8, 8, ngf * 8 * 2] => [batch, 16, 16, ngf * 8 * 2]
-        (a.ngf * 4, 0.0),   # decoder_4: [batch, 16, 16, ngf * 8 * 2] => [batch, 32, 32, ngf * 4 * 2]
-        (a.ngf * 2, 0.0),   # decoder_3: [batch, 32, 32, ngf * 4 * 2] => [batch, 64, 64, ngf * 2 * 2]
-        (a.ngf, 0.0),       # decoder_2: [batch, 64, 64, ngf * 2 * 2] => [batch, 128, 128, ngf * 2]
+        a.ngf * 8,   # decoder_8: [batch, 1, 1, ngf * 8] => [batch, 2, 2, ngf * 8 * 2]
+        a.ngf * 8,   # decoder_7: [batch, 2, 2, ngf * 8 * 2] => [batch, 4, 4, ngf * 8 * 2]
+        a.ngf * 8,   # decoder_6: [batch, 4, 4, ngf * 8 * 2] => [batch, 8, 8, ngf * 8 * 2]
+        a.ngf * 8,   # decoder_5: [batch, 8, 8, ngf * 8 * 2] => [batch, 16, 16, ngf * 8 * 2]
+        a.ngf * 8,   # gan_self_attention: [batch, 16, 16, ngf*8]
+        a.ngf * 4,   # decoder_4: [batch, 16, 16, ngf * 8 * 2] => [batch, 32, 32, ngf * 4 * 2]
+        a.ngf * 2,   # decoder_3: [batch, 32, 32, ngf * 4 * 2] => [batch, 64, 64, ngf * 2 * 2]
+        a.ngf,       # decoder_2: [batch, 64, 64, ngf * 2 * 2] => [batch, 128, 128, ngf * 2]
     ]
 
     num_encoder_layers = len(layers) - 1  # -1 for attention layer
-    for decoder_layer, (out_channels, dropout) in enumerate(layer_specs):
+    for decoder_layer, out_channels in enumerate(layer_specs):
         skip_layer = num_encoder_layers - decoder_layer - 1
-        if decoder_layer <= 3:
+        if decoder_layer == 4:
+            output = google_attention(layers[-1], out_channels, sn=spec_norm,
+                                      scope='gen_self_attention')
+        if decoder_layer > 4:
             skip_layer += 1  # offset for attention layer
         with tf.variable_scope("decoder_%d" % (skip_layer + 1)):
             if decoder_layer == 0:
                 # first decoder layer doesn't have skip connections
                 # since it is directly connected to the skip_layer
-                input = layers[-1]
+                x_in = layers[-1]
             else:
-                input = tf.concat([layers[-1], layers[skip_layer]], axis=3)
+                x_in = tf.concat([layers[-1], layers[skip_layer]], axis=3)
 
-            rectified = tf.nn.relu(input)
             # [batch, in_height, in_width, in_channels] => [batch, in_height*2, in_width*2, out_channels]
-            output = gen_deconv(rectified, out_channels)
-            output = batchnorm(output)
-
-            if dropout > 0.0:
-                output = tf.nn.dropout(output, keep_prob=1 - dropout)
-
+            output = ops.up_resblock(x_in, out_channels, sn=spec_norm,
+                                     scope=f'up_resblock_{skip_layer + 1}')
             layers.append(output)
 
     # decoder_1: [batch, 128, 128, ngf * 2] => [batch, 256, 256, generator_outputs_channels]
-    with tf.variable_scope("decoder_1"):
-        input = tf.concat([layers[-1], layers[0]], axis=3)
-        rectified = tf.nn.relu(input)
-        output = gen_deconv(rectified, generator_outputs_channels)
+    with tf.variable_scope('decoder_1'):
+        x_in = tf.concat([layers[-1], layers[0]], axis=3)
+        output = ops.up_resblock(x_in, generator_outputs_channels,
+                                 sn=spec_norm, scope=f'up_resblock_1')
         output = tf.tanh(output)
         layers.append(output)
 
@@ -498,34 +494,35 @@ def create_generator(generator_inputs, generator_outputs_channels):
 
 
 def create_model(inputs, targets):
-    def create_discriminator(discrim_inputs, discrim_targets):
+    def create_discriminator(discrim_inputs, discrim_targets,
+                             spec_norm=False):
         n_layers = 3
         layers = []
 
         # 2x [batch, height, width, in_channels] => [batch, height, width, in_channels * 2]
-        input = tf.concat([discrim_inputs, discrim_targets], axis=3)
+        x_in = tf.concat([discrim_inputs, discrim_targets], axis=3)
 
         # layer_1: [batch, 256, 256, in_channels * 2] => [batch, 128, 128, ndf]
-        with tf.variable_scope("layer_1"):
-            convolved = discrim_conv(input, a.ndf, stride=2)
-            rectified = lrelu(convolved, 0.2)
-            layers.append(rectified)
+        x = ops.init_down_resblock(x_in, a.ndf, sn=spec_norm, scope='layer_1')
+        x = ops.down_resblock(x, a.ndf*2, sn=spec_norm, scope='layer_2'))
+        x = google_attention(x, a.ndf*2, sn=spec_norm,
+                             scope='dsc_self_attention')
+        layers.append(x)
 
         # layer_2: [batch, 128, 128, ndf] => [batch, 64, 64, ndf * 2]
         # layer_3: [batch, 64, 64, ndf * 2] => [batch, 32, 32, ndf * 4]
         # layer_4: [batch, 32, 32, ndf * 4] => [batch, 31, 31, ndf * 8]
         for i in range(n_layers):
-            with tf.variable_scope("layer_%d" % (len(layers) + 1)):
-                out_channels = a.ndf * min(2**(i+1), 8)
-                stride = 1 if i == n_layers - 1 else 2  # last layer here has stride 1
-                convolved = discrim_conv(layers[-1], out_channels, stride=stride)
-                normalized = batchnorm(convolved)
-                rectified = lrelu(normalized, 0.2)
-                layers.append(rectified)
+            out_channels = a.ndf * min(2**(i+1), 8)
+            to_down = False if i == n_layers - 1 else True  # last layer doesn't downsample
+            x = ops.down_resblock(layers[-1], out_channels, to_down=to_down,
+                                  sn=spec_norm,
+                                  scope=f'layer_{len(layers) + 1}')
+            layers.append(x)
 
         # layer_5: [batch, 31, 31, ndf * 8] => [batch, 30, 30, 1]
         with tf.variable_scope("layer_%d" % (len(layers) + 1)):
-            convolved = discrim_conv(rectified, out_channels=1, stride=1)
+            convolved = discrim_conv(layers[-1], out_channels=1, stride=1)
             output = tf.sigmoid(convolved)
             layers.append(output)
 
@@ -533,19 +530,22 @@ def create_model(inputs, targets):
 
     with tf.variable_scope("generator"):
         out_channels = int(targets.get_shape()[-1])
-        outputs = create_generator(inputs, out_channels)
+        outputs = create_generator(inputs, out_channels,
+                                   spec_norm=a.spec_norm)
 
     # create two copies of discriminator, one for real pairs and one for fake pairs
     # they share the same underlying variables
     with tf.name_scope("real_discriminator"):
         with tf.variable_scope("discriminator"):
             # 2x [batch, height, width, channels] => [batch, 30, 30, 1]
-            predict_real = create_discriminator(inputs, targets)
+            predict_real = create_discriminator(inputs, targets,
+                                                spec_norm=a.spec_norm)
 
     with tf.name_scope("fake_discriminator"):
         with tf.variable_scope("discriminator", reuse=True):
             # 2x [batch, height, width, channels] => [batch, 30, 30, 1]
-            predict_fake = create_discriminator(inputs, outputs)
+            predict_fake = create_discriminator(inputs, outputs,
+                                                spec_norm=a.spec_norm)
 
     with tf.name_scope("discriminator_loss"):
         # minimizing -tf.log will try to get inputs to 1
@@ -664,8 +664,8 @@ def main():
         # export the generator to a meta graph that can be imported later for standalone generation
         if a.lab_colorization:
             raise Exception("export not supported for lab_colorization")
-        input = tf.placeholder(tf.string, shape=[1])
-        input_data = tf.decode_base64(input[0])
+        x_in = tf.placeholder(tf.string, shape=[1])
+        input_data = tf.decode_base64(x_in[0])
         input_image = tf.image.decode_png(input_data)
         # remove alpha channel if present
         input_image = tf.cond(tf.equal(tf.shape(input_image)[2], 4),
@@ -698,7 +698,7 @@ def main():
         key = tf.placeholder(tf.string, shape=[1])
         inputs = {
             "key": key.name,
-            "input": input.name
+            "input": x_in.name
         }
         tf.add_to_collection("inputs", json.dumps(inputs))
         outputs = {
