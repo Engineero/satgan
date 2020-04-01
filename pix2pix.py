@@ -454,19 +454,21 @@ def create_generator(generator_inputs, generator_outputs_channels,
         a.ngf * 8,   # decoder_8: [batch, 1, 1, ngf * 8] => [batch, 2, 2, ngf * 8 * 2]
         a.ngf * 8,   # decoder_7: [batch, 2, 2, ngf * 8 * 2] => [batch, 4, 4, ngf * 8 * 2]
         a.ngf * 8,   # decoder_6: [batch, 4, 4, ngf * 8 * 2] => [batch, 8, 8, ngf * 8 * 2]
-        a.ngf * 8,   # decoder_5: [batch, 8, 8, ngf * 8 * 2] => [batch, 16, 16, ngf * 8 * 2]
         a.ngf * 8,   # gan_self_attention: [batch, 16, 16, ngf*8]
+        a.ngf * 8,   # decoder_5: [batch, 8, 8, ngf * 8 * 2] => [batch, 16, 16, ngf * 8 * 2]
         a.ngf * 4,   # decoder_4: [batch, 16, 16, ngf * 8 * 2] => [batch, 32, 32, ngf * 4 * 2]
         a.ngf * 2,   # decoder_3: [batch, 32, 32, ngf * 4 * 2] => [batch, 64, 64, ngf * 2 * 2]
         a.ngf,       # decoder_2: [batch, 64, 64, ngf * 2 * 2] => [batch, 128, 128, ngf * 2]
     ]
 
-    num_encoder_layers = len(layers) - 1  # -1 for attention layer
+    num_encoder_layers = len(layers)
     for decoder_layer, out_channels in enumerate(layer_specs):
         skip_layer = num_encoder_layers - decoder_layer - 1
         if decoder_layer == 4:
             output = google_attention(layers[-1], out_channels, sn=spec_norm,
                                       scope='gen_self_attention')
+            layers.append(output)
+            continue
         if decoder_layer > 4:
             skip_layer += 1  # offset for attention layer
         with tf.variable_scope("decoder_%d" % (skip_layer + 1)):
@@ -484,7 +486,9 @@ def create_generator(generator_inputs, generator_outputs_channels,
 
     # decoder_1: [batch, 128, 128, ngf * 2] => [batch, 256, 256, generator_outputs_channels]
     with tf.variable_scope('decoder_1'):
-        x_in = tf.concat([layers[-1], layers[0]], axis=3)
+        x = ops.batch_norm(layers[-1])
+        x = ops.relu(x)
+        x_in = tf.concat([x, layers[0]], axis=3)
         output = ops.up_resblock(x_in, generator_outputs_channels,
                                  sn=spec_norm, scope=f'up_resblock_1')
         output = tf.tanh(output)
@@ -504,8 +508,11 @@ def create_model(inputs, targets):
 
         # layer_1: [batch, 256, 256, in_channels * 2] => [batch, 128, 128, ndf]
         x = ops.init_down_resblock(x_in, a.ndf, sn=spec_norm, scope='layer_1')
-        x = ops.down_resblock(x, a.ndf*2, sn=spec_norm, scope='layer_2'))
-        x = google_attention(x, a.ndf*2, sn=spec_norm,
+        layers.append(x)
+        x = ops.down_resblock(layers[-1], a.ndf*2, sn=spec_norm,
+                              scope='layer_2')
+        layers.append(x)
+        x = google_attention(layers[-1], a.ndf*2, sn=spec_norm,
                              scope='dsc_self_attention')
         layers.append(x)
 
@@ -517,11 +524,11 @@ def create_model(inputs, targets):
             to_down = False if i == n_layers - 1 else True  # last layer doesn't downsample
             x = ops.down_resblock(layers[-1], out_channels, to_down=to_down,
                                   sn=spec_norm,
-                                  scope=f'layer_{len(layers) + 1}')
+                                  scope=f'layer_{len(layers)}')
             layers.append(x)
 
         # layer_5: [batch, 31, 31, ndf * 8] => [batch, 30, 30, 1]
-        with tf.variable_scope("layer_%d" % (len(layers) + 1)):
+        with tf.variable_scope("layer_%d" % (len(layers))):
             convolved = discrim_conv(layers[-1], out_channels=1, stride=1)
             output = tf.sigmoid(convolved)
             layers.append(output)
