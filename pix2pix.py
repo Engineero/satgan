@@ -42,8 +42,10 @@ parser.add_argument("--no_flip", dest="flip", action="store_false", help="don't 
 parser.set_defaults(flip=True)
 parser.add_argument("--lr_gen", type=float, default=4e-4, help="initial learning rate for generator adam")
 parser.add_argument("--lr_dsc", type=float, default=1e-4, help="initial learning rate for discriminator adam")
+parser.add_argument("--lr_task", type=float, default=1e-4, help="initial learning rate for task adam")
 parser.add_argument("--beta1_gen", type=float, default=0.5, help="momentum term of generator adam")
 parser.add_argument("--beta1_dsc", type=float, default=0.5, help="momentum term of discriminator adam")
+parser.add_argument("--beta1_task", type=float, default=0.5, help="momentum term of task adam")
 parser.add_argument("--l1_weight", type=float, default=100.0, help="weight on L1 term for generator gradient")
 parser.add_argument("--gan_weight", type=float, default=1.0, help="weight on GAN term for generator gradient")
 parser.add_argument("--n_channels", type=int, default=3,
@@ -57,10 +59,16 @@ parser.add_argument("--crop_size", type=int, default=256,
 parser.add_argument("--output_filetype", default="png", choices=["png", "jpeg"])
 a = parser.parse_args()
 
+# Define globals.
 EPS = 1e-12
-
-Examples = collections.namedtuple("Examples", "paths, inputs, targets, count, steps_per_epoch")
-Model = collections.namedtuple("Model", "outputs, predict_real, predict_fake, discrim_loss, discrim_grads_and_vars, gen_loss_GAN, gen_loss_L1, gen_grads_and_vars, train")
+Examples = collections.namedtuple(
+    "Examples",
+    "paths, inputs, targets, count, steps_per_epoch"
+)
+Model = collections.namedtuple(
+    "Model",
+    "outputs, predict_real, predict_fake, detect_real, detect_fake, discrim_loss, discrim_grads_and_vars, task_loss, task_grads_and_vars, gen_loss_GAN, gen_loss_L1, gen_grads_and_vars, train"
+)
 
 
 def preprocess(image, add_noise=False):
@@ -347,7 +355,7 @@ def load_examples():
     elif a.which_direction == "BtoA":
         inputs, targets = [b_images, a_images]
     else:
-        raise Exception("invalid direction")
+        raise ValueError(f"Invalid direction given: {a.which_direction}")
 
     # synchronize seed for image operations so that we do the same operations
     # to both input and output images
@@ -497,7 +505,22 @@ def create_generator(generator_inputs, generator_outputs_channels):
     return layers[-1]
 
 
-def create_model(inputs, targets):
+def create_task_net(inputs, targets):
+    """Creates the task network.
+
+    Args:
+        inputs: task network inputs.
+        targets: task network targets.
+
+    Returns:
+        Task network (detection) output.
+    """
+    # TODO (NLT): implement YOLO or something for detection task.
+    layers = []
+    return layers[-1]
+
+
+def create_model(inputs, targets, task_targets=None):
     def create_discriminator(discrim_inputs, discrim_targets):
         n_layers = 3
         layers = []
@@ -535,8 +558,20 @@ def create_model(inputs, targets):
         out_channels = int(targets.get_shape()[-1])
         outputs = create_generator(inputs, out_channels)
 
-    # create two copies of discriminator, one for real pairs and one for fake pairs
-    # they share the same underlying variables
+    # Create two copies of the task network, one for real images (targets
+    # input to this method) and one for generated images (outputs from
+    # generator). The task targets (detected objects) should be the same for
+    # both.
+    with tf.name_scope('real_task_net'):
+        with tf.compat.v1.variable_scope('task_net'):
+            detect_real = create_task_net(targets, task_targets)
+
+    with tf.name_scope('fake_task_net'):
+        with tf.compat.v1.variable_scope('task_net', reuse=True):
+            detect_fake = create_task_net(outputs, task_targets)
+
+    # Create two copies of discriminator, one for real pairs and one for fake
+    # pairs they share the same underlying variables
     with tf.name_scope("real_discriminator"):
         with tf.variable_scope("discriminator"):
             # 2x [batch, height, width, channels] => [batch, 30, 30, 1]
@@ -560,21 +595,31 @@ def create_model(inputs, targets):
         gen_loss_L1 = tf.reduce_mean(tf.abs(targets - outputs))
         gen_loss = gen_loss_GAN * a.gan_weight + gen_loss_L1 * a.l1_weight
 
+    with tf.name_scope('task_loss'):
+        # TODO (NLT): implement YOLO loss or similar for detection.
+        task_loss = 0.
+
     with tf.name_scope("discriminator_train"):
         discrim_tvars = [var for var in tf.trainable_variables() if var.name.startswith("discriminator")]
         discrim_optim = tf.train.AdamOptimizer(a.lr_dsc, a.beta1_dsc)
         discrim_grads_and_vars = discrim_optim.compute_gradients(discrim_loss, var_list=discrim_tvars)
         discrim_train = discrim_optim.apply_gradients(discrim_grads_and_vars)
 
+    with tf.name_scope('task_train'):
+        task_tvars = [var for var in tf.trainable_variables() if var.name.startswith('task')]
+        task_optim = tf.train.AdamOptimizer(a.lr_task, a.beta1_task)
+        task_grads_and_vars = task_optim.compute_gradients(task_loss, var_list=task_tvars)
+        task_train = task_optim.apply_gradients(task_grads_and_vars)
+
     with tf.name_scope("generator_train"):
-        with tf.control_dependencies([discrim_train]):
+        with tf.control_dependencies([discrim_train, task_train]):
             gen_tvars = [var for var in tf.trainable_variables() if var.name.startswith("generator")]
             gen_optim = tf.train.AdamOptimizer(a.lr_gen, a.beta1_gen)
             gen_grads_and_vars = gen_optim.compute_gradients(gen_loss, var_list=gen_tvars)
             gen_train = gen_optim.apply_gradients(gen_grads_and_vars)
 
     ema = tf.train.ExponentialMovingAverage(decay=0.99)
-    update_losses = ema.apply([discrim_loss, gen_loss_GAN, gen_loss_L1])
+    update_losses = ema.apply([discrim_loss, task_loss, gen_loss_GAN, gen_loss_L1])
 
     global_step = tf.train.get_or_create_global_step()
     incr_global_step = tf.assign(global_step, global_step+1)
@@ -582,8 +627,12 @@ def create_model(inputs, targets):
     return Model(
         predict_real=predict_real,
         predict_fake=predict_fake,
+        detect_real=detect_real,
+        detect_fake=detect_fake,
         discrim_loss=ema.average(discrim_loss),
         discrim_grads_and_vars=discrim_grads_and_vars,
+        task_loss=ema.average(task_loss),
+        task_grads_and_vars=task_grads_and_vars,
         gen_loss_GAN=ema.average(gen_loss_GAN),
         gen_loss_L1=ema.average(gen_loss_L1),
         gen_grads_and_vars=gen_grads_and_vars,
