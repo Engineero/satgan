@@ -6,3 +6,4 @@ models
 experiment_files/
 gan_output/
 logfiles/
+.vscode/
