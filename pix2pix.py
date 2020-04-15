@@ -13,6 +13,10 @@ import collections
 import math
 import time
 from ops import conv, max_pooling, hw_flatten
+from .model import build_darknet_model
+from tensorflow.keras.layers import Conv2D, Lambda, Concatenate
+from tensorflow.keras.models import Model
+from tensorflow.keras.regularizers import l1_l2
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--input_dir", help="path to folder containing images")
@@ -54,6 +58,16 @@ parser.add_argument("--transform", action="store_true", default=False,
                     help="Whether to apply image transformations.")
 parser.add_argument("--crop_size", type=int, default=256,
                     help="Size of cropped image chunks.")
+parser.add_argument('--num_classes', type=int, default=1,
+                    help='Number of classes in the data.')
+parser.add_argument('--l1_reg_kernel', type=float, default=0.,
+                    help='L1 regularization term for kernels')                   
+parser.add_argument('--l2_reg_kernel', type=float, default=0.,
+                    help='L2 regularization term for kernels')                   
+parser.add_argument('--l1_reg_bias', type=float, default=0.,
+                    help='L1 regularization term for bias')                   
+parser.add_argument('--l2_reg_bias', type=float, default=0.,
+                    help='L2 regularization term for bias')                   
 
 # export options
 parser.add_argument("--output_filetype", default="png", choices=["png", "jpeg"])
@@ -516,8 +530,67 @@ def create_task_net(inputs, targets):
         Task network (detection) output.
     """
     # TODO (NLT): implement YOLO or something for detection task.
-    layers = []
-    return layers[-1]
+    image_shape = tf.shape(inputs)
+    # Feature pyramid network or darknet or something with res blocks.
+    model = build_darknet_model(image_shape)
+    # Predictor heads for object centroid, width, height.
+    pred_xy = Conv2D(
+        filters=2,
+        kernel_size=1,
+        strides=1,
+        padding='same',
+        kernel_initializer='he_normal',
+        activation='sigmoid',
+        kernel_regularizer=l1_l2(a.l1_reg_kernel,
+                                 a.l2_reg_kernel),
+        bias_regularizer=l1_l2(a.l1_reg_bias,
+                               a.l2_reg_bias)
+    )(inputs)
+    pred_wh = Conv2D(
+        filters=2,
+        kernel_size=1,
+        strides=1,
+        padding='same',
+        kernel_initializer='he_normal',
+        activation='sigmoid',
+        kernel_regularizer=l1_l2(a.l1_reg_kernel,
+                                 a.l2_reg_kernel),
+        bias_regularizer=l1_l2(a.l1_reg_bias,
+                               a.l2_reg_bias)
+    )(inputs)
+    pred_obj = Conv2D(
+        filters=2,
+        kernel_size=1,
+        strides=1,
+        padding='same',
+        kernel_initializer='he_normal',
+        activation='sigmoid',
+        kernel_regularizer=l1_l2(a.l1_reg_kernel,
+                                 a.l2_reg_kernel),
+        bias_regularizer=l1_l2(a.l1_reg_bias,
+                               a.l2_reg_bias)
+    )(inputs)
+    pred_class = Conv2D(
+        filters=a.num_classes,
+        kernel_size=1,
+        strides=1,
+        padding='same',
+        kernel_initializer='he_normal',
+        activation='sigmoid',
+        kernel_regularizer=l1_l2(a.l1_reg_kernel,
+                                 a.l2_reg_kernel),
+        bias_regularizer=l1_l2(a.l1_reg_bias,
+                               a.l2_reg_bias)
+    )(inputs)
+
+    # Concatenate prediction heads together.
+    pred = Concatenate(axis=-1, name='pred_layer')(
+        [pred_xy,
+         pred_wh,
+         pred_obj,
+         pred_class]
+    )
+    return Model(inputs=inputs, outputs=pred)
 
 
 def create_model(inputs, targets, task_targets=None):
