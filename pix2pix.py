@@ -17,6 +17,7 @@ from .model import build_darknet_model
 from tensorflow.keras.layers import Conv2D, Lambda, Concatenate
 from tensorflow.keras.models import Model
 from tensorflow.keras.regularizers import l1_l2
+from tensorflow.keras.losses import mean_squared_error, sparse_categorical_crossentropy
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--input_dir", help="path to folder containing images")
@@ -519,20 +520,17 @@ def create_generator(generator_inputs, generator_outputs_channels):
     return layers[-1]
 
 
-def create_task_net(inputs, targets):
+def create_task_net(input_shape):
     """Creates the task network.
 
     Args:
-        inputs: task network inputs.
-        targets: task network targets.
+        input_shape: shape of input images.
 
     Returns:
-        Task network (detection) output.
+        Task network (detection) model.
     """
-    # TODO (NLT): implement YOLO or something for detection task.
-    image_shape = tf.shape(inputs)
     # Feature pyramid network or darknet or something with res blocks.
-    model = build_darknet_model(image_shape)
+    model = build_darknet_model(input_shape)
     # Predictor heads for object centroid, width, height.
     pred_xy = Conv2D(
         filters=2,
@@ -545,7 +543,7 @@ def create_task_net(inputs, targets):
                                  a.l2_reg_kernel),
         bias_regularizer=l1_l2(a.l1_reg_bias,
                                a.l2_reg_bias)
-    )(inputs)
+    )(model.output)
     pred_wh = Conv2D(
         filters=2,
         kernel_size=1,
@@ -557,7 +555,7 @@ def create_task_net(inputs, targets):
                                  a.l2_reg_kernel),
         bias_regularizer=l1_l2(a.l1_reg_bias,
                                a.l2_reg_bias)
-    )(inputs)
+    )(model.output)
     pred_obj = Conv2D(
         filters=2,
         kernel_size=1,
@@ -569,7 +567,7 @@ def create_task_net(inputs, targets):
                                  a.l2_reg_kernel),
         bias_regularizer=l1_l2(a.l1_reg_bias,
                                a.l2_reg_bias)
-    )(inputs)
+    )(model.output)
     pred_class = Conv2D(
         filters=a.num_classes,
         kernel_size=1,
@@ -581,16 +579,9 @@ def create_task_net(inputs, targets):
                                  a.l2_reg_kernel),
         bias_regularizer=l1_l2(a.l1_reg_bias,
                                a.l2_reg_bias)
-    )(inputs)
-
-    # Concatenate prediction heads together.
-    pred = Concatenate(axis=-1, name='pred_layer')(
-        [pred_xy,
-         pred_wh,
-         pred_obj,
-         pred_class]
-    )
-    return Model(inputs=inputs, outputs=pred)
+    )(model.output)
+    return Model(inputs=model.input,
+                 outputs=[pred_xy, pred_wh, pred_obj, pred_class])
 
 
 def create_model(inputs, targets, task_targets=None):
@@ -635,13 +626,12 @@ def create_model(inputs, targets, task_targets=None):
     # input to this method) and one for generated images (outputs from
     # generator). The task targets (detected objects) should be the same for
     # both.
-    with tf.name_scope('real_task_net'):
-        with tf.compat.v1.variable_scope('task_net'):
-            detect_real = create_task_net(targets, task_targets)
-
-    with tf.name_scope('fake_task_net'):
-        with tf.compat.v1.variable_scope('task_net', reuse=True):
-            detect_fake = create_task_net(outputs, task_targets)
+    with tf.name_scope('task_net'):
+        task_net = create_task_net(targets.shape.as_list())
+        with tf.name_scope('real_task_net'):
+            detect_real = task_net.predict(targets)
+        with tf.name_scope('fake_task_net'):
+            detect_fake = task_net.predict(outputs)
 
     # Create two copies of discriminator, one for real pairs and one for fake
     # pairs they share the same underlying variables
@@ -670,7 +660,20 @@ def create_model(inputs, targets, task_targets=None):
 
     with tf.name_scope('task_loss'):
         # TODO (NLT): implement YOLO loss or similar for detection.
-        task_loss = 0.
+        with tf.name_scope('real'):
+            xy_loss = mean_squared_error(predict_real.pred_xy, targets.xy)
+            wh_loss = mean_squared_error(predict_real.pred_wh, targets.wh)
+            obj_loss = sparse_categorical_crossentropy(predict_real.pred_obj, targets.obj)
+            class_loss = sparse_categorical_crossentropy(predict_real.pred_class, 0)
+            real_loss = xy_loss + wh_loss + obj_loss + class_loss
+        with tf.name_scope('fake'):
+            xy_loss = mean_squared_error(predict_fake.pred_xy, targets.xy)
+            wh_loss = mean_squared_error(predict_fake.pred_wh, targets.wh)
+            obj_loss = sparse_categorical_crossentropy(predict_fake.pred_obj, targets.obj)
+            class_loss = sparse_categorical_crossentropy(predict_fake.pred_class, 0)
+            fake_loss = xy_loss + wh_loss + obj_loss + class_loss
+        task_loss = real_loss + fake_loss
+        return task_loss
 
     with tf.name_scope("discriminator_train"):
         discrim_tvars = [var for var in tf.trainable_variables() if var.name.startswith("discriminator")]
