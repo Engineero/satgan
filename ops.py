@@ -7,7 +7,7 @@ from .model.SpectralNormalization import SpectralNormalization
 
 
 ##################################################################################
-# Layer
+# Layers
 ##################################################################################
 def conv(x, filters, kernel_size=(1, 1), strides=(1, 1), padding=None,
          use_bias=False, sn=False, scope='conv_0'):
@@ -120,7 +120,7 @@ def hw_flatten(x) :
 
 
 ##################################################################################
-# Residual-block
+# Residual-blocks
 ##################################################################################
 def up_resblock(x_init, filters, use_bias=True, sn=False, scope='resblock'):
     """Residual block with upsampling.
@@ -278,47 +278,5 @@ def init_down_resblock(x_init, filters, use_bias=True, sn=False, scope='resblock
 
 
 ##################################################################################
-# Loss function
+# Loss functions
 ##################################################################################
-def discriminator_loss(loss_func, real, fake):
-    real_loss = 0
-    fake_loss = 0
-
-    if loss_func.__contains__('wgan') :
-        real_loss = -tf.reduce_mean(real)
-        fake_loss = tf.reduce_mean(fake)
-
-    if loss_func == 'lsgan' :
-        real_loss = tf.reduce_mean(tf.squared_difference(real, 1.0))
-        fake_loss = tf.reduce_mean(tf.square(fake))
-
-    if loss_func == 'gan' or loss_func == 'dragan' :
-        real_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(real), logits=real))
-        fake_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.zeros_like(fake), logits=fake))
-
-    if loss_func == 'hinge' :
-        real_loss = tf.reduce_mean(relu(1.0 - real))
-        fake_loss = tf.reduce_mean(relu(1.0 + fake))
-
-    loss = real_loss + fake_loss
-
-    return loss
-
-def generator_loss(loss_func, fake):
-    fake_loss = 0
-
-    if loss_func.__contains__('wgan') :
-        fake_loss = -tf.reduce_mean(fake)
-
-    if loss_func == 'lsgan' :
-        fake_loss = tf.reduce_mean(tf.squared_difference(fake, 1.0))
-
-    if loss_func == 'gan' or loss_func == 'dragan' :
-        fake_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(fake), logits=fake))
-
-    if loss_func == 'hinge' :
-        fake_loss = -tf.reduce_mean(fake)
-
-    loss = fake_loss
-
-    return loss
