@@ -1,227 +1,285 @@
 import tensorflow as tf
-import tensorflow.contrib as tf_contrib
 from tensorflow.keras.layers import (Conv2D, Flatten, Conv2DTranspose, Dense,
                                      Reshape, Input, BatchNormalization,
-                                     UpSampling2D)
-from .model import SpectralNormalization
+                                     UpSampling2D, LeakyReLU, ReLU,
+                                     AveragePooling2D, MaxPooling2D)
+from .model.SpectralNormalization import SpectralNormalization
 
-
-# Xavier : tf_contrib.layers.xavier_initializer()
-# He : tf_contrib.layers.variance_scaling_initializer()
-# Normal : tf.random_normal_initializer(mean=0.0, stddev=0.02)
-# l2_decay : tf_contrib.layers.l2_regularizer(0.0001)
-
-weight_init = tf_contrib.layers.xavier_initializer()
-weight_regularizer = None
-weight_regularizer_fully = None
 
 ##################################################################################
 # Layer
 ##################################################################################
+def conv(x, filters, kernel_size=(1, 1), strides=(1, 1), padding=None,
+         use_bias=False, sn=False, scope='conv_0'):
+    """Defines a convolutional block with optional spectral norm.
 
-def conv(x, channels, kernel=4, stride=2, pad=0, pad_type='zero',
-         use_bias=True, sn=False, scope='conv_0'):
+    Args:
+        x: input to the block.
+        filters: number of filters in the block.
+    
+    Keyword Args:
+        kernel_size: kernel size. Default is (1, 1).
+        strides: strides. Default is (1, 1).
+        padding: mode for padding. Default is None.
+        use_bias: whether to use bias. Default is False.
+        sn: whether to apply spectral normalization. Default is False.
+        scope: scope name for the block. Default is 'conv_0'.
+
+    Returns:
+        Convolutional block output.
+    """
+
     with tf.name_scope(scope):
-        if pad > 0:
-            h = x.get_shape().as_list()[1]
-            if h % stride == 0:
-                pad = pad * 2
-            else:
-                pad = max(kernel - (h % stride), 0)
-
-            pad_top = pad // 2
-            pad_bottom = pad - pad_top
-            pad_left = pad // 2
-            pad_right = pad - pad_left
-
-            if pad_type == 'zero':
-                x = tf.pad(x, [[0, 0], [pad_top, pad_bottom], [pad_left, pad_right], [0, 0]])
-            if pad_type == 'reflect':
-                x = tf.pad(x, [[0, 0], [pad_top, pad_bottom], [pad_left, pad_right], [0, 0]], mode='REFLECT')
-
         if sn:
-            w = tf.get_variable("kernel", shape=[kernel, kernel, x.get_shape()[-1], channels], initializer=weight_init,
-                                regularizer=weight_regularizer)
-            x = tf.nn.conv2d(input=x, filter=spectral_norm(w),
-                             strides=[1, stride, stride, 1], padding='VALID')
-            if use_bias:
-                bias = tf.get_variable("bias", [channels], initializer=tf.constant_initializer(0.0))
-                x = tf.nn.bias_add(x, bias)
-
+            x = SpectralNormalization(
+                Conv2D(filters,
+                       kernel_size=kernel_size,
+                       strides=strides,
+                       use_bias=use_bias,
+                       padding=padding,
+                       sn=sn)(x)
+            )
         else:
-            x = tf.layers.conv2d(inputs=x, filters=channels,
-                                 kernel_size=kernel, kernel_initializer=weight_init,
-                                 kernel_regularizer=weight_regularizer,
-                                 strides=stride, use_bias=use_bias)
-
+            x = Conv2D(filters,
+                       kernel_size=kernel_size,
+                       strides=strides,
+                       use_bias=use_bias,
+                       padding=padding,
+                       sn=sn)(x)
         return x
 
 
-def deconv(x, channels, kernel=4, stride=2, padding='SAME', use_bias=True, sn=False, scope='deconv_0'):
-    with tf.variable_scope(scope):
-        x_shape = x.get_shape().as_list()
+def deconv(x, filters, kernel_size=(4, 4), strides=(2, 2), padding='same',
+           use_bias=True, sn=False, scope='deconv_0'):
+    """Defines a deconvolutional block with optional spectral norm.
 
-        if padding == 'SAME':
-            output_shape = [x_shape[0], x_shape[1] * stride, x_shape[2] * stride, channels]
+    Args:
+        x: input to the block.
+        filters: number of filters in the block.
+    
+    Keyword Args:
+        kernel_size: kernel size. Default is (4, 4).
+        strides: strides. Default is (2, 2).
+        padding: mode for padding. Default is 'same'.
+        use_bias: whether to use bias. Default is True.
+        sn: whether to apply spectral normalization. Default is False.
+        scope: scope name for the block. Default is 'deconv_0'.
 
-        else:
-            output_shape = [x_shape[0], x_shape[1] * stride + max(kernel - stride, 0),
-                            x_shape[2] * stride + max(kernel - stride, 0), channels]
+    Returns:
+        Deconvolutional block output.
+    """
 
+    with tf.name_scope(scope):
         if sn:
-            w = tf.get_variable("kernel", shape=[kernel, kernel, channels, x.get_shape()[-1]], initializer=weight_init,
-                                regularizer=weight_regularizer)
-            x = tf.nn.conv2d_transpose(x, filter=spectral_norm(w), output_shape=output_shape,
-                                       strides=[1, stride, stride, 1], padding=padding)
-
-            if use_bias:
-                bias = tf.get_variable("bias", [channels], initializer=tf.constant_initializer(0.0))
-                x = tf.nn.bias_add(x, bias)
-
+            x = SpectralNormalization(
+                Conv2DTranspose(filters,
+                                kernel_size=kernel_size,
+                                strides=strides,
+                                padding=padding,
+                                use_bias=use_bias)(x)
+            )
         else:
-            x = tf.layers.conv2d_transpose(inputs=x, filters=channels,
-                                           kernel_size=kernel, kernel_initializer=weight_init,
-                                           kernel_regularizer=weight_regularizer,
-                                           strides=stride, padding=padding, use_bias=use_bias)
-
+            x = Conv2DTranspose(filters,
+                                kernel_size=kernel_size,
+                                strides=strides,
+                                padding=padding,
+                                use_bias=use_bias)(x)
         return x
 
-def fully_connected(x, units, use_bias=True, sn=False, scope='linear'):
-    with tf.variable_scope(scope):
-        x = flatten(x)
-        shape = x.get_shape().as_list()
-        channels = shape[-1]
 
+def fully_connected(x, units, activation=None, use_bias=True, sn=False,
+                    scope='linear'):
+    """Fully connected layer with optional spectral norm.
+
+    Args:
+        units: number of units in FC output.
+    
+    Keyword Args:
+        activation: activation to use. Default is None which applies no
+            activation (linear layer).
+        use_bias: whether to use bias. Default is True.
+        sn: whether to use spectral normalization. Default is False.
+        scope: name scope for layer. Default is 'linear'.
+
+    Returns:
+        Dense layer output.
+    """
+
+    with tf.name_scope(scope):
         if sn:
-            w = tf.get_variable("kernel", [channels, units], tf.float32,
-                                initializer=weight_init, regularizer=weight_regularizer_fully)
-            if use_bias:
-                bias = tf.get_variable("bias", [units],
-                                       initializer=tf.constant_initializer(0.0))
-
-                x = tf.matmul(x, spectral_norm(w)) + bias
-            else:
-                x = tf.matmul(x, spectral_norm(w))
-
+            x = SpectralNormalization(
+                Dense(units, activation=activation, use_bias=use_bias)(x)
+            )
         else:
-            x = tf.layers.dense(x, units=units, kernel_initializer=weight_init,
-                                kernel_regularizer=weight_regularizer_fully,
-                                use_bias=use_bias)
-
+            x = Dense(units, activation=activation, use_bias=use_bias)(x)
         return x
 
-def flatten(x) :
-    return tf.layers.flatten(x)
 
 def hw_flatten(x) :
     return tf.reshape(x, shape=[x.shape[0], -1, x.shape[-1]])
 
+
 ##################################################################################
 # Residual-block
 ##################################################################################
+def up_resblock(x_init, filters, use_bias=True, sn=False, scope='resblock'):
+    """Residual block with upsampling.
 
-def up_resblock(x_init, channels, use_bias=True, is_training=True, sn=False, scope='resblock'):
-    with tf.variable_scope(scope):
-        with tf.variable_scope('res1'):
-            x = batch_norm(x_init, is_training)
-            x = relu(x)
-            x = up_sample(x, scale_factor=2)
-            x = conv(x, channels, kernel=3, stride=1, pad=1, pad_type='reflect', use_bias=False, sn=sn)
+    Args:
+        x_init: input image.
+        filters: number of filters in the block.
 
-        with tf.variable_scope('res2'):
-            x = batch_norm(x, is_training)
-            x = relu(x)
-            x = conv(x, channels, kernel=3, stride=1, pad=1, pad_type='reflect', use_bias=use_bias, sn=sn)
+    Keyword Args:
+        use_bias: whether to use bias in res blocks. Default is True.
+        sn: whether to use spectral normalization. Default is False.
+        scope: name scope in which to create blocks. Default is 'resblock'.
 
-        with tf.variable_scope('shortcut'):
-            x_init = up_sample(x_init, scale_factor=2)
-            x_init = conv(x_init, channels, kernel=1, stride=1, use_bias=False, sn=sn)
+    Returns:
+        Residual block output layer.
+    """
+
+    with tf.name_scope(scope):
+        with tf.name_scope('res1'):
+            x = BatchNormalization()(x_init)
+            x = LeakyReLU()(x)
+            x = UpSampling2D(size=(2, 2), interpolation='nearest')(x)
+            x = conv(x,
+                     filters,
+                     kernel_size=(3, 3),
+                     strides=(1, 1),
+                     padding='same',
+                     use_bias=False,
+                     sn=sn)
+
+        with tf.name_scope('res2'):
+            x = BatchNormalization()(x_init)
+            x = LeakyReLU()(x)
+            x = conv(x,
+                     filters,
+                     kernel_size=(3, 3),
+                     strides=(1, 1),
+                     padding='same',
+                     use_bias=use_bias,
+                     sn=sn)
+
+        with tf.name_scope('shortcut'):
+            x_init = UpSampling2D(size=(2, 2), interpolation='nearest')(x_init)
+            x_init = conv(x_init,
+                          filters,
+                          kernel_size=(1, 1),
+                          strides=(1, 1),
+                          padding='same',
+                          use_bias=False,
+                          sn=sn)
 
         return x + x_init
 
-def down_resblock(x_init, channels, to_down=True, use_bias=True, sn=False, scope='resblock'):
-    with tf.variable_scope(scope):
-        init_channel = x_init.shape.as_list()[-1]
-        with tf.variable_scope('res1'):
-            x = lrelu(x_init, 0.2)
-            x = conv(x, channels, kernel=3, stride=1, pad=1, pad_type='reflect', use_bias=use_bias, sn=sn)
+def down_resblock(x_init, filters, to_down=True, use_bias=True, sn=False, scope='resblock'):
+    """Residual block without average pooling.
 
-        with tf.variable_scope('res2'):
-            x = lrelu(x, 0.2)
-            x = conv(x, channels, kernel=3, stride=1, pad=1, pad_type='reflect', use_bias=use_bias, sn=sn)
+    Args:
+        x_init: input image.
+        filters: number of filters in the block.
+
+    Keyword Args:
+        use_bias: whether to use bias in res blocks. Default is True.
+        sn: whether to use spectral normalization. Default is False.
+        scope: name scope in which to create blocks. Default is 'resblock'.
+
+    Returns:
+        Residual block output layer.
+    """
+    with tf.name_scope(scope):
+        init_channel = x_init.shape.as_list()[-1]
+        with tf.name_scope('res1'):
+            x = LeakyReLU()(x_init)
+            x = conv(x,
+                     filters,
+                     kernel_size=(3, 3),
+                     strides=(1, 1),
+                     padding='same',
+                     use_bias=use_bias,
+                     sn=sn)
+
+        with tf.name_scope('res2'):
+            x = LeakyReLU()(x)
+            x = conv(x,
+                     filters,
+                     kernel_size=(3, 3),
+                     strides=(1, 1),
+                     padding='same',
+                     use_bias=use_bias,
+                     sn=sn)
 
             if to_down :
-                x = down_sample(x)
+                x = AveragePooling2D(pool_size=(2, 2), padding='same')(x)
 
-        if to_down or init_channel != channels :
-            with tf.variable_scope('shortcut'):
-                x_init = conv(x_init, channels, kernel=1, stride=1, use_bias=use_bias, sn=sn)
+        if to_down or init_channel != filters :
+            with tf.name_scope('shortcut'):
+                x_init = conv(x_init,
+                              filters,
+                              kernel_size=(1, 1),
+                              strides=(1, 1),
+                              use_bias=use_bias,
+                              sn=sn)
                 if to_down :
-                    x_init = down_sample(x_init)
-
-
-        return x + x_init
-
-def init_down_resblock(x_init, channels, use_bias=True, sn=False, scope='resblock'):
-    with tf.variable_scope(scope):
-        with tf.variable_scope('res1'):
-            x = conv(x_init, channels, kernel=3, stride=1, pad=1, pad_type='reflect', use_bias=use_bias, sn=sn)
-            x = lrelu(x, 0.2)
-
-        with tf.variable_scope('res2'):
-            x = conv(x, channels, kernel=3, stride=1, pad=1, pad_type='reflect', use_bias=use_bias, sn=sn)
-            x = down_sample(x)
-
-        with tf.variable_scope('shortcut'):
-            x_init = down_sample(x_init)
-            x_init = conv(x_init, channels, kernel=1, stride=1, use_bias=use_bias, sn=sn)
+                    x_init = AveragePooling2D(pool_size=(2, 2),
+                                              padding='same')(x_init)
 
         return x + x_init
 
-##################################################################################
-# Sampling
-##################################################################################
+def init_down_resblock(x_init, filters, use_bias=True, sn=False, scope='resblock'):
+    """Initial residual block with average pooling.
 
-def global_avg_pooling(x):
-    gap = tf.reduce_mean(x, axis=[1, 2])
+    Args:
+        x_init: input image.
+        filters: number of filters in the block.
 
-    return gap
+    Keyword Args:
+        use_bias: whether to use bias in res blocks. Default is True.
+        sn: whether to use spectral normalization. Default is False.
+        scope: name scope in which to create blocks. Default is 'resblock'.
 
-def global_sum_pooling(x) :
-    gsp = tf.reduce_sum(x, axis=[1, 2])
+    Returns:
+        Residual block output layer.
+    """
 
-    return gsp
+    with tf.name_scope(scope):
+        with tf.name_scope('res1'):
+            x = conv(x_init,
+                     filters,
+                     kernel_size=(3, 3),
+                     strides=(1, 1),
+                     padding='same',
+                     use_bias=use_bias,
+                     sn=sn)
+            x = LeakyReLU()(x)
 
-def up_sample(x, scale_factor=2):
-    _, h, w, _ = x.get_shape().as_list()
-    new_size = [h * scale_factor, w * scale_factor]
-    return tf.image.resize_nearest_neighbor(x, size=new_size)
+        with tf.name_scope('res2'):
+            x = conv(x_init,
+                     filters,
+                     kernel_size=(3, 3),
+                     strides=(1, 1),
+                     padding='same',
+                     use_bias=use_bias,
+                     sn=sn)
+            x = AveragePooling2D(pool_size=(2, 2), padding='same')(x)
 
-def down_sample(x):
-    return tf.layers.average_pooling2d(x, pool_size=2, strides=2, padding='SAME')
+        with tf.name_scope('shortcut'):
+            x_init = AveragePooling2D(pool_size=(2, 2), padding='same')(x_init)
+            x_init = conv(x_init,
+                          filters,
+                          kernel_size=(1, 1),
+                          strides=(1, 1),
+                          use_bias=use_bias,
+                          sn=sn)
 
-def max_pooling(x) :
-    return tf.layers.max_pooling2d(x, pool_size=2, strides=2, padding='SAME')
+        return x + x_init
 
-##################################################################################
-# Activation function
-##################################################################################
-
-def lrelu(x, alpha=0.2):
-    return tf.nn.leaky_relu(x, alpha)
-
-
-def relu(x):
-    return tf.nn.relu(x)
-
-
-def tanh(x):
-    return tf.tanh(x)
 
 ##################################################################################
 # Loss function
 ##################################################################################
-
 def discriminator_loss(loss_func, real, fake):
     real_loss = 0
     fake_loss = 0
