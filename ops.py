@@ -1,5 +1,9 @@
 import tensorflow as tf
 import tensorflow.contrib as tf_contrib
+from tensorflow.keras.layers import (Conv2D, Flatten, Conv2DTranspose, Dense,
+                                     Reshape, Input, BatchNormalization,
+                                     UpSampling2D)
+from .model import SpectralNormalization
 
 
 # Xavier : tf_contrib.layers.xavier_initializer()
@@ -15,8 +19,9 @@ weight_regularizer_fully = None
 # Layer
 ##################################################################################
 
-def conv(x, channels, kernel=4, stride=2, pad=0, pad_type='zero', use_bias=True, sn=False, scope='conv_0'):
-    with tf.variable_scope(scope):
+def conv(x, channels, kernel=4, stride=2, pad=0, pad_type='zero',
+         use_bias=True, sn=False, scope='conv_0'):
+    with tf.name_scope(scope):
         if pad > 0:
             h = x.get_shape().as_list()[1]
             if h % stride == 0:
@@ -212,46 +217,6 @@ def relu(x):
 
 def tanh(x):
     return tf.tanh(x)
-
-##################################################################################
-# Normalization function
-##################################################################################
-
-def batch_norm(x, is_training=True, scope='batch_norm'):
-    return tf_contrib.layers.batch_norm(x,
-                                        decay=0.9, epsilon=1e-05,
-                                        center=True, scale=True, updates_collections=None,
-                                        is_training=is_training, scope=scope)
-
-def spectral_norm(w, iteration=1):
-    w_shape = w.shape.as_list()
-    w = tf.reshape(w, [-1, w_shape[-1]])
-
-    u = tf.get_variable("u", [1, w_shape[-1]], initializer=tf.random_normal_initializer(), trainable=False)
-
-    u_hat = u
-    v_hat = None
-    for i in range(iteration):
-        """
-        power iteration
-        Usually iteration = 1 will be enough
-        """
-        v_ = tf.matmul(u_hat, tf.transpose(w))
-        v_hat = tf.nn.l2_normalize(v_)
-
-        u_ = tf.matmul(v_hat, w)
-        u_hat = tf.nn.l2_normalize(u_)
-
-    u_hat = tf.stop_gradient(u_hat)
-    v_hat = tf.stop_gradient(v_hat)
-
-    sigma = tf.matmul(tf.matmul(v_hat, w), tf.transpose(u_hat))
-
-    with tf.control_dependencies([u.assign(u_hat)]):
-        w_norm = w / sigma
-        w_norm = tf.reshape(w_norm, w_shape)
-
-    return w_norm
 
 ##################################################################################
 # Loss function
