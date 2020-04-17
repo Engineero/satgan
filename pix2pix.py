@@ -439,8 +439,47 @@ def create_generator(a, input_shape, generator_outputs_channels):
         x = LeakyReLU()(x)
         x = ops.deconv(x, filters=generator_outputs_channels, padding='same',
                        scope='g_logit')
-        x = tanh(x)
+        x = tanh(x, name='generator')
         return Model(inputs=x_in, outputs=x)
+
+
+def create_discriminator(a, input_shape, target_shape):
+    """Creates the discriminator network.
+
+    Args:
+        a: command-line arguments object.
+        input_shape: input images shape (generator priors).
+        target_shape: target images shape (real or generator outputs).
+
+    Returns:
+        Discriminator network model.
+    """
+    n_layers = 3
+
+    # 2x [batch, height, width, in_channels] => [batch, height, width, in_channels * 2]
+    x_in = Input(shape=input_shape)
+    y_in = Input(shape=target_shape)
+    input_concat = Concatenate([x_in, y_in], axis=3)
+
+    # layer_1: [batch, 256, 256, in_channels * 2] => [batch, 128, 128, ndf]
+    x = ops.down_resblock(input_concat, filters=a.ndf,
+                          sn=a.spec_norm, scope='layer_1')
+
+    # layer_2: [batch, 128, 128, ndf] => [batch, 64, 64, ndf * 2]
+    # layer_3: [batch, 64, 64, ndf * 2] => [batch, 32, 32, ndf * 4]
+    # layer_4: [batch, 32, 32, ndf * 4] => [batch, 31, 31, ndf * 8]
+    for i in range(n_layers):
+        out_channels = a.ndf * min(2**(i+1), 8)
+        x = ops.down_resblock(x, filters=out_channels, sn=a.spec_norm,
+                              scope=f'layer_{i+1}')
+        x = BatchNormalization()(x)
+
+    # layer_5: [batch, 31, 31, ndf * 8] => [batch, 30, 30, 1]
+    x = ops.down_resblock(x, filters=1, to_down=False, sn=a.spec_norm,
+                          scope=f'layer_{n_layers + 1}')
+    x = tf.nn.sigmoid(x, name='discriminator')
+
+    return Model(inputs=[x_in, y_in], outputs=x)
 
 
 def create_task_net(a, input_shape):
@@ -509,131 +548,89 @@ def create_task_net(a, input_shape):
 
 def create_model(a, inputs, targets, task_targets=None):
     input_shape = inputs.shape.as_list()
-    def create_discriminator(a, discrim_inputs, discrim_targets):
-        """Creates the discriminator network.
-
-        Args:
-            a: command-line arguments object.
-            discrim_inputs: input images (generator priors).
-            discrim_targets: target_images, real or generator outputs.
-
-        Returns:
-            Discriminator network model.
-        """
-        n_layers = 3
-
-        # 2x [batch, height, width, in_channels] => [batch, height, width, in_channels * 2]
-        x_in = Input(shape=discrim_inputs.shape.as_list())
-        y_in = Input(shape=discrim_targets.shape.as_list())
-        input_concat = Concatenate([x_in, y_in], axis=3)
-
-        # layer_1: [batch, 256, 256, in_channels * 2] => [batch, 128, 128, ndf]
-        x = ops.down_resblock(input_concat, filters=a.ndf,
-                              sn=a.spec_norm, scope='layer_1')
-
-        # layer_2: [batch, 128, 128, ndf] => [batch, 64, 64, ndf * 2]
-        # layer_3: [batch, 64, 64, ndf * 2] => [batch, 32, 32, ndf * 4]
-        # layer_4: [batch, 32, 32, ndf * 4] => [batch, 31, 31, ndf * 8]
-        for i in range(n_layers):
-            out_channels = a.ndf * min(2**(i+1), 8)
-            x = ops.down_resblock(x, filters=out_channels, sn=a.spec_norm,
-                                  scope=f'layer_{i+1}')
-            x = BatchNormalization()(x)
-
-        # layer_5: [batch, 31, 31, ndf * 8] => [batch, 30, 30, 1]
-        x = ops.down_resblock(x, filters=1, to_down=False, sn=a.spec_norm,
-                              scope=f'layer_{n_layers + 1}')
-        x = tf.nn.sigmoid(x)
-
-        return Model(inputs=[x_in, y_in], outputs=x)
-
+    target_shape = targets.shape.as_list()
     with tf.name_scope("generator"):
         out_channels = int(targets.get_shape()[-1])
         generator = create_generator(a, input_shape, out_channels)
+        fake_img = generator(inputs)
 
     # Create two copies of the task network, one for real images (targets
     # input to this method) and one for generated images (outputs from
     # generator). The task targets (detected objects) should be the same for
     # both.
     with tf.name_scope('task_net'):
-        task_net = create_task_net(a, targets.shape.as_list())
+        task_net = create_task_net(a, target_shape)
 
     # Create two copies of discriminator, one for real pairs and one for fake
     # pairs they share the same underlying variables
     with tf.name_scope("discriminator"):
         # TODO (NLT): figure out discriminator loss, interaction with Keras changes.
-        # discriminator = create_discriminator(a, inputs, targets)
-        with tf.compat.v1.variable_scope("discriminator"):
-            # 2x [batch, height, width, channels] => [batch, 30, 30, 1]
-            predict_real = create_discriminator(a, inputs, targets)
+        discriminator = create_discriminator(a, input_shape, target_shape)
+        predict_real = discriminator(inputs, targets)
+        predict_fake = discriminator(inputs, fake_img)
+    #     with tf.compat.v1.variable_scope("discriminator"):
+    #         # 2x [batch, height, width, channels] => [batch, 30, 30, 1]
+    #         predict_real = create_discriminator(a, inputs, targets)
 
-    with tf.name_scope("fake_discriminator"):
-        with tf.compat.v1.variable_scope("discriminator", reuse=True):
-            # 2x [batch, height, width, channels] => [batch, 30, 30, 1]
-            predict_fake = create_discriminator(a, inputs, generator.outputs[0])
+    # with tf.name_scope("fake_discriminator"):
+    #     with tf.compat.v1.variable_scope("discriminator", reuse=True):
+    #         # 2x [batch, height, width, channels] => [batch, 30, 30, 1]
+    #         predict_fake = create_discriminator(a, inputs, generator.outputs[0])
 
     with tf.name_scope("discriminator_loss"):
         # minimizing -tf.log will try to get inputs to 1
         # predict_real => 1
         # predict_fake => 0
-        discrim_loss = tf.reduce_mean(-(tf.math.log(predict_real + EPS) + tf.math.log(1 - predict_fake + EPS)))
+        discrim_loss = tf.reduce_mean(-(tf.math.log(predict_real + EPS) + \
+                       tf.math.log(1 - predict_fake + EPS)))
 
     with tf.name_scope("generator_loss"):
         # predict_fake => 1
         # abs(targets - outputs) => 0
         gen_loss_GAN = tf.reduce_mean(-tf.math.log(predict_fake + EPS))
-        gen_loss_L1 = tf.reduce_mean(tf.abs(targets - outputs))
+        gen_loss_L1 = tf.reduce_mean(tf.abs(targets - fake_img))
         gen_loss = gen_loss_GAN * a.gan_weight + gen_loss_L1 * a.l1_weight
 
     with tf.name_scope('task_loss'):
         # TODO (NLT): implement YOLO loss or similar for detection.
-        xy_loss = mean_squared_error(task_net.outputs.pred_xy, targets.xy)
-        wh_loss = mean_squared_error(task_net.outputs.pred_wh, targets.wh)
-        obj_loss = sparse_categorical_crossentropy(task_net.outputs.pred_obj, targets.obj)
-        class_loss = sparse_categorical_crossentropy(task_net.outputs.pred_class, 0)
-        task_loss = xy_loss + wh_loss + obj_loss + class_loss
-        return task_loss
+        pred_xy, pred_wh, pred_obj, pred_class = task_net(targets)
+        pred_xy_fake, pred_wh_fake, pred_obj_fake, pred_class_fake = \
+            task_net(fake_img)
+        xy_loss = mean_squared_error(pred_xy, task_targets.xy)
+        wh_loss = mean_squared_error(pred_wh, task_targets.wh)
+        obj_loss = sparse_categorical_crossentropy(pred_obj, task_targets.obj)
+        class_loss = sparse_categorical_crossentropy(pred_class, 0)
+        task_loss_real = xy_loss + wh_loss + obj_loss + class_loss
+        xy_loss_fake = mean_squared_error(pred_xy_fake, task_targets.xy)
+        wh_loss_fake = mean_squared_error(pred_wh_fake, task_targets.wh)
+        obj_loss_fake = sparse_categorical_crossentropy(pred_obj_fake,
+                                                        task_targets.obj)
+        class_loss_fake = sparse_categorical_crossentropy(pred_class_fake, 0)
+        task_loss_fake = xy_loss_fake + wh_loss_fake + obj_loss_fake + \
+            class_loss_fake
+        task_loss = task_loss_real + task_loss_fake
+    
+    model = Model(inputs=[inputs, targets],
+                  outputs=[generator.outputs, discriminator.outputs,
+                           task_net.outputs])
 
-    with tf.name_scope("discriminator_train"):
-        discrim_tvars = [var for var in tf.trainable_variables() if var.name.startswith("discriminator")]
-        discrim_optim = tf.train.AdamOptimizer(a.lr_dsc, a.beta1_dsc)
-        discrim_grads_and_vars = discrim_optim.compute_gradients(discrim_loss, var_list=discrim_tvars)
-        discrim_train = discrim_optim.apply_gradients(discrim_grads_and_vars)
-
-    with tf.name_scope('task_train'):
-        task_tvars = [var for var in tf.trainable_variables() if var.name.startswith('task')]
-        task_optim = tf.train.AdamOptimizer(a.lr_task, a.beta1_task)
-        task_grads_and_vars = task_optim.compute_gradients(task_loss, var_list=task_tvars)
-        task_train = task_optim.apply_gradients(task_grads_and_vars)
-
-    with tf.name_scope("generator_train"):
-        with tf.control_dependencies([discrim_train, task_train]):
-            gen_tvars = [var for var in tf.trainable_variables() if var.name.startswith("generator")]
-            gen_optim = tf.train.AdamOptimizer(a.lr_gen, a.beta1_gen)
-            gen_grads_and_vars = gen_optim.compute_gradients(gen_loss, var_list=gen_tvars)
-            gen_train = gen_optim.apply_gradients(gen_grads_and_vars)
-
-    ema = tf.train.ExponentialMovingAverage(decay=0.99)
-    update_losses = ema.apply([discrim_loss, task_loss, gen_loss_GAN, gen_loss_L1])
-
-    global_step = tf.train.get_or_create_global_step()
-    incr_global_step = tf.assign(global_step, global_step+1)
-
-    return Model(
-        predict_real=predict_real,
-        predict_fake=predict_fake,
-        detect_real=detect_real,
-        detect_fake=detect_fake,
-        discrim_loss=ema.average(discrim_loss),
-        discrim_grads_and_vars=discrim_grads_and_vars,
-        task_loss=ema.average(task_loss),
-        task_grads_and_vars=task_grads_and_vars,
-        gen_loss_GAN=ema.average(gen_loss_GAN),
-        gen_loss_L1=ema.average(gen_loss_L1),
-        gen_grads_and_vars=gen_grads_and_vars,
-        outputs=outputs,
-        train=tf.group(update_losses, incr_global_step, gen_train),
-    )
+    # TODO (NLT): compile the model with appropriate losses, optimizers, callbacks, etc.
+    losses = {'generator': gen_loss,
+              'discriminator': discrim_loss,
+              'task_net': task_loss}
+    loss_weights = {'generator': a.gen_weight,
+                    'discriminator': a.dsc_weight,
+                    'task_net': a.task_weight}}
+    optimizers = {'generator': 'adam',
+                  'discriminator': 'adam',
+                  'task_net': 'adam'}
+    metrics = {'generator': 'mse',
+               'discriminator': 'sparse_categorical_crossentropy',
+               'task_net': 'mse'}
+    model.compile(loss=losses
+                  loss_weights=loss_weights,
+                  optimizer=optimizers,
+                  metrics=metrics)
 
 
 def save_images(a, fetches, step=None):
