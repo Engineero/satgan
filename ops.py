@@ -2,7 +2,8 @@ import tensorflow as tf
 from tensorflow.keras.layers import (Conv2D, Flatten, Conv2DTranspose, Dense,
                                      Reshape, Input, BatchNormalization,
                                      UpSampling2D, LeakyReLU, ReLU,
-                                     AveragePooling2D, MaxPooling2D)
+                                     AveragePooling2D, MaxPooling2D,
+                                     SeparableConv2D)
 from .model.SpectralNormalization import SpectralNormalization
 
 
@@ -10,7 +11,7 @@ from .model.SpectralNormalization import SpectralNormalization
 # Layers
 ##################################################################################
 def conv(x, filters, kernel_size=(1, 1), strides=(1, 1), padding=None,
-         use_bias=False, sn=False, scope='conv_0'):
+         use_bias=False, sn=False, scope='conv_0', separable=False):
     """Defines a convolutional block with optional spectral norm.
 
     Args:
@@ -24,28 +25,31 @@ def conv(x, filters, kernel_size=(1, 1), strides=(1, 1), padding=None,
         use_bias: whether to use bias. Default is False.
         sn: whether to apply spectral normalization. Default is False.
         scope: scope name for the block. Default is 'conv_0'.
+        separable: whether to use separable convolution. Default is False.
 
     Returns:
         Convolutional block output.
     """
+    if separable:
+        conv_op = SeparableConv2D
+    else:
+        conv_op = Conv2D
 
     with tf.name_scope(scope):
         if sn:
             x = SpectralNormalization(
-                Conv2D(filters,
-                       kernel_size=kernel_size,
-                       strides=strides,
-                       use_bias=use_bias,
-                       padding=padding,
-                       sn=sn)(x)
+                conv_op(filters,
+                        kernel_size=kernel_size,
+                        strides=strides,
+                        use_bias=use_bias,
+                        padding=padding)(x)
             )
         else:
-            x = Conv2D(filters,
-                       kernel_size=kernel_size,
-                       strides=strides,
-                       use_bias=use_bias,
-                       padding=padding,
-                       sn=sn)(x)
+            x = conv_op(filters,
+                        kernel_size=kernel_size,
+                        strides=strides,
+                        use_bias=use_bias,
+                        padding=padding)(x)
         return x
 
 
@@ -122,7 +126,8 @@ def hw_flatten(x) :
 ##################################################################################
 # Residual-blocks
 ##################################################################################
-def up_resblock(x_init, filters, use_bias=True, sn=False, scope='resblock'):
+def up_resblock(x_init, filters, use_bias=True, sn=False, scope='resblock',
+                separable=False):
     """Residual block with upsampling.
 
     Args:
@@ -133,6 +138,7 @@ def up_resblock(x_init, filters, use_bias=True, sn=False, scope='resblock'):
         use_bias: whether to use bias in res blocks. Default is True.
         sn: whether to use spectral normalization. Default is False.
         scope: name scope in which to create blocks. Default is 'resblock'.
+        separable: whether to use separable convolution. Default is False.
 
     Returns:
         Residual block output layer.
@@ -149,7 +155,8 @@ def up_resblock(x_init, filters, use_bias=True, sn=False, scope='resblock'):
                      strides=(1, 1),
                      padding='same',
                      use_bias=False,
-                     sn=sn)
+                     sn=sn,
+                     separable=separable)
 
         with tf.name_scope('res2'):
             x = BatchNormalization()(x_init)
@@ -160,7 +167,8 @@ def up_resblock(x_init, filters, use_bias=True, sn=False, scope='resblock'):
                      strides=(1, 1),
                      padding='same',
                      use_bias=use_bias,
-                     sn=sn)
+                     sn=sn,
+                     separable=separable)
 
         with tf.name_scope('shortcut'):
             x_init = UpSampling2D(size=(2, 2), interpolation='nearest')(x_init)
@@ -170,11 +178,13 @@ def up_resblock(x_init, filters, use_bias=True, sn=False, scope='resblock'):
                           strides=(1, 1),
                           padding='same',
                           use_bias=False,
-                          sn=sn)
+                          sn=sn,
+                          separable=separable)
 
         return x + x_init
 
-def down_resblock(x_init, filters, to_down=True, use_bias=True, sn=False, scope='resblock'):
+def down_resblock(x_init, filters, to_down=True, use_bias=True, sn=False,
+                  scope='resblock', separable=False):
     """Residual block without average pooling.
 
     Args:
@@ -185,6 +195,7 @@ def down_resblock(x_init, filters, to_down=True, use_bias=True, sn=False, scope=
         use_bias: whether to use bias in res blocks. Default is True.
         sn: whether to use spectral normalization. Default is False.
         scope: name scope in which to create blocks. Default is 'resblock'.
+        separable: whether to use separable convolution. Default is False.
 
     Returns:
         Residual block output layer.
@@ -199,7 +210,8 @@ def down_resblock(x_init, filters, to_down=True, use_bias=True, sn=False, scope=
                      strides=(1, 1),
                      padding='same',
                      use_bias=use_bias,
-                     sn=sn)
+                     sn=sn,
+                     separable=separable)
 
         with tf.name_scope('res2'):
             x = LeakyReLU()(x)
@@ -209,7 +221,8 @@ def down_resblock(x_init, filters, to_down=True, use_bias=True, sn=False, scope=
                      strides=(1, 1),
                      padding='same',
                      use_bias=use_bias,
-                     sn=sn)
+                     sn=sn,
+                     separable=separable)
 
             if to_down :
                 x = AveragePooling2D(pool_size=(2, 2), padding='same')(x)
@@ -221,7 +234,8 @@ def down_resblock(x_init, filters, to_down=True, use_bias=True, sn=False, scope=
                               kernel_size=(1, 1),
                               strides=(1, 1),
                               use_bias=use_bias,
-                              sn=sn)
+                              sn=sn,
+                              separable=separable)
                 if to_down :
                     x_init = AveragePooling2D(pool_size=(2, 2),
                                               padding='same')(x_init)
