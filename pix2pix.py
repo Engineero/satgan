@@ -12,9 +12,12 @@ import random
 import collections
 import math
 import time
-from ops import conv, max_pooling, hw_flatten
+import ops
 from .model import build_darknet_model
-from tensorflow.keras.layers import Conv2D, Lambda, Concatenate
+from tensorflow.keras.layers import (Input, Conv2D, Concatenate,
+                                     MaxPooling2D, BatchNormalization,
+                                     LeakyReLU)
+from tensorflow.keras.activations import tanh
 from tensorflow.keras.models import Model
 from tensorflow.keras.regularizers import l1_l2
 from tensorflow.keras.losses import mean_squared_error, sparse_categorical_crossentropy
@@ -78,85 +81,85 @@ def augment(a, image, brightness):
     return rgb
 
 
-def discrim_conv(batch_input, out_channels, stride):
-    padded_input = tf.pad(batch_input, [[0, 0], [1, 1], [1, 1], [0, 0]],
-                          mode="CONSTANT")
-    return tf.layers.conv2d(
-        padded_input,
-        out_channels,
-        kernel_size=4,
-        strides=(stride, stride),
-        padding="valid",
-        kernel_initializer=tf.random_normal_initializer(0, 0.02)
-    )
+# def discrim_conv(batch_input, out_channels, stride):
+#     padded_input = tf.pad(batch_input, [[0, 0], [1, 1], [1, 1], [0, 0]],
+#                           mode="CONSTANT")
+#     return tf.layers.conv2d(
+#         padded_input,
+#         out_channels,
+#         kernel_size=4,
+#         strides=(stride, stride),
+#         padding="valid",
+#         kernel_initializer=tf.random_normal_initializer(0, 0.02)
+#     )
+#
+#
+# def gen_conv(a, batch_input, out_channels):
+#     # [batch, in_height, in_width, in_channels] => [batch, out_height, out_width, out_channels]
+#     initializer = tf.random_normal_initializer(0, 0.02)
+#     if a.separable_conv:
+#         return tf.layers.separable_conv2d(batch_input, out_channels,
+#                                           kernel_size=4, strides=(2, 2),
+#                                           padding="same",
+#                                           depthwise_initializer=initializer,
+#                                           pointwise_initializer=initializer)
+#     else:
+#         return tf.layers.conv2d(batch_input, out_channels, kernel_size=4,
+#                                 strides=(2, 2), padding="same",
+#                                 kernel_initializer=initializer)
+#
+#
+# def gen_deconv(a, batch_input, out_channels):
+#     # [batch, in_height, in_width, in_channels] => [batch, out_height, out_width, out_channels]
+#     initializer = tf.random_normal_initializer(0, 0.02)
+#     if a.separable_conv:
+#         _b, h, w, _c = batch_input.shape
+#         resized_input = tf.image.resize_images(
+#             batch_input,
+#             [h * 2, w * 2],
+#             method=tf.image.ResizeMethod.NEAREST_NEIGHBOR
+#         )
+#         return tf.layers.separable_conv2d(
+#             resized_input,
+#             out_channels,
+#             kernel_size=4,
+#             strides=(1, 1),
+#             padding="same",
+#             depthwise_initializer=initializer,
+#             pointwise_initializer=initializer
+#         )
+#     else:
+#         return tf.layers.conv2d_transpose(
+#             batch_input,
+#             out_channels,
+#             kernel_size=4,
+#             strides=(2, 2),
+#             padding="same",
+#             kernel_initializer=initializer
+#         )
 
 
-def gen_conv(a, batch_input, out_channels):
-    # [batch, in_height, in_width, in_channels] => [batch, out_height, out_width, out_channels]
-    initializer = tf.random_normal_initializer(0, 0.02)
-    if a.separable_conv:
-        return tf.layers.separable_conv2d(batch_input, out_channels,
-                                          kernel_size=4, strides=(2, 2),
-                                          padding="same",
-                                          depthwise_initializer=initializer,
-                                          pointwise_initializer=initializer)
-    else:
-        return tf.layers.conv2d(batch_input, out_channels, kernel_size=4,
-                                strides=(2, 2), padding="same",
-                                kernel_initializer=initializer)
+# def lrelu(x, a):
+#     with tf.name_scope("lrelu"):
+#         # adding these together creates the leak part and linear part
+#         # then cancels them out by subtracting/adding an absolute value term
+#         # leak: a*x/2 - a*abs(x)/2
+#         # linear: x/2 + abs(x)/2
+# 
+#         # this block looks like it has 2 inputs on the graph unless we do this
+#         x = tf.identity(x)
+#         return (0.5 * (1 + a)) * x + (0.5 * (1 - a)) * tf.abs(x)
 
 
-def gen_deconv(a, batch_input, out_channels):
-    # [batch, in_height, in_width, in_channels] => [batch, out_height, out_width, out_channels]
-    initializer = tf.random_normal_initializer(0, 0.02)
-    if a.separable_conv:
-        _b, h, w, _c = batch_input.shape
-        resized_input = tf.image.resize_images(
-            batch_input,
-            [h * 2, w * 2],
-            method=tf.image.ResizeMethod.NEAREST_NEIGHBOR
-        )
-        return tf.layers.separable_conv2d(
-            resized_input,
-            out_channels,
-            kernel_size=4,
-            strides=(1, 1),
-            padding="same",
-            depthwise_initializer=initializer,
-            pointwise_initializer=initializer
-        )
-    else:
-        return tf.layers.conv2d_transpose(
-            batch_input,
-            out_channels,
-            kernel_size=4,
-            strides=(2, 2),
-            padding="same",
-            kernel_initializer=initializer
-        )
-
-
-def lrelu(x, a):
-    with tf.name_scope("lrelu"):
-        # adding these together creates the leak part and linear part
-        # then cancels them out by subtracting/adding an absolute value term
-        # leak: a*x/2 - a*abs(x)/2
-        # linear: x/2 + abs(x)/2
-
-        # this block looks like it has 2 inputs on the graph unless we do this
-        x = tf.identity(x)
-        return (0.5 * (1 + a)) * x + (0.5 * (1 - a)) * tf.abs(x)
-
-
-def batchnorm(inputs):
-    return tf.layers.batch_normalization(
-        inputs,
-        axis=3,
-        epsilon=1e-5,
-        momentum=0.1,
-        training=True,
-        gamma_initializer=tf.random_normal_initializer(1.0, 0.02)
-    )
+# def batchnorm(inputs):
+#     return tf.layers.batch_normalization(
+#         inputs,
+#         axis=3,
+#         epsilon=1e-5,
+#         momentum=0.1,
+#         training=True,
+#         gamma_initializer=tf.random_normal_initializer(1.0, 0.02)
+#     )
 
 
 def check_image(a, image):
@@ -364,107 +367,80 @@ def load_examples(a):
     )
 
 
-def google_attention(x, channels, sn=False, scope='attention'):
+def google_attention(x, filters, sn=False, scope='attention'):
     with tf.name_scope(scope):
         batch_size, height, width, num_channels = x.get_shape().as_list()
-        f = conv(x, channels // 8, kernel=1, stride=1, sn=sn,
-                 scope='f_conv')  # [bs, h, w, c']
-        f = max_pooling(f)
-        g = conv(x, channels // 8, kernel=1, stride=1, sn=sn,
-                 scope='g_conv')  # [bs, h, w, c']
-        h = conv(x, channels // 2, kernel=1, stride=1, sn=sn,
-                 scope='h_conv')  # [bs, h, w, c]
-        h = max_pooling(h)
+        f = ops.conv(x, filters // 8, kernel_size=(1, 1), strides=(1, 1),
+                     sn=sn, scope='f_conv')  # [bs, h, w, c']
+        f = MaxPooling2D()(f)
+        g = ops.conv(x, filters // 8, kernel_size=(1, 1), strides=(1, 1),
+                     sn=sn, scope='g_conv')  # [bs, h, w, c']
+        h = ops.conv(x, filters // 2, kernel_size=(1, 1), strides=(1, 1),
+                     sn=sn, scope='h_conv')  # [bs, h, w, c]
+        h = MaxPooling2D()(h)
 
         # N = h * w
-        s = tf.matmul(hw_flatten(g), hw_flatten(f),
+        s = tf.matmul(ops.hw_flatten(g), ops.hw_flatten(f),
                       transpose_b=True)  # # [bs, N, N]
         beta = tf.nn.softmax(s)  # attention map
-        o = tf.matmul(beta, hw_flatten(h))  # [bs, N, C]
-        gamma = tf.get_variable("gamma", [1],
-                                initializer=tf.constant_initializer(0.0))
+        o = tf.matmul(beta, ops.hw_flatten(h))  # [bs, N, C]
+        gamma = tf.compat.v1.get_variable(
+            "gamma",
+            [1],
+            initializer=tf.constant_initializer(0.0)
+        )
         o = tf.reshape(o, shape=[batch_size,
                                  height,
                                  width,
                                  num_channels // 2])  # [bs, h, w, C]
-        o = conv(o, channels, kernel=1, stride=1, sn=sn, scope='attn_conv')
+        o = ops.conv(o, filters, kernel_size=(1, 1), strides=(1, 1), sn=sn,
+                     scope='attn_conv')
         x = gamma * o + x
     return x
 
 
-def create_generator(a, generator_inputs, generator_outputs_channels):
-    layers = []
+def create_generator(a, input_shape, generator_outputs_channels):
+    """Creates the generator network.
 
+    Args:
+        a: command-line arguments object.
+        input_shape: shape of the input image.
+        generator_output_channels: number of channels generator should output.
+
+    Returns:
+        Generator network model.
+    """
+
+    x_in = Input(shape=input_shape)
+    num_blocks = 8
+    num_filters = a.ngf
     # encoder_1: [batch, 256, 256, in_channels] => [batch, 128, 128, ngf]
-    with tf.variable_scope("encoder_1"):
-        output = gen_conv(a, generator_inputs, a.ngf)
-        layers.append(output)
+    with tf.name_scope("generator"):
+        skip_layers = []
+        x = ops.up_resblock(x_in, filters=num_filters, sn=a.spec_norm,
+                            scope='front_down_resblock_0')
+        for i in range(num_blocks // 2):
+            x = ops.down_resblock(x, filters=num_filters // 2, sn=a.spec_norm,
+                                  scope=f'mid_down_resblock_{i}')
+            num_filters = num_filters // 2
+            skip_layers.append(x)
 
-    layer_specs = [
-        a.ngf * 2, # encoder_2: [batch, 128, 128, ngf] => [batch, 64, 64, ngf * 2]
-        a.ngf * 4, # encoder_3: [batch, 64, 64, ngf * 2] => [batch, 32, 32, ngf * 4]
-        a.ngf * 8, # encoder_4: [batch, 32, 32, ngf * 4] => [batch, 16, 16, ngf * 8]
-        a.ngf * 8, # gan_self_attention: [batch, 16, 16, ngf*8]
-        a.ngf * 8, # encoder_5: [batch, 16, 16, ngf * 8] => [batch, 8, 8, ngf * 8]
-        a.ngf * 8, # encoder_6: [batch, 8, 8, ngf * 8] => [batch, 4, 4, ngf * 8]
-        a.ngf * 8, # encoder_7: [batch, 4, 4, ngf * 8] => [batch, 2, 2, ngf * 8]
-        a.ngf * 8, # encoder_8: [batch, 2, 2, ngf * 8] => [batch, 1, 1, ngf * 8]
-    ]
+        x = google_attention(x, filters=num_filters, scope='self_attention')
 
-    for layer_num, out_channels in enumerate(layer_specs):
-        if layer_num == 3:
-            output = google_attention(layers[-1], out_channels, sn=True,
-                                      scope='gen_self_attention')
-        else:
-            with tf.variable_scope("encoder_%d" % (len(layers) + 1)):
-                rectified = lrelu(layers[-1], 0.2)
-                # [batch, in_height, in_width, in_channels] => [batch, in_height/2, in_width/2, out_channels]
-                convolved = gen_conv(a, rectified, out_channels)
-                output = batchnorm(convolved)
-        layers.append(output)
+        # Build the back end of the generator with skip connections.
+        for i in range(num_blocks // 2, num_blocks):
+            x = ops.up_resblock(Concatenate()([x, skip_layers.pop()]),
+                                filters=num_filters,
+                                sn=a.sn,
+                                scope=f'back_up_resblock_{i}')
+            num_filters = num_filters * 2
 
-    layer_specs = [
-        (a.ngf * 8, 0.5),   # decoder_8: [batch, 1, 1, ngf * 8] => [batch, 2, 2, ngf * 8 * 2]
-        (a.ngf * 8, 0.5),   # decoder_7: [batch, 2, 2, ngf * 8 * 2] => [batch, 4, 4, ngf * 8 * 2]
-        (a.ngf * 8, 0.5),   # decoder_6: [batch, 4, 4, ngf * 8 * 2] => [batch, 8, 8, ngf * 8 * 2]
-        (a.ngf * 8, 0.0),   # decoder_5: [batch, 8, 8, ngf * 8 * 2] => [batch, 16, 16, ngf * 8 * 2]
-        (a.ngf * 4, 0.0),   # decoder_4: [batch, 16, 16, ngf * 8 * 2] => [batch, 32, 32, ngf * 4 * 2]
-        (a.ngf * 2, 0.0),   # decoder_3: [batch, 32, 32, ngf * 4 * 2] => [batch, 64, 64, ngf * 2 * 2]
-        (a.ngf, 0.0),       # decoder_2: [batch, 64, 64, ngf * 2 * 2] => [batch, 128, 128, ngf * 2]
-    ]
-
-    num_encoder_layers = len(layers) - 1  # -1 for attention layer
-    for decoder_layer, (out_channels, dropout) in enumerate(layer_specs):
-        skip_layer = num_encoder_layers - decoder_layer - 1
-        if decoder_layer <= 3:
-            skip_layer += 1  # offset for attention layer
-        with tf.variable_scope("decoder_%d" % (skip_layer + 1)):
-            if decoder_layer == 0:
-                # first decoder layer doesn't have skip connections
-                # since it is directly connected to the skip_layer
-                input = layers[-1]
-            else:
-                input = tf.concat([layers[-1], layers[skip_layer]], axis=3)
-
-            rectified = tf.nn.relu(input)
-            # [batch, in_height, in_width, in_channels] => [batch, in_height*2, in_width*2, out_channels]
-            output = gen_deconv(a, rectified, out_channels)
-            output = batchnorm(output)
-
-            if dropout > 0.0:
-                output = tf.nn.dropout(output, keep_prob=1 - dropout)
-
-            layers.append(output)
-
-    # decoder_1: [batch, 128, 128, ngf * 2] => [batch, 256, 256, generator_outputs_channels]
-    with tf.variable_scope("decoder_1"):
-        input = tf.concat([layers[-1], layers[0]], axis=3)
-        rectified = tf.nn.relu(input)
-        output = gen_deconv(a, rectified, generator_outputs_channels)
-        output = tf.tanh(output)
-        layers.append(output)
-
-    return layers[-1]
+        x = BatchNormalization()(x)
+        x = LeakyReLU()(x)
+        x = ops.deconv(x, filters=generator_outputs_channels, padding='same',
+                       scope='g_logit')
+        x = tanh(x)
+        return Model(inputs=x_in, outputs=x)
 
 
 def create_task_net(a, input_shape):
@@ -532,16 +508,17 @@ def create_task_net(a, input_shape):
 
 
 def create_model(a, inputs, targets, task_targets=None):
+    input_shape = inputs.shape.as_list()
     def create_discriminator(a, discrim_inputs, discrim_targets):
         n_layers = 3
         layers = []
 
         # 2x [batch, height, width, in_channels] => [batch, height, width, in_channels * 2]
-        input = tf.concat([discrim_inputs, discrim_targets], axis=3)
+        input_concat = tf.concat([discrim_inputs, discrim_targets], axis=3)
 
         # layer_1: [batch, 256, 256, in_channels * 2] => [batch, 128, 128, ndf]
         with tf.variable_scope("layer_1"):
-            convolved = discrim_conv(input, a.ndf, stride=2)
+            convolved = discrim_conv(input_concat, a.ndf, stride=2)
             rectified = lrelu(convolved, 0.2)
             layers.append(rectified)
 
@@ -567,7 +544,7 @@ def create_model(a, inputs, targets, task_targets=None):
 
     with tf.variable_scope("generator"):
         out_channels = int(targets.get_shape()[-1])
-        outputs = create_generator(a, inputs, out_channels)
+        outputs = create_generator(a, input_shape, out_channels)
 
     # Create two copies of the task network, one for real images (targets
     # input to this method) and one for generated images (outputs from
@@ -575,22 +552,18 @@ def create_model(a, inputs, targets, task_targets=None):
     # both.
     with tf.name_scope('task_net'):
         task_net = create_task_net(a, targets.shape.as_list())
-        with tf.name_scope('real_task_net'):
-            detect_real = task_net.predict(targets)
-        with tf.name_scope('fake_task_net'):
-            detect_fake = task_net.predict(outputs)
 
     # Create two copies of discriminator, one for real pairs and one for fake
     # pairs they share the same underlying variables
     with tf.name_scope("real_discriminator"):
         with tf.variable_scope("discriminator"):
             # 2x [batch, height, width, channels] => [batch, 30, 30, 1]
-            predict_real = create_discriminator(a, inputs, targets)
+            predict_real = create_discriminator(a, input_shape, targets)
 
     with tf.name_scope("fake_discriminator"):
         with tf.variable_scope("discriminator", reuse=True):
             # 2x [batch, height, width, channels] => [batch, 30, 30, 1]
-            predict_fake = create_discriminator(a, inputs, outputs)
+            predict_fake = create_discriminator(a, input_shape, outputs)
 
     with tf.name_scope("discriminator_loss"):
         # minimizing -tf.log will try to get inputs to 1
@@ -607,19 +580,11 @@ def create_model(a, inputs, targets, task_targets=None):
 
     with tf.name_scope('task_loss'):
         # TODO (NLT): implement YOLO loss or similar for detection.
-        with tf.name_scope('real'):
-            xy_loss = mean_squared_error(predict_real.pred_xy, targets.xy)
-            wh_loss = mean_squared_error(predict_real.pred_wh, targets.wh)
-            obj_loss = sparse_categorical_crossentropy(predict_real.pred_obj, targets.obj)
-            class_loss = sparse_categorical_crossentropy(predict_real.pred_class, 0)
-            real_loss = xy_loss + wh_loss + obj_loss + class_loss
-        with tf.name_scope('fake'):
-            xy_loss = mean_squared_error(predict_fake.pred_xy, targets.xy)
-            wh_loss = mean_squared_error(predict_fake.pred_wh, targets.wh)
-            obj_loss = sparse_categorical_crossentropy(predict_fake.pred_obj, targets.obj)
-            class_loss = sparse_categorical_crossentropy(predict_fake.pred_class, 0)
-            fake_loss = xy_loss + wh_loss + obj_loss + class_loss
-        task_loss = real_loss + fake_loss
+        xy_loss = mean_squared_error(task_net.outputs.pred_xy, targets.xy)
+        wh_loss = mean_squared_error(task_net.outputs.pred_wh, targets.wh)
+        obj_loss = sparse_categorical_crossentropy(task_net.outputs.pred_obj, targets.obj)
+        class_loss = sparse_categorical_crossentropy(task_net.outputs.pred_class, 0)
+        task_loss = xy_loss + wh_loss + obj_loss + class_loss
         return task_loss
 
     with tf.name_scope("discriminator_train"):
@@ -736,8 +701,8 @@ def main(a):
         # export the generator to a meta graph that can be imported later for standalone generation
         if a.lab_colorization:
             raise Exception("export not supported for lab_colorization")
-        input = tf.placeholder(tf.string, shape=[1])
-        input_data = tf.decode_base64(input[0])
+        x_in = tf.placeholder(tf.string, shape=[1])
+        input_data = tf.decode_base64(x_in[0])
         input_image = tf.image.decode_png(input_data)
         # remove alpha channel if present
         input_image = tf.cond(tf.equal(tf.shape(input_image)[2], 4),
@@ -771,7 +736,7 @@ def main(a):
         key = tf.placeholder(tf.string, shape=[1])
         inputs = {
             "key": key.name,
-            "input": input.name
+            "input": x_in.name
         }
         tf.add_to_collection("inputs", json.dumps(inputs))
         outputs = {
