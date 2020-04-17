@@ -275,8 +275,3 @@ def init_down_resblock(x_init, filters, use_bias=True, sn=False, scope='resblock
                           sn=sn)
 
         return x + x_init
-
-
-##################################################################################
-# Loss functions
-##################################################################################
