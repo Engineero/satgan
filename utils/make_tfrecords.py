@@ -195,7 +195,7 @@ def make_tf_records(args):
     output_dir = Path(args.output_dir).resolve()
     a_paths = sorted(a_dir.glob('**/*.fits'))
     b_paths = sorted(b_dir.glob('**/*.fits'))
-    annotation_paths = sorted(annotation_dir.glob('**/*.json'))
+    annotation_paths = sorted(annotation_dir.glob('**/Annotations/*.json'))
     examples = []
     for a_path, b_path, annotation in zip(a_paths, b_paths, annotation_paths):
         examples.append((a_path, b_path, annotation))
