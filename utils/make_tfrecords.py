@@ -217,7 +217,7 @@ if __name__ == '__main__':
                         help='Output directory for TFRecords files.')
     parser.add_argument('--group_size', type=int, default=256,
                         help='Number of records per TFRecords file.')
-    parser.add_argument('--output_name', deafult='tfrecords',
+    parser.add_argument('--output_name', default='tfrecords',
                         help='Name prepended to output TFRecords files.')
     args = parser.parse_args()
     _check_args(args)
