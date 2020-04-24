@@ -45,7 +45,7 @@ def _check_args(args):
         os.makedirs(output_dir)
     path_list = [a_dir, b_dir, annotation_dir]
     for path in path_list:
-        if len(path.glob('*')) == 0:
+        if not path.glob('*'):
             raise ValueError(f'Path {path} is empty!')
 
 
