@@ -39,7 +39,10 @@ def _check_args(args):
             f'Annotation path {args.annotation_dir} is not a directory!'
         )
     if output_dir.is_dir():
-        raise ValueError('Output directory already exists!')
+        try:
+            output_dir.rmdir()
+        except:
+            raise ValueError('Output directory already exists!')
     else:
         print(f'Making output directory {output_dir}...')
         os.makedirs(output_dir)
@@ -66,7 +69,8 @@ def _group_list(ungrouped_list, group_size, padding=None):
     """
     grouped_list = zip_longest(*[iter(ungrouped_list)] * group_size,
                                fillvalue=padding)
-    return grouped_list
+    num_groups = len(ungrouped_list) // group_size
+    return grouped_list, num_groups
 
 
 # The following functions can be used to convert a value to a type compatible
@@ -193,8 +197,8 @@ def make_tf_records(args):
         print(f'Writing partition "{name}" with {len(examples)} examples...')
         partition_dir = output_dir / name
         os.mkdir(partition_dir)
-        groups = _group_list(examples, args.group_size)
-        for i, example_group in tqdm(enumerate(groups), total=len(groups)):
+        groups, num_groups = _group_list(examples, args.group_size)
+        for i, example_group in tqdm(enumerate(groups), total=num_groups):
             tfrecords_name = f'{args.output_name}_{name}_{i}.tfrecords'
             output_path = partition_dir / tfrecords_name
             with tf.io.TFRecordWriter(output_path) as writer:
