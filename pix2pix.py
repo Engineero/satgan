@@ -270,114 +270,143 @@ def lab_to_rgb(a, lab):
 
 
 def load_examples(a):
-    if a.input_dir is None or not os.path.isdir(a.input_dir):
+    # Create data queue from training dataset.
+    if a.train_dir is None or not os.path.isdir(a.train_dir):
         raise NotADirectoryError(
-            f"Input directory {a.input_dir} does not exist!"
+            f"Training directory {a.train_dir} does not exist!"
         )
-    annotation_paths = glob.glob(os.path.join(a.input_dir, '*.json'))
-    if len(annotation_paths) == 0:
+    train_paths = glob.glob(os.path.join(a.train_dir, "*.tfrecords"))
+    if len(train_paths) == 0:
         raise ValueError(
-            f'Input directory {a.input_dir} contains no annotation files!'
+            f"Training directory {a.input_dir} contains no TFRecords files!"
         )
-    input_paths = glob.glob(os.path.join(a.input_dir, "*.jpg"))
-    decode = tf.image.decode_jpeg
-    if len(input_paths) == 0:
-        input_paths = glob.glob(os.path.join(a.input_dir, "*.png"))
-        decode = tf.image.decode_png
-    if len(input_paths) == 0:
+    train_data = tf.data.TFRecordDataset(filenames=train_paths)
+
+    # Create data queue from validation dataset.
+    if a.valid_dir is None or not os.path.isdir(a.valid_dir):
+        raise NotADirectoryError(
+            f"Validation directory {a.valid_dir} does not exist!"
+        )
+    valid_paths = glob.glob(os.path.join(a.valid_dir, "*.tfrecords"))
+    if len(valid_paths) == 0:
         raise ValueError(
-            f"Input directory {a.input_dir} contains no image files!"
+            f"Validation directory {a.valid_dir} contains no TFRecords files!"
         )
-    def get_name(path):
-        name, _ = os.path.splitext(os.path.basename(path))
-        return name
-    # If the image names are numbers, sort by the value rather than
-    # asciibetically. Having sorted inputs means that the outputs are sorted in
-    # test mode.
-    if all(get_name(path).isdigit() for path in input_paths):
-        input_paths = sorted(input_paths, key=lambda path: int(get_name(path)))
-        annotation_paths = sorted(annotation_paths,
-                                  key=lambda path: int(get_name(path)))
+    valid_data = tf.data.TFRecordDataset(filenames=valid_paths)
+
+    # Create data queue from testing dataset, if given.
+    if a.test_dir is not None:
+        if not os.path.isdir(a.test_dir):
+            raise NotADirectoryError(
+                f"Testing directory {a.test_dir} does not exist!"
+            )
+        test_paths = glob.glob(os.path.join(a.test_dir, "*.tfrecords"))
+        if len(test_paths) == 0:
+            raise ValueError(
+                f"Testing directory {a.test_dir} contains no TFRecords files!"
+            )
+        test_data = tf.data.TFRecordDataset(filenames=test_paths)
     else:
-        input_paths = sorted(input_paths)
-        annotation_paths = sorted(annotation_paths)
-    with tf.name_scope("load_images"):
-        path_queue = tf.compat.v1.train.string_input_producer(
-            input_paths,
-            shuffle=a.mode == "train"
-        )
-        reader = tf.compat.v1.WholeFileReader()
-        paths, contents = reader.read(path_queue)
-        raw_input = decode(contents)
-        raw_input = tf.image.convert_image_dtype(raw_input, dtype=tf.float32)
-        assertion = tf.assert_equal(tf.shape(raw_input)[2], 3,
-                                    message="image does not have 3 channels")
-        with tf.control_dependencies([assertion]):
-            raw_input = tf.identity(raw_input)
+        test_data = None
 
-        raw_input.set_shape([None, None, a.n_channels])
+    # Specify transformations on datasets.
+    train_data = train_data.shuffle(a.buffer_size).batch(a.batch_size) \
+        .repeat(a.max_epochs)
+    valid_data = valid_data.shuffle(a.buffer_size).batch(a.batch_size) \
+        .repeat(a.max_epochs)
+    if a.test_dir is not None:
+        test_data = test_data.shuffle(a.buffer_size).batch(a.batch_size)
+    return train_data, valid_data, test_data
+    
+    # def get_name(path):
+    #     name, _ = os.path.splitext(os.path.basename(path))
+    #     return name
+    # # If the image names are numbers, sort by the value rather than
+    # # asciibetically. Having sorted inputs means that the outputs are sorted in
+    # # test mode.
+    # if all(get_name(path).isdigit() for path in input_paths):
+    #     input_paths = sorted(input_paths, key=lambda path: int(get_name(path)))
+    #     annotation_paths = sorted(annotation_paths,
+    #                               key=lambda path: int(get_name(path)))
+    # else:
+    #     input_paths = sorted(input_paths)
+    #     annotation_paths = sorted(annotation_paths)
+    # with tf.name_scope("load_images"):
+    #     path_queue = tf.compat.v1.train.string_input_producer(
+    #         input_paths,
+    #         shuffle=a.mode == "train"
+    #     )
+    #     reader = tf.compat.v1.WholeFileReader()
+    #     paths, contents = reader.read(path_queue)
+    #     raw_input = tf.image.convert_image_dtype(raw_input, dtype=tf.float32)
+    #     assertion = tf.assert_equal(tf.shape(raw_input)[2], 3,
+    #                                 message="image does not have 3 channels")
+    #     with tf.control_dependencies([assertion]):
+    #         raw_input = tf.identity(raw_input)
 
-        if a.lab_colorization:
-            # load color and brightness from image, no B image exists here
-            lab = rgb_to_lab(a, raw_input)
-            L_chan, a_chan, b_chan = preprocess_lab(lab)
-            a_images = tf.expand_dims(L_chan, axis=2)
-            b_images = tf.stack([a_chan, b_chan], axis=2)
-        else:
-            # break apart image pair and move to range [-1, 1]
-            width = tf.shape(raw_input)[1] # [height, width, channels]
-            a_images = preprocess(raw_input[:, :width//2, :], add_noise=True)
-            b_images = preprocess(raw_input[:, width//2:, :])
-    if a.which_direction == "AtoB":
-        inputs, targets = [a_images, b_images]
-    elif a.which_direction == "BtoA":
-        inputs, targets = [b_images, a_images]
-    else:
-        raise ValueError(f"Invalid direction given: {a.which_direction}")
+    #     raw_input.set_shape([None, None, a.n_channels])
 
-    # synchronize seed for image operations so that we do the same operations
-    # to both input and output images
-    seed = random.randint(0, 2**31 - 1)
-    def transform(image):
-        r = image
-        if a.flip:
-            r = tf.image.random_flip_left_right(r, seed=seed)
-        # area produces a nice downscaling, but does nearest neighbor for
-        # upscaling assume we're going to be doing downscaling here
-        r = tf.image.resize_images(r, [a.scale_size, a.scale_size],
-                                   method=tf.image.ResizeMethod.AREA)
-        offset = tf.cast(tf.floor(
-            tf.random_uniform(
-                [2],
-                0,
-                a.scale_size - a.crop_size + 1,
-                seed=seed)
-            ),
-            dtype=tf.int32
-        )
-        if a.scale_size > a.crop_size:
-            r = tf.image.crop_to_bounding_box(r, offset[0], offset[1],
-                                              a.crop_size, a.crop_size)
-        elif a.scale_size < a.crop_size:
-            raise Exception("scale size cannot be less than crop size")
-        return r
+    #     if a.lab_colorization:
+    #         # load color and brightness from image, no B image exists here
+    #         lab = rgb_to_lab(a, raw_input)
+    #         L_chan, a_chan, b_chan = preprocess_lab(lab)
+    #         a_images = tf.expand_dims(L_chan, axis=2)
+    #         b_images = tf.stack([a_chan, b_chan], axis=2)
+    #     else:
+    #         # break apart image pair and move to range [-1, 1]
+    #         width = tf.shape(raw_input)[1] # [height, width, channels]
+    #         a_images = preprocess(raw_input[:, :width//2, :], add_noise=True)
+    #         b_images = preprocess(raw_input[:, width//2:, :])
+    # if a.which_direction == "AtoB":
+    #     inputs, targets = [a_images, b_images]
+    # elif a.which_direction == "BtoA":
+    #     inputs, targets = [b_images, a_images]
+    # else:
+    #     raise ValueError(f"Invalid direction given: {a.which_direction}")
 
-    with tf.name_scope("input_images"):
-        input_images = transform(inputs)
-    with tf.name_scope("target_images"):
-        target_images = transform(targets)
-    paths_batch, inputs_batch, targets_batch = tf.train.batch(
-        [paths, input_images, target_images],
-        batch_size=a.batch_size
-    )
-    steps_per_epoch = int(math.ceil(len(input_paths) / a.batch_size))
-    return Examples(
-        paths=paths_batch,
-        inputs=inputs_batch,
-        targets=targets_batch,
-        count=len(input_paths),
-        steps_per_epoch=steps_per_epoch,
-    )
+    # # synchronize seed for image operations so that we do the same operations
+    # # to both input and output images
+    # seed = random.randint(0, 2**31 - 1)
+    # def transform(image):
+    #     r = image
+    #     if a.flip:
+    #         r = tf.image.random_flip_left_right(r, seed=seed)
+    #     # area produces a nice downscaling, but does nearest neighbor for
+    #     # upscaling assume we're going to be doing downscaling here
+    #     r = tf.image.resize_images(r, [a.scale_size, a.scale_size],
+    #                                method=tf.image.ResizeMethod.AREA)
+    #     offset = tf.cast(tf.floor(
+    #         tf.random_uniform(
+    #             [2],
+    #             0,
+    #             a.scale_size - a.crop_size + 1,
+    #             seed=seed)
+    #         ),
+    #         dtype=tf.int32
+    #     )
+    #     if a.scale_size > a.crop_size:
+    #         r = tf.image.crop_to_bounding_box(r, offset[0], offset[1],
+    #                                           a.crop_size, a.crop_size)
+    #     elif a.scale_size < a.crop_size:
+    #         raise Exception("scale size cannot be less than crop size")
+    #     return r
+
+    # with tf.name_scope("input_images"):
+    #     input_images = transform(inputs)
+    # with tf.name_scope("target_images"):
+    #     target_images = transform(targets)
+    # paths_batch, inputs_batch, targets_batch = tf.train.batch(
+    #     [paths, input_images, target_images],
+    #     batch_size=a.batch_size
+    # )
+    # steps_per_epoch = int(math.ceil(len(input_paths) / a.batch_size))
+    # return Examples(
+    #     paths=paths_batch,
+    #     inputs=inputs_batch,
+    #     targets=targets_batch,
+    #     count=len(input_paths),
+    #     steps_per_epoch=steps_per_epoch,
+    # )
 
 
 def google_attention(x, filters, sn=False, scope='attention'):
@@ -778,7 +807,7 @@ def main(a):
                               write_meta_graph=False)
         return  # if a.mode == 'export'
 
-    examples = load_examples(a)
+    train_data, valid_data, test_data = load_examples(a)
     print("examples count = %d" % examples.count)
     # inputs and targets are [batch_size, height, width, channels]
     model = create_model(a, examples.inputs, examples.targets)
@@ -976,15 +1005,31 @@ def main(a):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input_dir", help="path to folder containing images")
+    parser.add_argument(
+        "--train_dir",
+        default=None,
+        help="Path to folder containing TFRecords training files."
+    )
+    parser.add_argument(
+        "--valid_dir",
+        default=None,
+        help="Path to folder containing TFRecords validation files."
+    )
+    parser.add_argument(
+        "--test_dir",
+        default=None,
+        help="Path to folder containing TFRecords testing files."
+    )
     parser.add_argument("--mode", required=True,
                         choices=["train", "test", "export"])
     parser.add_argument("--output_dir", required=True,
                         help="where to put output files")
     parser.add_argument("--seed", type=int)
-    parser.add_argument("--checkpoint", default=None,
-                        help="directory with checkpoint to resume training from or use for testing")
-
+    parser.add_argument(
+        "--checkpoint",
+        default=None,
+        help="directory with checkpoint to resume training from or use for testing"
+    )
     parser.add_argument("--max_steps", type=int,
                         help="number of training steps (0 to disable)")
     parser.add_argument("--max_epochs", type=int, help="number of training epochs")
@@ -998,7 +1043,6 @@ if __name__ == '__main__':
                         help="write current training images every display_freq steps")
     parser.add_argument("--save_freq", type=int, default=5000,
                         help="save model every save_freq steps, 0 to disable")
-
     parser.add_argument("--separable_conv", action="store_true",
                         help="use separable convolutions in the generator")
     parser.add_argument("--aspect_ratio", type=float, default=1.0,
@@ -1052,6 +1096,8 @@ if __name__ == '__main__':
                         help='L1 regularization term for bias')                   
     parser.add_argument('--l2_reg_bias', type=float, default=0.,
                         help='L2 regularization term for bias')                   
+    parser.add_argument('--buffer_size', type=int, default=512,
+                        help='Buffer size for shuffling input data.')
 
     # export options
     parser.add_argument("--output_filetype", default="png",
