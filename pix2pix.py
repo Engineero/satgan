@@ -12,8 +12,8 @@ import random
 import collections
 import math
 import time
-import ops
-from .model import build_darknet_model
+from .utils import ops
+from .utils.darknet import build_darknet_model
 from tensorflow.keras.layers import (Input, Conv2D, Concatenate,
                                      MaxPooling2D, BatchNormalization,
                                      LeakyReLU)
@@ -29,10 +29,10 @@ Examples = collections.namedtuple(
     "Examples",
     "paths, inputs, targets, count, steps_per_epoch"
 )
-Model = collections.namedtuple(
-    "Model",
-    "outputs, predict_real, predict_fake, detect_real, detect_fake, discrim_loss, discrim_grads_and_vars, task_loss, task_grads_and_vars, gen_loss_GAN, gen_loss_L1, gen_grads_and_vars, train"
-)
+#Model = collections.namedtuple(
+#    "Model",
+#    "outputs, predict_real, predict_fake, detect_real, detect_fake, discrim_loss, discrim_grads_and_vars, task_loss, task_grads_and_vars, gen_loss_GAN, gen_loss_L1, gen_grads_and_vars, train"
+#)
 
 
 def preprocess(image, add_noise=False):
@@ -270,30 +270,43 @@ def lab_to_rgb(a, lab):
 
 
 def load_examples(a):
-    if a.input_dir is None or not os.path.exists(a.input_dir):
-        raise Exception("input_dir does not exist")
+    if a.input_dir is None or not os.path.isdir(a.input_dir):
+        raise NotADirectoryError(
+            f"Input directory {a.input_dir} does not exist!"
+        )
+    annotation_paths = glob.glob(os.path.join(a.input_dir, '*.json'))
+    if len(annotation_paths) == 0:
+        raise ValueError(
+            f'Input directory {a.input_dir} contains no annotation files!'
+        )
     input_paths = glob.glob(os.path.join(a.input_dir, "*.jpg"))
     decode = tf.image.decode_jpeg
     if len(input_paths) == 0:
         input_paths = glob.glob(os.path.join(a.input_dir, "*.png"))
         decode = tf.image.decode_png
     if len(input_paths) == 0:
-        raise Exception("input_dir contains no image files")
+        raise ValueError(
+            f"Input directory {a.input_dir} contains no image files!"
+        )
     def get_name(path):
         name, _ = os.path.splitext(os.path.basename(path))
         return name
-    # if the image names are numbers, sort by the value rather than asciibetically
-    # having sorted inputs means that the outputs are sorted in test mode
+    # If the image names are numbers, sort by the value rather than
+    # asciibetically. Having sorted inputs means that the outputs are sorted in
+    # test mode.
     if all(get_name(path).isdigit() for path in input_paths):
         input_paths = sorted(input_paths, key=lambda path: int(get_name(path)))
+        annotation_paths = sorted(annotation_paths,
+                                  key=lambda path: int(get_name(path)))
     else:
         input_paths = sorted(input_paths)
+        annotation_paths = sorted(annotation_paths)
     with tf.name_scope("load_images"):
-        path_queue = tf.train.string_input_producer(
+        path_queue = tf.compat.v1.train.string_input_producer(
             input_paths,
             shuffle=a.mode == "train"
         )
-        reader = tf.WholeFileReader()
+        reader = tf.compat.v1.WholeFileReader()
         paths, contents = reader.read(path_queue)
         raw_input = decode(contents)
         raw_input = tf.image.convert_image_dtype(raw_input, dtype=tf.float32)
@@ -620,14 +633,14 @@ def create_model(a, inputs, targets, task_targets=None):
               'task_net': task_loss}
     loss_weights = {'generator': a.gen_weight,
                     'discriminator': a.dsc_weight,
-                    'task_net': a.task_weight}}
+                    'task_net': a.task_weight}
     optimizers = {'generator': 'adam',
                   'discriminator': 'adam',
                   'task_net': 'adam'}
     metrics = {'generator': 'mse',
                'discriminator': 'sparse_categorical_crossentropy',
                'task_net': 'mse'}
-    model.compile(loss=losses
+    model.compile(loss=losses,
                   loss_weights=loss_weights,
                   optimizer=optimizers,
                   metrics=metrics)
@@ -858,7 +871,9 @@ def main(a):
         tf.summary.histogram(var.op.name + "/gradients", grad)
 
     with tf.name_scope("parameter_count"):
-        parameter_count = tf.reduce_sum([tf.reduce_prod(tf.shape(v)) for v in tf.trainable_variables()])
+        parameter_count = tf.reduce_sum(
+            [tf.reduce_prod(tf.shape(v)) for v in tf.trainable_variables()]
+        )
 
     saver = tf.train.Saver(max_to_keep=1)
 
@@ -934,7 +949,10 @@ def main(a):
 
                 if should(a.trace_freq):
                     print("recording trace")
-                    sv.summary_writer.add_run_metadata(run_metadata, "step_%d" % results["global_step"])
+                    sv.summary_writer.add_run_metadata(
+                        run_metadata,
+                        "step_%d" % results["global_step"]
+                    )
 
                 if should(a.progress_freq):
                     # global_step will have the correct step count if we resume from a checkpoint
@@ -949,7 +967,8 @@ def main(a):
 
                 if should(a.save_freq):
                     print("saving model")
-                    saver.save(sess, os.path.join(a.output_dir, "model"), global_step=sv.global_step)
+                    saver.save(sess, os.path.join(a.output_dir, "model"),
+                               global_step=sv.global_step)
 
                 if sv.should_stop():
                     break
@@ -1035,6 +1054,7 @@ if __name__ == '__main__':
                         help='L2 regularization term for bias')                   
 
     # export options
-    parser.add_argument("--output_filetype", default="png", choices=["png", "jpeg"])
+    parser.add_argument("--output_filetype", default="png",
+                        choices=["png", "jpeg"])
     args = parser.parse_args()
     main(args)
