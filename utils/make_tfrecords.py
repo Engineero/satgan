@@ -38,11 +38,11 @@ def _check_args(args):
         raise NotADirectoryError(
             f'Annotation path {args.annotation_dir} is not a directory!'
         )
-    if not output_dir.is_dir():
+    if output_dir.is_dir():
+        raise ValueError('Output directory already exists!')
+    else:
         print(f'Making output directory {output_dir}...')
         os.makedirs(output_dir)
-    if not len(output_dir.glob('*')) == 0:
-        raise ValueError('Output directory is not empty!')
     path_list = [a_dir, b_dir, annotation_dir]
     for path in path_list:
         if len(path.glob('*')) == 0:
