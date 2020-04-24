@@ -201,7 +201,7 @@ def make_tf_records(args):
         for i, example_group in tqdm(enumerate(groups), total=num_groups):
             tfrecords_name = f'{args.output_name}_{name}_{i}.tfrecords'
             output_path = partition_dir / tfrecords_name
-            with tf.io.TFRecordWriter(output_path) as writer:
+            with tf.io.TFRecordWriter(output_path.as_posix()) as writer:
                 for example in example_group:
                     # Make sure it's not empty.
                     if example:
