@@ -275,27 +275,28 @@ def _parse_example(eg):
     example = tf.io.parse_example(
         eg[tf.newaxis],
         {
-            'a_raw': tf.io.FixedLenFeature(shape=(), dtype=tf.string),
-            'b_raw': tf.io.FixedLenFeature(shape=(), dtype=tf.string),
-            'filename': tf.io.FixedLenFeature(shape=(), dtype=tf.string),
-            'height': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
-            'width': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
-            'classes': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
-            'ymin': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
-            'ymax': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
-            'ycenter': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
-            'xmin': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
-            'xmax': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
-            'xcenter': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
+            'a_raw/bytesList/value': tf.io.FixedLenFeature(shape=(), dtype=tf.string),
+            'b_raw/bytesList/value': tf.io.FixedLenFeature(shape=(), dtype=tf.string),
+            'filename/bytesList/value': tf.io.FixedLenFeature(shape=(), dtype=tf.string),
+            'height/int64List/value': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
+            'width/int64List/value': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
+            'classes/int64List/value': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
+            'ymin/floatList/value': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
+            'ymax/floatList/value': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
+            'ycenter/floatList/value': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
+            'xmin/floatList/value': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
+            'xmax/floatList/value': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
+            'xcenter/floatList/value': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
         }
     )
-    return example['a_raw'][0], (example['b_raw'][0],
-                                 example['xcenter'][0],
-                                 example['ycenter'][0],
-                                 example['xmin'][0],
-                                 example['xmax'][0],
-                                 example['ymin'][0],
-                                 example['ymax'][0])
+    return (example['a_raw/bytesList/value'][0],
+            (example['b_raw/bytesList/value'][0],
+             example['xcenter/floatList/value'][0],
+             example['ycenter/floatList/value'][0],
+             example['xmin/floatList/value'][0],
+             example['xmax/floatList/value'][0],
+             example['ymin/floatList/value'][0],
+             example['ymax/floatList/value'][0]))
 
 
 def load_examples(a):
@@ -676,12 +677,12 @@ def create_model(a, inputs, targets, task_targets):
         xy_loss = mean_squared_error(pred_xy, [task_targets[0], task_targets[1]])
         wh_loss = mean_squared_error(pred_wh, [target_w, target_h])
         obj_loss = sparse_categorical_crossentropy(pred_obj, 1)
-        class_loss = sparse_categorical_crossentropy(pred_class, 0)
+        class_loss = sparse_categorical_crossentropy(pred_class, 1)
         task_loss_real = xy_loss + wh_loss + obj_loss + class_loss
         xy_loss_fake = mean_squared_error(pred_xy_fake, [task_targets[0], task_targets[1]])
         wh_loss_fake = mean_squared_error(pred_wh_fake, [target_w, target_h])
         obj_loss_fake = sparse_categorical_crossentropy(pred_obj_fake, 1)
-        class_loss_fake = sparse_categorical_crossentropy(pred_class_fake, 0)
+        class_loss_fake = sparse_categorical_crossentropy(pred_class_fake, 1)
         task_loss_fake = xy_loss_fake + wh_loss_fake + obj_loss_fake + \
             class_loss_fake
         task_loss = task_loss_real + task_loss_fake
