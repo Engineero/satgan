@@ -270,6 +270,34 @@ def lab_to_rgb(a, lab):
         return tf.reshape(srgb_pixels, tf.shape(lab))
 
 
+def _parse_example(eg):
+    """Parses a single TFRecord Example for the task network."""
+    example = tf.io.parse_example(
+        eg[tf.newaxis],
+        {
+            'features/a_raw': tf.io.FixedLenFeature(shape=(), dtype=tf.string),
+            'features/b_raw': tf.io.FixedLenFeature(shape=(), dtype=tf.string),
+            'features/filename': tf.io.FixedLenFeature(shape=(), dtype=tf.string),
+            'features/height': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
+            'features/width': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
+            'features/classes': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
+            'features/ymin': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
+            'features/ymax': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
+            'features/ycenter': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
+            'features/xmin': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
+            'features/xmax': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
+            'features/xcenter': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
+        }
+    )
+    return example['features/a_raw'][0], (example['features/b_raw'][0],
+                                          example['features/xcenter'][0],
+                                          example['features/ycenter'][0],
+                                          example['features/xmin'][0],
+                                          example['features/xmax'][0],
+                                          example['features/ymin'][0],
+                                          example['features/ymax'][0])
+
+
 def load_examples(a):
     # Create data queue from training dataset.
     if a.train_dir is None or not os.path.isdir(a.train_dir):
@@ -282,6 +310,7 @@ def load_examples(a):
             f"Training directory {a.input_dir} contains no TFRecords files!"
         )
     train_data = tf.data.TFRecordDataset(filenames=train_paths)
+    train_data = train_data.map(_parse_example)
 
     # Create data queue from validation dataset.
     if a.valid_dir is None or not os.path.isdir(a.valid_dir):
@@ -294,6 +323,7 @@ def load_examples(a):
             f"Validation directory {a.valid_dir} contains no TFRecords files!"
         )
     valid_data = tf.data.TFRecordDataset(filenames=valid_paths)
+    valid_data = valid_data.map(_parse_example)
 
     # Create data queue from testing dataset, if given.
     if a.test_dir is not None:
@@ -307,6 +337,7 @@ def load_examples(a):
                 f"Testing directory {a.test_dir} contains no TFRecords files!"
             )
         test_data = tf.data.TFRecordDataset(filenames=test_paths)
+        test_data = test_data.map(_parse_example)
     else:
         test_data = None
 
@@ -589,9 +620,10 @@ def create_task_net(a, input_shape):
                  outputs=[pred_xy, pred_wh, pred_obj, pred_class])
 
 
-def create_model(a, inputs, targets, task_targets=None):
+def create_model(a, inputs, targets, task_targets):
     input_shape = inputs.shape.as_list()
     target_shape = targets.shape.as_list()
+    task_target_shape = task_targets.shape.as_list()
     with tf.name_scope("generator"):
         out_channels = int(targets.get_shape()[-1])
         generator = create_generator(a, input_shape, out_channels)
@@ -602,7 +634,7 @@ def create_model(a, inputs, targets, task_targets=None):
     # generator). The task targets (detected objects) should be the same for
     # both.
     with tf.name_scope('task_net'):
-        task_net = create_task_net(a, target_shape)
+        task_net = create_task_net(a, task_target_shape)
 
     # Create two copies of discriminator, one for real pairs and one for fake
     # pairs they share the same underlying variables
@@ -636,18 +668,19 @@ def create_model(a, inputs, targets, task_targets=None):
 
     with tf.name_scope('task_loss'):
         # TODO (NLT): implement YOLO loss or similar for detection.
+        target_w = task_targets[-1] - task_targets[-2]
+        target_h = task_targets[3] - task_targets[2]
         pred_xy, pred_wh, pred_obj, pred_class = task_net(targets)
         pred_xy_fake, pred_wh_fake, pred_obj_fake, pred_class_fake = \
             task_net(fake_img)
-        xy_loss = mean_squared_error(pred_xy, task_targets.xy)
-        wh_loss = mean_squared_error(pred_wh, task_targets.wh)
-        obj_loss = sparse_categorical_crossentropy(pred_obj, task_targets.obj)
+        xy_loss = mean_squared_error(pred_xy, [task_targets[0], task_targets[1]])
+        wh_loss = mean_squared_error(pred_wh, [target_w, target_h])
+        obj_loss = sparse_categorical_crossentropy(pred_obj, 1)
         class_loss = sparse_categorical_crossentropy(pred_class, 0)
         task_loss_real = xy_loss + wh_loss + obj_loss + class_loss
-        xy_loss_fake = mean_squared_error(pred_xy_fake, task_targets.xy)
-        wh_loss_fake = mean_squared_error(pred_wh_fake, task_targets.wh)
-        obj_loss_fake = sparse_categorical_crossentropy(pred_obj_fake,
-                                                        task_targets.obj)
+        xy_loss_fake = mean_squared_error(pred_xy_fake, [task_targets[0], task_targets[1]])
+        wh_loss_fake = mean_squared_error(pred_wh_fake, [target_w, target_h])
+        obj_loss_fake = sparse_categorical_crossentropy(pred_obj_fake, 1)
         class_loss_fake = sparse_categorical_crossentropy(pred_class_fake, 0)
         task_loss_fake = xy_loss_fake + wh_loss_fake + obj_loss_fake + \
             class_loss_fake
@@ -749,9 +782,14 @@ def main(a):
 
     # Build data generators.
     train_data, val_data, test_data = load_examples(a)
+    inputs, (targets, xcenter, ycenter, xmin, xmax, ymin, ymax) = train_data
+    task_targets = (xcenter, ycenter, xmin, xmax, ymin, ymax)
+
+    # Get inputs, targets, and task targets from generators.
+
 
     # Build the model.
-    model = create_model(a, train_data, val_data, test_data)  # TODO (NLT): update signature
+    model = create_model(a, inputs, targets, task_targets)  # TODO (NLT): update signature
 
     # Train the model.
     history = model.fit(
