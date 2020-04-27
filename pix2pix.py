@@ -275,28 +275,28 @@ def _parse_example(eg):
     example = tf.io.parse_example(
         eg[tf.newaxis],
         {
-            'feature/a_raw/bytesList/value': tf.io.FixedLenFeature(shape=(), dtype=tf.string),
-            'feature/b_raw/bytesList/value': tf.io.FixedLenFeature(shape=(), dtype=tf.string),
-            'feature/filename/bytesList/value': tf.io.FixedLenFeature(shape=(), dtype=tf.string),
-            'feature/height/int64List/value': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
-            'feature/width/int64List/value': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
-            'feature/classes/int64List/value': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
-            'feature/ymin/floatList/value': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
-            'feature/ymax/floatList/value': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
-            'feature/ycenter/floatList/value': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
-            'feature/xmin/floatList/value': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
-            'feature/xmax/floatList/value': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
-            'feature/xcenter/floatList/value': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
+            'features/feature/a_raw/bytesList/value': tf.io.FixedLenFeature(shape=(), dtype=tf.string),
+            'features/feature/b_raw/bytesList/value': tf.io.FixedLenFeature(shape=(), dtype=tf.string),
+            'features/feature/filename/bytesList/value': tf.io.FixedLenFeature(shape=(), dtype=tf.string),
+            'features/feature/height/int64List/value': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
+            'features/feature/width/int64List/value': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
+            'features/feature/classes/int64List/value': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
+            'features/feature/ymin/floatList/value': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
+            'features/feature/ymax/floatList/value': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
+            'features/feature/ycenter/floatList/value': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
+            'features/feature/xmin/floatList/value': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
+            'features/feature/xmax/floatList/value': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
+            'features/feature/xcenter/floatList/value': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
         }
     )
-    return (example['feature/a_raw/bytesList/value'][0],
-            (example['feature/b_raw/bytesList/value'][0],
-             example['feature/xcenter/floatList/value'][0],
-             example['feature/ycenter/floatList/value'][0],
-             example['feature/xmin/floatList/value'][0],
-             example['feature/xmax/floatList/value'][0],
-             example['feature/ymin/floatList/value'][0],
-             example['feature/ymax/floatList/value'][0]))
+    return (example['features/feature/a_raw/bytesList/value'][0],
+            (example['features/feature/b_raw/bytesList/value'][0],
+             example['features/feature/xcenter/floatList/value'][0],
+             example['features/feature/ycenter/floatList/value'][0],
+             example['features/feature/xmin/floatList/value'][0],
+             example['features/feature/xmax/floatList/value'][0],
+             example['features/feature/ymin/floatList/value'][0],
+             example['features/feature/ymax/floatList/value'][0]))
 
 
 def load_examples(a):
