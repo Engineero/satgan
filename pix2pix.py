@@ -12,8 +12,8 @@ import random
 import collections
 import math
 import time
-from .utils import ops
-from .utils.darknet import build_darknet_model
+from utils import ops
+from utils.darknet import build_darknet_model
 from tensorflow.keras.layers import (Input, Conv2D, Concatenate,
                                      MaxPooling2D, BatchNormalization,
                                      LeakyReLU)

@@ -4,7 +4,7 @@ from tensorflow.keras.layers import (Conv2D, Flatten, Conv2DTranspose, Dense,
                                      UpSampling2D, LeakyReLU, ReLU,
                                      AveragePooling2D, MaxPooling2D,
                                      SeparableConv2D)
-from .model.SpectralNormalization import SpectralNormalization
+from .SpectralNormalization import SpectralNormalization
 
 
 ##################################################################################
