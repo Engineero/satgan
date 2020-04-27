@@ -275,27 +275,27 @@ def _parse_example(eg):
     example = tf.io.parse_example(
         eg[tf.newaxis],
         {
-            'features/a_raw': tf.io.FixedLenFeature(shape=(), dtype=tf.string),
-            'features/b_raw': tf.io.FixedLenFeature(shape=(), dtype=tf.string),
-            'features/filename': tf.io.FixedLenFeature(shape=(), dtype=tf.string),
-            'features/height': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
-            'features/width': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
-            'features/classes': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
-            'features/ymin': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
-            'features/ymax': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
-            'features/ycenter': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
-            'features/xmin': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
-            'features/xmax': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
-            'features/xcenter': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
+            'a_raw': tf.io.FixedLenFeature(shape=(), dtype=tf.string),
+            'b_raw': tf.io.FixedLenFeature(shape=(), dtype=tf.string),
+            'filename': tf.io.FixedLenFeature(shape=(), dtype=tf.string),
+            'height': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
+            'width': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
+            'classes': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
+            'ymin': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
+            'ymax': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
+            'ycenter': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
+            'xmin': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
+            'xmax': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
+            'xcenter': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
         }
     )
-    return example['features/a_raw'], (example['features/b_raw'],
-                                       example['features/xcenter'],
-                                       example['features/ycenter'],
-                                       example['features/xmin'],
-                                       example['features/xmax'],
-                                       example['features/ymin'],
-                                       example['features/ymax'])
+    return example['a_raw'], (example['b_raw'],
+                              example['xcenter'],
+                              example['ycenter'],
+                              example['xmin'],
+                              example['xmax'],
+                              example['ymin'],
+                              example['ymax'])
 
 
 def load_examples(a):
