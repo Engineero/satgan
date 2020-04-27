@@ -289,13 +289,13 @@ def _parse_example(eg):
             'xcenter': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
         }
     )
-    return example['a_raw'], (example['b_raw'],
-                              example['xcenter'],
-                              example['ycenter'],
-                              example['xmin'],
-                              example['xmax'],
-                              example['ymin'],
-                              example['ymax'])
+    return example['a_raw'][0], (example['b_raw'][0],
+                                 example['xcenter'][0],
+                                 example['ycenter'][0],
+                                 example['xmin'][0],
+                                 example['xmax'][0],
+                                 example['ymin'][0],
+                                 example['ymax'][0])
 
 
 def load_examples(a):
