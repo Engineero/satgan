@@ -275,8 +275,15 @@ def _parse_example(eg):
     example = tf.io.parse_example(
         eg[tf.newaxis],
         {
-            'a_raw': tf.io.FixedLenFeature(shape=(), dtype=tf.string),
-            'b_raw': tf.io.FixedLenFeature(shape=(), dtype=tf.string),
+            'a_raw': preprocess(
+                tf.image.decode_png(tf.io.FixedLenFeature(shape=(),
+                                                          dtype=tf.string)),
+                add_noise=True
+            ),
+            'b_raw': preprocess(
+                tf.image.decode_png(tf.io.FixedLenFeature(shape=(),
+                                    dtype=tf.string))
+            ),
             'filename': tf.io.FixedLenFeature(shape=(), dtype=tf.string),
             'height': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
             'width': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
@@ -289,13 +296,13 @@ def _parse_example(eg):
             'xcenter': tf.io.FixedLenFeature(shape=(), dtype=tf.float32),
         }
     )
-    return (example['a_raw'][0], (example['b_raw'][0],
-                                  example['xcenter'][0],
-                                  example['ycenter'][0],
-                                  example['xmin'][0],
-                                  example['xmax'][0],
-                                  example['ymin'][0],
-                                  example['ymax'][0]))
+    task_targets = (example['xcenter'][0],
+                    example['ycenter'][0],
+                    example['xmin'][0],
+                    example['xmax'][0],
+                    example['ymin'][0],
+                    example['ymax'][0])
+    return (example['a_raw'][0], (example['b_raw'][0], task_targets))
 
 
 def load_examples(a):
@@ -782,8 +789,7 @@ def main(a):
 
     # Build data generators.
     train_data, val_data, test_data = load_examples(a)
-    inputs, (targets, xcenter, ycenter, xmin, xmax, ymin, ymax) = train_data
-    task_targets = (xcenter, ycenter, xmin, xmax, ymin, ymax)
+    inputs, (targets, task_targets) = next(iter(train_data))
 
     # Get inputs, targets, and task targets from generators.
 
