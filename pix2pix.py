@@ -270,7 +270,7 @@ def lab_to_rgb(a, lab):
         return tf.reshape(srgb_pixels, tf.shape(lab))
 
 
-def _parse_example(serialized_example, a_to_b=True):
+def _parse_example(serialized_example, a):
     """Parses a single TFRecord Example for the task network."""
     example = tf.io.parse_example(
         [serialized_example],
@@ -284,36 +284,42 @@ def _parse_example(serialized_example, a_to_b=True):
             #    tf.image.decode_png(tf.io.FixedLenFeature(shape=(),
             #                        dtype=tf.string))
             #),
-            'a_raw': tf.io.FixedLenFeature(shape=(), dtype=tf.string),
-            'b_raw': tf.io.FixedLenFeature(shape=(), dtype=tf.string),
+            'a_raw': tf.io.VarLenFeature(dtype=tf.string),
+            'b_raw': tf.io.VarLenFeature(dtype=tf.string),
             'filename': tf.io.VarLenFeature(dtype=tf.string),
             'height': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
             'width': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
             'classes': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
-            'ymin': tf.io.FixedLenFeature(shape=(), dtype=tf.float32,
-                                          default_value=0.),
-            'ymax': tf.io.FixedLenFeature(shape=(), dtype=tf.float32,
-                                          default_value=1.),
-            'ycenter': tf.io.FixedLenFeature(shape=(), dtype=tf.float32,
-                                             default_value=0.),
-            'xmin': tf.io.FixedLenFeature(shape=(), dtype=tf.float32,
-                                          default_value=0.),
-            'xmax': tf.io.FixedLenFeature(shape=(), dtype=tf.float32,
-                                          default_value=1.),
-            'xcenter': tf.io.FixedLenFeature(shape=(), dtype=tf.float32,
-                                             default_value=0.),
+            'ymin': tf.io.VarLenFeature(dtype=tf.float32),
+            'ymax': tf.io.VarLenFeature(dtype=tf.float32),
+            'ycenter': tf.io.VarLenFeature(dtype=tf.float32),
+            'xmin': tf.io.VarLenFeature(dtype=tf.float32),
+            'xmax': tf.io.VarLenFeature(dtype=tf.float32),
+            'xcenter': tf.io.VarLenFeature(dtype=tf.float32),
         }
     )
-    task_targets = (example['xcenter'][0],
-                    example['ycenter'][0],
-                    example['xmin'][0],
-                    example['xmax'][0],
-                    example['ymin'][0],
-                    example['ymax'][0])
-    if a_to_b:
-        return (example['a_raw'][0], (example['b_raw'][0], task_targets))
+    width = tf.cast(example['width'], tf.int32)
+    height = tf.cast(example['height'], tf.int32)
+    xcenter = tf.cast(tf.sparse.to_dense(example['xcenter']), tf.float32)
+    xmin = tf.cast(tf.sparse.to_dense(example['xmin']), tf.float32)
+    xmax = tf.cast(tf.sparse.to_dense(example['xmax']), tf.float32)
+    ycenter = tf.cast(tf.sparse.to_dense(example['ycenter']), tf.float32)
+    ymin = tf.cast(tf.sparse.to_dense(example['ymin']), tf.float32)
+    ymax = tf.cast(tf.sparse.to_dense(example['ymax']), tf.float32)
+    bboxes = tf.stack([xcenter, ycenter, xmin, xmax, ymin, ymax], axis=1)
+    task_targets = (bboxes, width, height)
+    a_image = tf.sparse.to_dense(example['a_raw'], default_value='')
+    a_image = tf.io.decode_raw(a_image, tf.int16)
+    tf.reshape(a_image, [height, width, a.num_channels])
+    a_image = preprocess(a_image, add_noise=True)
+    b_image = tf.sparse.to_dense(example['b_raw'], default_value='')
+    b_image = tf.io.decode_raw(b_image, tf.int16)
+    tf.reshape(b_image, [height, width, a.num_channels])
+    b_image = preprocess(b_image, add_noise=False)
+    if a.which_direction == 'AtoB':
+        return (a_image, (b_image, task_targets))
     else:
-        return (example['b_raw'][0], (example['a_raw'][0], task_targets))
+        return (b_image, (a_image, task_targets))
 
 
 def load_examples(a):
