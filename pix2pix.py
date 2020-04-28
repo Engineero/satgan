@@ -361,12 +361,12 @@ def load_examples(a):
 
     # Specify transformations on datasets.
     train_data = train_data.shuffle(a.buffer_size).batch(a.batch_size)
-    train_data = train_data.repeat(a.max_epochs)
     train_data = train_data.map(_parse_example)
+    train_data = train_data.repeat(a.max_epochs)
 
     valid_data = valid_data.shuffle(a.buffer_size).batch(a.batch_size)
-    valid_data = valid_data.repeat(a.max_epochs)
     valid_data = valid_data.map(_parse_example)
+    valid_data = valid_data.repeat(a.max_epochs)
 
     if a.test_dir is not None:
         test_data = test_data.shuffle(a.buffer_size).batch(a.batch_size)
