@@ -275,18 +275,18 @@ def _parse_example(eg):
     example = tf.io.parse_example(
         eg[tf.newaxis],
         {
-            'a_raw': preprocess(
-                tf.image.decode_png(tf.io.FixedLenFeature(shape=(),
-                                                          dtype=tf.string)),
-                add_noise=True
-            ),
-            'b_raw': preprocess(
-                tf.image.decode_png(tf.io.FixedLenFeature(shape=(),
-                                    dtype=tf.string))
-            ),
-            #'a_raw': tf.io.FixedLenFeature(shape=(), dtype=tf.string),
-            #'b_raw': tf.io.FixedLenFeature(shape=(), dtype=tf.string),
-            'filename': tf.io.FixedLenFeature(shape=(), dtype=tf.string),
+            #'a_raw': preprocess(
+            #    tf.image.decode_png(tf.io.FixedLenFeature(shape=(),
+            #                                              dtype=tf.string)),
+            #    add_noise=True
+            #),
+            #'b_raw': preprocess(
+            #    tf.image.decode_png(tf.io.FixedLenFeature(shape=(),
+            #                        dtype=tf.string))
+            #),
+            'a_raw': tf.io.FixedLenFeature(shape=(), dtype=tf.string),
+            'b_raw': tf.io.FixedLenFeature(shape=(), dtype=tf.string),
+            'filename': tf.io.VarLenFeature(dtype=tf.string),
             'height': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
             'width': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
             'classes': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
