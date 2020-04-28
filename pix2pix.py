@@ -270,7 +270,7 @@ def lab_to_rgb(a, lab):
         return tf.reshape(srgb_pixels, tf.shape(lab))
 
 
-def _parse_example(serialized_example):
+def _parse_example(serialized_example, a_to_b=True):
     """Parses a single TFRecord Example for the task network."""
     example = tf.io.parse_example(
         [serialized_example],
@@ -310,7 +310,10 @@ def _parse_example(serialized_example):
                     example['xmax'][0],
                     example['ymin'][0],
                     example['ymax'][0])
-    return (example['a_raw'][0], (example['b_raw'][0], task_targets))
+    if a_to_b:
+        return (example['a_raw'][0], (example['b_raw'][0], task_targets))
+    else:
+        return (example['b_raw'][0], (example['a_raw'][0], task_targets))
 
 
 def load_examples(a):
@@ -361,16 +364,22 @@ def load_examples(a):
 
     # Specify transformations on datasets.
     train_data = train_data.shuffle(a.buffer_size).batch(a.batch_size)
-    train_data = train_data.map(_parse_example)
+    train_data = train_data.map(
+        lambda x: _parse_example(x, a.which_direction)
+    )
     train_data = train_data.repeat(a.max_epochs)
 
     valid_data = valid_data.shuffle(a.buffer_size).batch(a.batch_size)
-    valid_data = valid_data.map(_parse_example)
+    valid_data = valid_data.map(
+        lambda x: _parse_example(x, a.which_direction)
+    )
     valid_data = valid_data.repeat(a.max_epochs)
 
     if a.test_dir is not None:
         test_data = test_data.shuffle(a.buffer_size).batch(a.batch_size)
-        test_data = test_data.map(_parse_example)
+        test_data = test_data.map(
+            lambda x: _parse_example(x, a.which_direction)
+        )
     return train_data, valid_data, test_data
     
     # def get_name(path):
