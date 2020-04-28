@@ -280,7 +280,7 @@ def _parse_example(serialized_example, a):
             'filename': tf.io.VarLenFeature(dtype=tf.string),
             'height': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
             'width': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
-            'classes': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
+            'classes': tf.io.VarLenFeature(dtype=tf.int64),
             'ymin': tf.io.VarLenFeature(dtype=tf.float32),
             'ymax': tf.io.VarLenFeature(dtype=tf.float32),
             'ycenter': tf.io.VarLenFeature(dtype=tf.float32),
