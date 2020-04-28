@@ -324,7 +324,9 @@ def load_examples(a):
         raise ValueError(
             f"Training directory {a.input_dir} contains no TFRecords files!"
         )
-    train_data = tf.data.TFRecordDataset(filenames=train_paths)
+    train_data = tf.data.TFRecordDataset(
+        filenames=[p.as_posix() for p in train_paths]
+    )
     train_data = train_data.map(_parse_example)
 
     # Create data queue from validation dataset.
@@ -337,7 +339,9 @@ def load_examples(a):
         raise ValueError(
             f"Validation directory {a.valid_dir} contains no TFRecords files!"
         )
-    valid_data = tf.data.TFRecordDataset(filenames=valid_paths)
+    valid_data = tf.data.TFRecordDataset(
+        filenames=[p.as_posix() for p in valid_paths]
+    )
     valid_data = valid_data.map(_parse_example)
 
     # Create data queue from testing dataset, if given.
@@ -351,7 +355,9 @@ def load_examples(a):
             raise ValueError(
                 f"Testing directory {a.test_dir} contains no TFRecords files!"
             )
-        test_data = tf.data.TFRecordDataset(filenames=test_paths)
+        test_data = tf.data.TFRecordDataset(
+            filenames=[p.as_posix() for p in test_paths]
+        )
         test_data = test_data.map(_parse_example)
     else:
         test_data = None
