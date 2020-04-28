@@ -5,7 +5,6 @@ from __future__ import print_function
 import tensorflow as tf
 import numpy as np
 import argparse
-import os
 import json
 import glob
 import random
@@ -728,11 +727,10 @@ def create_model(a, inputs, targets, task_targets):
 
 def save_images(a, fetches, step=None):
     image_dir = Path(a.output_dir).resolve() / 'images'
-    if not image_dir.is_dir():
-        os.makedirs(image_dir)
+    image_dir.mkdir(parents=True, exist_ok=True)
     filesets = []
     for i, in_path in enumerate(fetches["paths"]):
-        name, _ = os.path.splitext(os.path.basename(in_path.decode("utf8")))
+        name = Path(in_path.decode("utf8")).stem
         fileset = {"name": name, "step": step}
         for kind in ["inputs", "outputs", "targets"]:
             filename = name + "-" + kind + ".png"
