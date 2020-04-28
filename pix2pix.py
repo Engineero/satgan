@@ -371,20 +371,20 @@ def load_examples(a):
     # Specify transformations on datasets.
     train_data = train_data.shuffle(a.buffer_size).batch(a.batch_size)
     train_data = train_data.map(
-        lambda x: _parse_example(x, a.which_direction)
+        lambda x: _parse_example(x, a)
     )
     train_data = train_data.repeat(a.max_epochs)
 
     valid_data = valid_data.shuffle(a.buffer_size).batch(a.batch_size)
     valid_data = valid_data.map(
-        lambda x: _parse_example(x, a.which_direction)
+        lambda x: _parse_example(x, a)
     )
     valid_data = valid_data.repeat(a.max_epochs)
 
     if a.test_dir is not None:
         test_data = test_data.shuffle(a.buffer_size).batch(a.batch_size)
         test_data = test_data.map(
-            lambda x: _parse_example(x, a.which_direction)
+            lambda x: _parse_example(x, a)
         )
     return train_data, valid_data, test_data
     
