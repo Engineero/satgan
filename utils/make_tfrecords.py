@@ -8,7 +8,6 @@ Author: Nathan L. Toner
 import tensorflow as tf
 import numpy as np
 import argparse
-import os
 import json
 from pathlib import Path
 from astropy.io import fits
@@ -45,7 +44,7 @@ def _check_args(args):
             raise ValueError('Output directory already exists!')
     else:
         print(f'Making output directory {output_dir}...')
-        os.makedirs(output_dir)
+        output_dir.mkdir(parents=True)
     path_list = [a_dir, b_dir, annotation_dir]
     for path in path_list:
         if not path.glob('*'):
@@ -205,7 +204,7 @@ def make_tf_records(args):
     for name, examples in partitions.items():
         print(f'Writing partition "{name}" with {len(examples)} examples...')
         partition_dir = output_dir / name
-        os.mkdir(partition_dir)
+        partition_dir.mkdir()
         groups, num_groups = _group_list(examples, args.group_size)
         for i, example_group in tqdm(enumerate(groups), total=num_groups):
             tfrecords_name = f'{args.output_name}_{name}_{i}.tfrecords'

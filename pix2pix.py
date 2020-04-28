@@ -12,6 +12,7 @@ import random
 import collections
 import math
 import time
+from pathlib import Path
 from utils import ops
 from utils.darknet import build_darknet_model
 from tensorflow.keras.layers import (Input, Conv2D, Concatenate,
@@ -315,11 +316,11 @@ def _parse_example(eg):
 
 def load_examples(a):
     # Create data queue from training dataset.
-    if a.train_dir is None or not os.path.isdir(a.train_dir):
+    if a.train_dir is None or not Path(a.train_dir).resolve().is_dir():
         raise NotADirectoryError(
             f"Training directory {a.train_dir} does not exist!"
         )
-    train_paths = glob.glob(os.path.join(a.train_dir, "*.tfrecords"))
+    train_paths = list(Path(a.train_dir).resolve().glob('**/*.tfrecords'))
     if len(train_paths) == 0:
         raise ValueError(
             f"Training directory {a.input_dir} contains no TFRecords files!"
@@ -328,11 +329,11 @@ def load_examples(a):
     train_data = train_data.map(_parse_example)
 
     # Create data queue from validation dataset.
-    if a.valid_dir is None or not os.path.isdir(a.valid_dir):
+    if a.valid_dir is None or not Path(a.valid_dir).resolve().is_dir():
         raise NotADirectoryError(
             f"Validation directory {a.valid_dir} does not exist!"
         )
-    valid_paths = glob.glob(os.path.join(a.valid_dir, "*.tfrecords"))
+    valid_paths = list(Path(a.valid_dir).resolve().glob('**/*.tfrecords'))
     if len(valid_paths) == 0:
         raise ValueError(
             f"Validation directory {a.valid_dir} contains no TFRecords files!"
@@ -342,11 +343,11 @@ def load_examples(a):
 
     # Create data queue from testing dataset, if given.
     if a.test_dir is not None:
-        if not os.path.isdir(a.test_dir):
+        if not Path(a.test_dir).resolve().is_dir():
             raise NotADirectoryError(
                 f"Testing directory {a.test_dir} does not exist!"
             )
-        test_paths = glob.glob(os.path.join(a.test_dir, "*.tfrecords"))
+        test_paths = list(Path(a.test_dir).resolve().glob('**/*.tfrecords'))
         if len(test_paths) == 0:
             raise ValueError(
                 f"Testing directory {a.test_dir} contains no TFRecords files!"
@@ -726,8 +727,8 @@ def create_model(a, inputs, targets, task_targets):
 
 
 def save_images(a, fetches, step=None):
-    image_dir = os.path.join(a.output_dir, "images")
-    if not os.path.exists(image_dir):
+    image_dir = Path(a.output_dir).resolve() / 'images'
+    if not image_dir.is_dir():
         os.makedirs(image_dir)
     filesets = []
     for i, in_path in enumerate(fetches["paths"]):
@@ -738,45 +739,46 @@ def save_images(a, fetches, step=None):
             if step is not None:
                 filename = "%08d-%s" % (step, filename)
             fileset[kind] = filename
-            out_path = os.path.join(image_dir, filename)
+            out_path = image_dir / filename
             contents = fetches[kind][i]
-            with open(out_path, "wb") as f:
+            with open(out_path.as_posix(), "wb") as f:
                 f.write(contents)
         filesets.append(fileset)
     return filesets
 
 
 def append_index(a, filesets, step=False):
-    index_path = os.path.join(a.output_dir, "index.html")
-    if os.path.exists(index_path):
-        index = open(index_path, "a")
-    else:
-        index = open(index_path, "w")
-        index.write("<html><body><table><tr>")
-        if step:
-            index.write("<th>step</th>")
-        index.write("<th>name</th><th>input</th><th>output</th><th>target</th></tr>")
-    for fileset in filesets:
-        index.write("<tr>")
-        if step:
-            index.write("<td>%d</td>" % fileset["step"])
-        index.write("<td>%s</td>" % fileset["name"])
-        for kind in ["inputs", "outputs", "targets"]:
-            index.write("<td><img src='images/%s'></td>" % fileset[kind])
-        index.write("</tr>")
+    index_path = Path(a.output_dir).resolve() / 'index.html'
+    first_line = False
+    if not index_path.is_dir():
+        first_line = True
+    with open(index_path.as_posix(), 'a+') as index:
+        if first_line:
+            index.write("<html><body><table><tr>")
+            if step:
+                index.write("<th>step</th>")
+            index.write("<th>name</th><th>input</th><th>output</th><th>target</th></tr>")
+        for fileset in filesets:
+            index.write("<tr>")
+            if step:
+                index.write("<td>%d</td>" % fileset["step"])
+            index.write("<td>%s</td>" % fileset["name"])
+            for kind in ["inputs", "outputs", "targets"]:
+                index.write("<td><img src='images/%s'></td>" % fileset[kind])
+            index.write("</tr>")
     return index_path
 
 
 def main(a):
     # Set up the callbacks.
     callbacks = []
-    if not os.path.exists(a.output_dir):
-        os.makedirs(a.output_dir)
+    output_path = Path(a.output_dir).resolve()
+    output_path.mkdir(parents=True, exist_ok=True)
     if a.tensorboard_dir is not None:
-        if not os.path.exists(a.tensorboard_dir):
-            os.makedirs(a.tensorboard_dir)
+        tensorboard_path = Path(a.tensorboard_dir).resolve()
+        tensorboard_path.mkdir(parents=True, exist_ok=True)
         tensorboard_callback = TensorBoard(
-            log_dir=a.tensorboard_dir,
+            log_dir=tensorboard_path.as_posix(),
             histogram_freq=0,
             batch_size=a.batch_size,
             write_graph=True,
@@ -786,7 +788,7 @@ def main(a):
         )
         callbacks.append(tensorboard_callback)
     model_checkpoint = ModelCheckpoint(
-        a.output_dir,
+        output_path.as_posix(),
         monitor='val_loss',
         verbose=1,
         save_best_only=True,
