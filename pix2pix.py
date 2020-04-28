@@ -327,7 +327,6 @@ def load_examples(a):
     train_data = tf.data.TFRecordDataset(
         filenames=[p.as_posix() for p in train_paths]
     )
-    train_data = train_data.map(_parse_example)
 
     # Create data queue from validation dataset.
     if a.valid_dir is None or not Path(a.valid_dir).resolve().is_dir():
@@ -342,7 +341,6 @@ def load_examples(a):
     valid_data = tf.data.TFRecordDataset(
         filenames=[p.as_posix() for p in valid_paths]
     )
-    valid_data = valid_data.map(_parse_example)
 
     # Create data queue from testing dataset, if given.
     if a.test_dir is not None:
@@ -358,17 +356,21 @@ def load_examples(a):
         test_data = tf.data.TFRecordDataset(
             filenames=[p.as_posix() for p in test_paths]
         )
-        test_data = test_data.map(_parse_example)
     else:
         test_data = None
 
     # Specify transformations on datasets.
-    train_data = train_data.shuffle(a.buffer_size).batch(a.batch_size) \
-        .repeat(a.max_epochs)
-    valid_data = valid_data.shuffle(a.buffer_size).batch(a.batch_size) \
-        .repeat(a.max_epochs)
+    train_data = train_data.shuffle(a.buffer_size).batch(a.batch_size)
+    train_data = train_data.repeat(a.max_epochs)
+    train_data = train_data.map(_parse_example)
+
+    valid_data = valid_data.shuffle(a.buffer_size).batch(a.batch_size)
+    valid_data = valid_data.repeat(a.max_epochs)
+    valid_data = valid_data.map(_parse_example)
+
     if a.test_dir is not None:
         test_data = test_data.shuffle(a.buffer_size).batch(a.batch_size)
+        test_data = test_data.map(_parse_example)
     return train_data, valid_data, test_data
     
     # def get_name(path):
