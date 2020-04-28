@@ -270,10 +270,10 @@ def lab_to_rgb(a, lab):
         return tf.reshape(srgb_pixels, tf.shape(lab))
 
 
-def _parse_example(eg):
+def _parse_example(serialized_example):
     """Parses a single TFRecord Example for the task network."""
     example = tf.io.parse_example(
-        eg[tf.newaxis],
+        [serialized_example],
         {
             #'a_raw': preprocess(
             #    tf.image.decode_png(tf.io.FixedLenFeature(shape=(),
