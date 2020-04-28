@@ -275,15 +275,6 @@ def _parse_example(serialized_example, a):
     example = tf.io.parse_example(
         [serialized_example],
         {
-            #'a_raw': preprocess(
-            #    tf.image.decode_png(tf.io.FixedLenFeature(shape=(),
-            #                                              dtype=tf.string)),
-            #    add_noise=True
-            #),
-            #'b_raw': preprocess(
-            #    tf.image.decode_png(tf.io.FixedLenFeature(shape=(),
-            #                        dtype=tf.string))
-            #),
             'a_raw': tf.io.VarLenFeature(dtype=tf.string),
             'b_raw': tf.io.VarLenFeature(dtype=tf.string),
             'filename': tf.io.VarLenFeature(dtype=tf.string),
@@ -306,15 +297,16 @@ def _parse_example(serialized_example, a):
     ycenter = tf.cast(tf.sparse.to_dense(example['ycenter']), tf.float32)
     ymin = tf.cast(tf.sparse.to_dense(example['ymin']), tf.float32)
     ymax = tf.cast(tf.sparse.to_dense(example['ymax']), tf.float32)
-    bboxes = tf.stack([xcenter, ycenter, xmin, xmax, ymin, ymax], axis=1)
+    classes = tf.cast(tf.sparse.to_dense(example['classes']), tf.float32)
+    bboxes = tf.stack([xcenter, ycenter, xmin, xmax, ymin, ymax, classes], axis=1)
     task_targets = (bboxes, width, height)
     a_image = tf.sparse.to_dense(example['a_raw'], default_value='')
     a_image = tf.io.decode_raw(a_image, tf.int16)
-    tf.reshape(a_image, [height, width, a.num_channels])
+    tf.reshape(a_image, [height, width, a.n_channels])
     a_image = preprocess(a_image, add_noise=True)
     b_image = tf.sparse.to_dense(example['b_raw'], default_value='')
     b_image = tf.io.decode_raw(b_image, tf.int16)
-    tf.reshape(b_image, [height, width, a.num_channels])
+    tf.reshape(b_image, [height, width, a.n_channels])
     b_image = preprocess(b_image, add_noise=False)
     if a.which_direction == 'AtoB':
         return (a_image, (b_image, task_targets))
