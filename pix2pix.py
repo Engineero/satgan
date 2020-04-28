@@ -280,13 +280,13 @@ def _parse_example(serialized_example, a):
             'filename': tf.io.VarLenFeature(dtype=tf.string),
             'height': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
             'width': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
-            'classes': tf.io.VarLenFeature(dtype=tf.int64),
-            'ymin': tf.io.VarLenFeature(dtype=tf.float32),
-            'ymax': tf.io.VarLenFeature(dtype=tf.float32),
-            'ycenter': tf.io.VarLenFeature(dtype=tf.float32),
-            'xmin': tf.io.VarLenFeature(dtype=tf.float32),
-            'xmax': tf.io.VarLenFeature(dtype=tf.float32),
-            'xcenter': tf.io.VarLenFeature(dtype=tf.float32),
+            'classes': tf.io.VarLenFeature(dtype=tf.int64, default_value=[]),
+            'ymin': tf.io.VarLenFeature(dtype=tf.float32, default_value=[]),
+            'ymax': tf.io.VarLenFeature(dtype=tf.float32, default_value=[]),
+            'ycenter': tf.io.VarLenFeature(dtype=tf.float32, default_value=[]),
+            'xmin': tf.io.VarLenFeature(dtype=tf.float32, default_value=[]),
+            'xmax': tf.io.VarLenFeature(dtype=tf.float32, default_value=[]),
+            'xcenter': tf.io.VarLenFeature(dtype=tf.float32, default_value=[]),
         }
     )
     width = tf.cast(example['width'], tf.int32)
