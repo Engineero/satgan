@@ -134,21 +134,16 @@ def _partition_examples(examples, splits_dict):
 
 def _serialize_example(example, pad_for_satsim=False):
     """Builds a TFRecords Example object from the example data."""
-    (a_path, b_path, annotation) = example
-    a_data = _read_fits(a_path)
-    b_data = _read_fits(b_path)
-    with open(annotation, 'r') as fp:
-        annotations = json.load(fp)['data']
-
     # Handle satsim offsets.
     if pad_for_satsim:
         pad_amount = 0.02
     else:
         pad_amount = 0.00
 
-    # Read data from annotation file.
-    # sequence = [file.encode() for file in annotations['file']['sequence']]
-    # class_name = [obj['class_name'].encode() for obj in annotations['objects']]
+    # Load annotation data and check for valid image (with objects).
+    (a_path, b_path, annotation) = example
+    with open(annotation, 'r') as fp:
+        annotations = json.load(fp)['data']
     class_id = [obj['class_id'] for obj in annotations['objects']]
     y_min = [obj['y_min'] - pad_amount for obj in annotations['objects']]
     y_max = [obj['y_max'] + pad_amount for obj in annotations['objects']]
@@ -156,11 +151,14 @@ def _serialize_example(example, pad_for_satsim=False):
     x_min = [obj['x_min'] - pad_amount for obj in annotations['objects']]
     x_max = [obj['x_max'] + pad_amount for obj in annotations['objects']]
     x_center = [obj['x_center'] for obj in annotations['objects']]
-    # source = [obj['source'].encode() for obj in annotations['objects']]
     magnitude = [obj['magnitude'] for obj in annotations['objects']]
     dir_name = annotations['file']['dirname']
     file_name = annotations['file']['filename']
     path_name = (Path(dir_name) / Path(file_name)).as_posix()
+    if not x_center:
+        return None
+    a_data = _read_fits(a_path)
+    b_data = _read_fits(b_path)
 
     # Replace the unknown magnitude's with NaN's
     for i in range(len(magnitude)):
@@ -214,7 +212,8 @@ def make_tf_records(args):
                     # Make sure it's not empty.
                     if example:
                         tf_example = _serialize_example(example)
-                        writer.write(tf_example.SerializeToString())
+                        if tf_example is not None:
+                            writer.write(tf_example.SerializeToString())
     print('Done!')
 
 
