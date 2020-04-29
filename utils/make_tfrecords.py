@@ -132,8 +132,16 @@ def _partition_examples(examples, splits_dict):
     return partitions
 
 
-def _serialize_example(example, pad_for_satsim=False):
-    """Builds a TFRecords Example object from the example data."""
+def _serialize_example(example, pad_for_satsim=False, skip_empty=False):
+    """Builds a TFRecords Example object from the example data.
+    
+    Args:
+        example: example structure with (a_path, b_path, annotation_path).
+        
+    Keyword Args:
+        pad_for_satsim: whether to pad images for satsim. Default is False.
+        skip_empty: whether to skip frames with no object. Default is False.
+    """
     # Handle satsim offsets.
     if pad_for_satsim:
         pad_amount = 0.02
@@ -155,7 +163,7 @@ def _serialize_example(example, pad_for_satsim=False):
     dir_name = annotations['file']['dirname']
     file_name = annotations['file']['filename']
     path_name = (Path(dir_name) / Path(file_name)).as_posix()
-    if not x_center:
+    if skip_empty and not x_center:
         return None
     a_data = _read_fits(a_path)
     b_data = _read_fits(b_path)
@@ -211,7 +219,10 @@ def make_tf_records(args):
                 for example in example_group:
                     # Make sure it's not empty.
                     if example:
-                        tf_example = _serialize_example(example)
+                        tf_example = _serialize_example(
+                            example, 
+                            skip_empty=args.skip_empty
+                        )
                         if tf_example is not None:
                             writer.write(tf_example.SerializeToString())
     print('Done!')
@@ -230,6 +241,8 @@ if __name__ == '__main__':
                         help='Number of records per TFRecords file.')
     parser.add_argument('--output_name', default='tfrecords',
                         help='Name prepended to output TFRecords files.')
+    parser.add_argument('--skip_empty', default=False, action='store_true',
+                        help='Whether to skip empty frames in dataset.')
     args = parser.parse_args()
     _check_args(args)
     make_tf_records(args)
