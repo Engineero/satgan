@@ -1223,6 +1223,8 @@ if __name__ == '__main__':
                         help='L2 regularization term for bias')                   
     parser.add_argument('--buffer_size', type=int, default=512,
                         help='Buffer size for shuffling input data.')
+    parser.add_argument('--spec_norm', default=False, action='store_true',
+                        help='Whether to perform spectral normalization.')
 
     # export options
     parser.add_argument("--output_filetype", default="png",
