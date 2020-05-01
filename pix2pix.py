@@ -712,20 +712,21 @@ def create_model(a, inputs, targets, task_targets):
 
     with tf.name_scope('task_loss'):
         # TODO (NLT): implement YOLO loss or similar for detection.
-        target_w = task_targets[-1] - task_targets[-2]
-        target_h = task_targets[3] - task_targets[2]
+        # task_targets are [xcenter, ycenter, xmin, xmax, ymin, ymax, class]
+        target_w = task_targets[:, 3] - task_targets[:, 2]
+        target_h = task_targets[:, 5] - task_targets[:, 4]
         pred_xy, pred_wh, pred_obj, pred_class = task_net(targets)
         pred_xy_fake, pred_wh_fake, pred_obj_fake, pred_class_fake = \
             task_net(fake_img)
-        xy_loss = mean_squared_error(pred_xy, [task_targets[0], task_targets[1]])
+        xy_loss = mean_squared_error(pred_xy, task_targets[:, 0:2])
         wh_loss = mean_squared_error(pred_wh, [target_w, target_h])
         obj_loss = sparse_categorical_crossentropy(pred_obj, 1)
-        class_loss = sparse_categorical_crossentropy(pred_class, 1)
+        class_loss = sparse_categorical_crossentropy(pred_class, task_targets[:, -1])
         task_loss_real = xy_loss + wh_loss + obj_loss + class_loss
-        xy_loss_fake = mean_squared_error(pred_xy_fake, [task_targets[0], task_targets[1]])
+        xy_loss_fake = mean_squared_error(pred_xy_fake, task_targets[:, 0:2])
         wh_loss_fake = mean_squared_error(pred_wh_fake, [target_w, target_h])
         obj_loss_fake = sparse_categorical_crossentropy(pred_obj_fake, 1)
-        class_loss_fake = sparse_categorical_crossentropy(pred_class_fake, 1)
+        class_loss_fake = sparse_categorical_crossentropy(pred_class_fake, task_targets[:, -1])
         task_loss_fake = xy_loss_fake + wh_loss_fake + obj_loss_fake + \
             class_loss_fake
         task_loss = task_loss_real + task_loss_fake
