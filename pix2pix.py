@@ -302,11 +302,11 @@ def _parse_example(serialized_example, a):
     task_targets = (bboxes, width, height)
     a_image = tf.sparse.to_dense(example['a_raw'], default_value='')
     a_image = tf.io.decode_raw(a_image, tf.float32)
-    # tf.reshape(a_image, [-1, height[0], width[0], a.n_channels])
+    a_image = tf.reshape(a_image, [-1, height[0], width[0], a.n_channels])
     a_image = preprocess(a_image, add_noise=True)
     b_image = tf.sparse.to_dense(example['b_raw'], default_value='')
     b_image = tf.io.decode_raw(b_image, tf.float32)
-    # tf.reshape(b_image, [-1, height[0], width[0], a.n_channels])
+    b_image = tf.reshape(b_image, [-1, height[0], width[0], a.n_channels])
     b_image = preprocess(b_image, add_noise=False)
     if a.which_direction == 'AtoB':
         return (a_image, (b_image, task_targets))
