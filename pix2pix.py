@@ -676,7 +676,7 @@ def create_model(a, inputs, targets, task_targets):
     print(f'task_target_shape: {task_target_shape}')
     with tf.name_scope("generator"):
         out_channels = target_shape[-1]
-        generator = create_generator(a, input_shape[1:], out_channels)
+        generator = create_generator(a, input_shape, out_channels)
         fake_img = generator(inputs)
 
     # Create two copies of the task network, one for real images (targets
