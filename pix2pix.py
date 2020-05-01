@@ -507,7 +507,7 @@ def google_attention(x, filters, sn=False, scope='attention'):
             [1],
             initializer=tf.constant_initializer(0.0)
         )
-        o = tf.reshape(o, shape=[batch_size,
+        o = tf.reshape(o, shape=[-1,
                                  height,
                                  width,
                                  num_channels // 2])  # [bs, h, w, C]
