@@ -575,8 +575,8 @@ def create_discriminator(a, input_shape, target_shape):
     n_layers = 3
 
     # 2x [batch, height, width, in_channels] => [batch, height, width, in_channels * 2]
-    x_in = Input(shape=input_shape)
-    y_in = Input(shape=target_shape)
+    x_in = Input(shape=input_shape[1:])
+    y_in = Input(shape=target_shape[1:])
     input_concat = Concatenate([x_in, y_in], axis=3)
 
     # layer_1: [batch, 256, 256, in_channels * 2] => [batch, 128, 128, ndf]
@@ -610,7 +610,7 @@ def create_task_net(a, input_shape):
         Task network (detection) model.
     """
     # Feature pyramid network or darknet or something with res blocks.
-    model = build_darknet_model(input_shape)
+    model = build_darknet_model(input_shape[1:])
     # Predictor heads for object centroid, width, height.
     pred_xy = Conv2D(
         filters=2,
