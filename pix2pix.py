@@ -40,12 +40,14 @@ def preprocess(image, add_noise=False):
     with tf.name_scope("preprocess"):
         # [0, 1] => [-1, 1]
         # return image * 2 - 1
+        image = tf.cast(image, tf.float32)
         if add_noise:
             noise = tf.random.normal(shape=tf.shape(image), mean=0.0,
                                      stddev=0.5, dtype=tf.float32)
-            return tf.image.per_image_standardization(image) + noise
+            result = tf.image.per_image_standardization(image) + noise
         else:
-            return tf.image.per_image_standardization(image)
+            result = tf.image.per_image_standardization(image)
+        return tf.cast(result, tf.uint16)
 
 
 def deprocess(image):
@@ -302,13 +304,11 @@ def _parse_example(serialized_example, a):
     task_targets = (bboxes, width, height)
     a_image = tf.sparse.to_dense(example['a_raw'], default_value='')
     a_image = tf.io.decode_raw(a_image, tf.uint16)
-    a_image = tf.reshape(a_image, [-1, height[0], width[0], a.n_channels])
-    a_image = tf.cast(a_image, tf.float32)
+    a_image = tf.reshape(a_image, [height[0], width[0], a.n_channels])
     a_image = preprocess(a_image, add_noise=True)
     b_image = tf.sparse.to_dense(example['b_raw'], default_value='')
     b_image = tf.io.decode_raw(b_image, tf.uint16)
-    b_image = tf.reshape(b_image, [-1, height[0], width[0], a.n_channels])
-    b_image = tf.cast(b_image, tf.float32)
+    b_image = tf.reshape(b_image, [height[0], width[0], a.n_channels])
     b_image = preprocess(b_image, add_noise=False)
     if a.which_direction == 'AtoB':
         return (a_image, (b_image, task_targets))
