@@ -562,7 +562,7 @@ def create_generator(a, input_shape, generator_outputs_channels):
         x = ops.deconv(x, filters=generator_outputs_channels, padding='same',
                        scope='g_logit')
         print(f'shape of x, final: {x.shape.as_list()}')
-        x = tanh(x, name='generator')
+        x = tanh(x)
         return Model(inputs=x_in, outputs=x)
 
 
