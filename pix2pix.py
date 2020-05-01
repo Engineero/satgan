@@ -496,9 +496,9 @@ def google_attention(x, filters, sn=False, scope='attention'):
         h = MaxPooling2D()(h)
 
         # N = h * w
-        flat_g = tf.reshape(g, [-1, height*width, num_channels])
-        flat_f = tf.reshape(f, [-1, height*width, num_channels])
-        flat_h = tf.reshape(h, [-1, height*width, num_channels])
+        flat_g = tf.reshape(g, [-1, height*width, filters // 8])
+        flat_f = tf.reshape(f, [-1, height*width, filters // 8])
+        flat_h = tf.reshape(h, [-1, height*width, filters // 2])
         s = tf.matmul(flat_g, flat_f, transpose_b=True)  # # [bs, N, N]
         beta = tf.nn.softmax(s)  # attention map
         o = tf.matmul(beta, flat_h)  # [bs, N, C]
