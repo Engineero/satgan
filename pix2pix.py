@@ -57,7 +57,7 @@ def preprocess(image, add_noise=False):
             noise = tf.random.normal(shape=tf.shape(image), mean=0.0,
                                      stddev=0.5, dtype=tf.float32)
             result += noise
-        return tf.cast(result, tf.uint16)
+        return result
 
 
 def deprocess(image):
