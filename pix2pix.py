@@ -546,7 +546,7 @@ def create_generator(a, input_shape, generator_outputs_channels):
             skip_layers.append(x)
 
         x = google_attention(x, filters=num_filters, scope='self_attention')
-        print(f'shape of x (attention): {x.shape.as_list()}')
+        print(f'shape of x, attention: {x.shape.as_list()}')
 
         # Build the back end of the generator with skip connections.
         for i in range(num_blocks // 2, num_blocks):
