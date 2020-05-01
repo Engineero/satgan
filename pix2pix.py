@@ -521,8 +521,8 @@ def create_generator(a, input_shape, generator_outputs_channels):
     # encoder_1: [batch, 256, 256, in_channels] => [batch, 128, 128, ngf]
     with tf.name_scope("generator"):
         skip_layers = []
-        x = ops.up_resblock(x_in, filters=num_filters, sn=a.spec_norm,
-                            scope='front_down_resblock_0')
+        x = ops.down_resblock(x_in, filters=num_filters, sn=a.spec_norm,
+                              scope='front_down_resblock_0')
         for i in range(num_blocks // 2):
             x = ops.down_resblock(x, filters=num_filters // 2, sn=a.spec_norm,
                                   scope=f'mid_down_resblock_{i}')
