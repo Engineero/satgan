@@ -685,8 +685,8 @@ def create_model(a, inputs, targets, task_targets):
     with tf.name_scope("discriminator"):
         # TODO (NLT): figure out discriminator loss, interaction with Keras changes.
         discriminator = create_discriminator(a, input_shape, target_shape)
-        predict_real = discriminator(inputs, targets)
-        predict_fake = discriminator(inputs, fake_img)
+        predict_real = discriminator([inputs, targets])
+        predict_fake = discriminator([inputs, fake_img])
     #     with tf.compat.v1.variable_scope("discriminator"):
     #         # 2x [batch, height, width, channels] => [batch, 30, 30, 1]
     #         predict_real = create_discriminator(a, inputs, targets)
