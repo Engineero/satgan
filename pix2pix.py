@@ -552,7 +552,7 @@ def create_generator(a, input_shape, generator_outputs_channels):
         for i in range(num_blocks // 2, num_blocks):
             x = ops.up_resblock(Concatenate()([x, skip_layers.pop()]),
                                 filters=num_filters,
-                                sn=a.sn,
+                                sn=a.spec_norm,
                                 scope=f'back_up_resblock_{i}')
             print(f'shape of x: {x.shape.as_list()}')
             num_filters = num_filters * 2
