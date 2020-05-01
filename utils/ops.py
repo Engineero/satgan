@@ -10,7 +10,7 @@ from .SpectralNormalization import SpectralNormalization
 ##################################################################################
 # Layers
 ##################################################################################
-def conv(x, filters, kernel_size=(1, 1), strides=(1, 1), padding=None,
+def conv(x, filters, kernel_size=(1, 1), strides=(1, 1), padding='valid',
          use_bias=False, sn=False, scope='conv_0', separable=False):
     """Defines a convolutional block with optional spectral norm.
 
@@ -21,7 +21,7 @@ def conv(x, filters, kernel_size=(1, 1), strides=(1, 1), padding=None,
     Keyword Args:
         kernel_size: kernel size. Default is (1, 1).
         strides: strides. Default is (1, 1).
-        padding: mode for padding. Default is None.
+        padding: mode for padding. Default is 'valid'.
         use_bias: whether to use bias. Default is False.
         sn: whether to apply spectral normalization. Default is False.
         scope: scope name for the block. Default is 'conv_0'.
