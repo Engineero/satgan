@@ -159,7 +159,7 @@ def up_resblock(x_init, filters, use_bias=True, sn=False, scope='resblock',
                      separable=separable)
 
         with tf.name_scope('res2'):
-            x = BatchNormalization()(x_init)
+            x = BatchNormalization()(x)
             x = LeakyReLU()(x)
             x = conv(x,
                      filters,
@@ -176,7 +176,6 @@ def up_resblock(x_init, filters, use_bias=True, sn=False, scope='resblock',
                           filters,
                           kernel_size=(1, 1),
                           strides=(1, 1),
-                          padding='same',
                           use_bias=False,
                           sn=sn,
                           separable=separable)
