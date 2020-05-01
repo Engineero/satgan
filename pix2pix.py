@@ -527,7 +527,7 @@ def create_generator(a, input_shape, generator_outputs_channels):
         Generator network model.
     """
 
-    x_in = Input(shape=input_shape)
+    x_in = Input(shape=input_shape[1:])  # don't give Input the batch dim
     num_blocks = 8
     num_filters = a.ngf
     # encoder_1: [batch, 256, 256, in_channels] => [batch, 128, 128, ngf]
