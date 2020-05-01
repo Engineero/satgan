@@ -37,16 +37,26 @@ Examples = collections.namedtuple(
 
 
 def preprocess(image, add_noise=False):
+    """Performs image standardization, optinoally adds Gaussian noise.
+
+    Args:
+        image: the image to transform
+
+    Keyword Args:
+        add_noise: whether to add Gaussian noise to the image. Default is
+            False.
+    
+    Returns:
+        Image shifted to zero mean and unit standard deviation with optional
+            Gaussian noise added.
+    """
     with tf.name_scope("preprocess"):
-        # [0, 1] => [-1, 1]
-        # return image * 2 - 1
         image = tf.cast(image, tf.float32)
+        result = tf.image.per_image_standardization(image)
         if add_noise:
             noise = tf.random.normal(shape=tf.shape(image), mean=0.0,
                                      stddev=0.5, dtype=tf.float32)
-            result = tf.image.per_image_standardization(image) + noise
-        else:
-            result = tf.image.per_image_standardization(image)
+            result += noise
         return tf.cast(result, tf.uint16)
 
 
