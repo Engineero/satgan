@@ -812,13 +812,13 @@ def main(a):
 
     # Build data generators.
     train_data, val_data, test_data = load_examples(a)
-    inputs, (targets, task_targets) = next(iter(train_data))
+    inputs, (targets, (task_targets, width, height)) = next(iter(train_data))
 
     # Get inputs, targets, and task targets from generators.
 
 
     # Build the model.
-    model = create_model(a, inputs, targets, task_targets)  # TODO (NLT): update signature
+    model = create_model(a, inputs, targets, task_targets)
 
     # Train the model.
     history = model.fit(
