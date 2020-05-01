@@ -485,7 +485,7 @@ def load_examples(a):
 
 def google_attention(x, filters, sn=False, scope='attention'):
     with tf.name_scope(scope):
-        batch_size, height, width, num_channels = x.get_shape().as_list()
+        _, height, width, num_channels = x.get_shape().as_list()
         f = ops.conv(x, filters // 8, kernel_size=(1, 1), strides=(1, 1),
                      sn=sn, scope='f_conv')  # [bs, h, w, c']
         f = MaxPooling2D()(f)
@@ -537,16 +537,13 @@ def create_generator(a, input_shape, generator_outputs_channels):
         skip_layers = []
         x = ops.down_resblock(x_in, filters=num_filters, sn=a.spec_norm,
                               scope='front_down_resblock_0')
-        print(f'shape of x, first block: {x.shape.as_list()}')
         for i in range(num_blocks // 2):
             x = ops.down_resblock(x, filters=num_filters // 2, sn=a.spec_norm,
                                   scope=f'mid_down_resblock_{i}')
-            print(f'shape of x, block {i}: {x.shape.as_list()}')
             num_filters = num_filters // 2
             skip_layers.append(x)
 
         x = google_attention(x, filters=num_filters, scope='self_attention')
-        print(f'shape of x, attention: {x.shape.as_list()}')
 
         # Build the back end of the generator with skip connections.
         for i in range(num_blocks // 2, num_blocks):
@@ -554,14 +551,12 @@ def create_generator(a, input_shape, generator_outputs_channels):
                                 filters=num_filters,
                                 sn=a.spec_norm,
                                 scope=f'back_up_resblock_{i}')
-            print(f'shape of x, block {i}: {x.shape.as_list()}')
             num_filters = num_filters * 2
 
         x = BatchNormalization()(x)
         x = LeakyReLU()(x)
         x = ops.deconv(x, filters=generator_outputs_channels, padding='same',
                        scope='g_logit')
-        print(f'shape of x, final: {x.shape.as_list()}')
         x = tanh(x)
         return Model(inputs=x_in, outputs=x)
 
@@ -671,11 +666,8 @@ def create_task_net(a, input_shape):
 
 def create_model(a, inputs, targets, task_targets):
     input_shape = inputs.shape.as_list()
-    print(f'input_shape: {input_shape}')
     target_shape = targets.shape.as_list()
-    print(f'target_shape: {target_shape}')
     task_target_shape = task_targets.shape.as_list()
-    print(f'task_target_shape: {task_target_shape}')
     with tf.name_scope("generator"):
         out_channels = target_shape[-1]
         generator = create_generator(a, input_shape, out_channels)
