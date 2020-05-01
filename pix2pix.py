@@ -678,7 +678,7 @@ def create_model(a, inputs, targets, task_targets):
     # generator). The task targets (detected objects) should be the same for
     # both.
     with tf.name_scope('task_net'):
-        task_net = create_task_net(a, task_target_shape)
+        task_net = create_task_net(a, input_shape)
 
     # Create two copies of discriminator, one for real pairs and one for fake
     # pairs they share the same underlying variables
