@@ -577,7 +577,7 @@ def create_discriminator(a, input_shape, target_shape):
     # 2x [batch, height, width, in_channels] => [batch, height, width, in_channels * 2]
     x_in = Input(shape=input_shape[1:])
     y_in = Input(shape=target_shape[1:])
-    input_concat = Concatenate([x_in, y_in], axis=3)
+    input_concat = Concatenate(axis=-1)([x_in, y_in])
 
     # layer_1: [batch, 256, 256, in_channels * 2] => [batch, 128, 128, ndf]
     x = ops.down_resblock(input_concat, filters=a.ndf,
