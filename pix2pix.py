@@ -537,16 +537,16 @@ def create_generator(a, input_shape, generator_outputs_channels):
         skip_layers = []
         x = ops.down_resblock(x_in, filters=num_filters, sn=a.spec_norm,
                               scope='front_down_resblock_0')
-        print(f'shape of x: {x.shape.as_list()}')
+        print(f'shape of x, first block: {x.shape.as_list()}')
         for i in range(num_blocks // 2):
             x = ops.down_resblock(x, filters=num_filters // 2, sn=a.spec_norm,
                                   scope=f'mid_down_resblock_{i}')
-            print(f'shape of x: {x.shape.as_list()}')
+            print(f'shape of x, block {i}: {x.shape.as_list()}')
             num_filters = num_filters // 2
             skip_layers.append(x)
 
         x = google_attention(x, filters=num_filters, scope='self_attention')
-        print(f'shape of x: {x.shape.as_list()}')
+        print(f'shape of x (attention): {x.shape.as_list()}')
 
         # Build the back end of the generator with skip connections.
         for i in range(num_blocks // 2, num_blocks):
@@ -554,14 +554,14 @@ def create_generator(a, input_shape, generator_outputs_channels):
                                 filters=num_filters,
                                 sn=a.spec_norm,
                                 scope=f'back_up_resblock_{i}')
-            print(f'shape of x: {x.shape.as_list()}')
+            print(f'shape of x, block {i}: {x.shape.as_list()}')
             num_filters = num_filters * 2
 
         x = BatchNormalization()(x)
         x = LeakyReLU()(x)
         x = ops.deconv(x, filters=generator_outputs_channels, padding='same',
                        scope='g_logit')
-        print(f'shape of x: {x.shape.as_list()}')
+        print(f'shape of x, final: {x.shape.as_list()}')
         x = tanh(x, name='generator')
         return Model(inputs=x_in, outputs=x)
 
