@@ -689,6 +689,12 @@ def create_model(a, inputs, targets, task_targets):
         predict_real = discriminator([inputs, targets])
         predict_fake = discriminator([inputs, fake_img])
 
+    # Plot the sub-models.
+    if a.plot_models:
+        plot_model(generator, to_file='plots/generator.png')
+        plot_model(task_net, to_file='plots/task_net.png')
+        plot_model(discriminator, to_file='plots/discriminator.png')
+
     with tf.name_scope("discriminator_loss"):
         # minimizing -tf.log will try to get inputs to 1
         # predict_real => 1
@@ -728,11 +734,8 @@ def create_model(a, inputs, targets, task_targets):
                   outputs=[generator.outputs, discriminator.outputs,
                            task_net.outputs])
 
-    # Plot the models.
+    # Plot the overall model.
     if a.plot_models:
-        plot_model(generator, to_file='plots/generator.png')
-        plot_model(task_net, to_file='plots/task_net.png')
-        plot_model(discriminator, to_file='plots/discriminator.png')
         plot_model(model, to_file='plots/full_model.png')
 
     # TODO (NLT): compile the model with appropriate losses, optimizers, callbacks, etc.
