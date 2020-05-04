@@ -22,7 +22,7 @@ from tensorflow.keras.models import Model, load_model
 from tensorflow.keras.regularizers import l1_l2
 from tensorflow.keras.losses import mean_squared_error, sparse_categorical_crossentropy
 from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint
-from tensorflow.keras.utilities import plot_model
+from tensorflow.keras.utils import plot_model
 
 
 # Define globals.
