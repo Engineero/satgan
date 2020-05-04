@@ -22,6 +22,7 @@ from tensorflow.keras.models import Model, load_model
 from tensorflow.keras.regularizers import l1_l2
 from tensorflow.keras.losses import mean_squared_error, sparse_categorical_crossentropy
 from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint
+from tensorflow.keras.utilities import plot_model
 
 
 # Define globals.
@@ -687,14 +688,6 @@ def create_model(a, inputs, targets, task_targets):
         discriminator = create_discriminator(a, input_shape, target_shape)
         predict_real = discriminator([inputs, targets])
         predict_fake = discriminator([inputs, fake_img])
-    #     with tf.compat.v1.variable_scope("discriminator"):
-    #         # 2x [batch, height, width, channels] => [batch, 30, 30, 1]
-    #         predict_real = create_discriminator(a, inputs, targets)
-
-    # with tf.name_scope("fake_discriminator"):
-    #     with tf.compat.v1.variable_scope("discriminator", reuse=True):
-    #         # 2x [batch, height, width, channels] => [batch, 30, 30, 1]
-    #         predict_fake = create_discriminator(a, inputs, generator.outputs[0])
 
     with tf.name_scope("discriminator_loss"):
         # minimizing -tf.log will try to get inputs to 1
@@ -734,6 +727,13 @@ def create_model(a, inputs, targets, task_targets):
     model = Model(inputs=[inputs, targets],
                   outputs=[generator.outputs, discriminator.outputs,
                            task_net.outputs])
+
+    # Plot the models.
+    if a.plot_models:
+        plot_model(generator, to_file='plots/generator.png')
+        plot_model(task_net, to_file='plots/task_net.png')
+        plot_model(discriminator, to_file='plots/discriminator.png')
+        plot_model(model, to_file='plots/full_model.png')
 
     # TODO (NLT): compile the model with appropriate losses, optimizers, callbacks, etc.
     losses = {'generator': gen_loss,
@@ -1240,6 +1240,8 @@ if __name__ == '__main__':
                         help='Buffer size for shuffling input data.')
     parser.add_argument('--spec_norm', default=False, action='store_true',
                         help='Whether to perform spectral normalization.')
+    parser.add_argument('--plot_models', default=False, action='store_true',
+                        help='Whether to plot model architectures.')
 
     # export options
     parser.add_argument("--output_filetype", default="png",
