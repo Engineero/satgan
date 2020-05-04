@@ -691,9 +691,9 @@ def create_model(a, inputs, targets, task_targets):
 
     # Plot the sub-models.
     if a.plot_models:
-        plot_model(generator, to_file='plots/generator.png')
-        plot_model(task_net, to_file='plots/task_net.png')
-        plot_model(discriminator, to_file='plots/discriminator.png')
+        plot_model(generator, to_file='plots/generator.svg')
+        plot_model(task_net, to_file='plots/task_net.svg')
+        plot_model(discriminator, to_file='plots/discriminator.svg')
 
     with tf.name_scope("discriminator_loss"):
         # minimizing -tf.log will try to get inputs to 1
@@ -729,14 +729,14 @@ def create_model(a, inputs, targets, task_targets):
         task_loss_fake = xy_loss_fake + wh_loss_fake + obj_loss_fake + \
             class_loss_fake
         task_loss = task_loss_real + task_loss_fake
-    
+
     model = Model(inputs=[inputs, targets],
                   outputs=[generator.outputs, discriminator.outputs,
                            task_net.outputs])
 
     # Plot the overall model.
     if a.plot_models:
-        plot_model(model, to_file='plots/full_model.png')
+        plot_model(model, to_file='plots/full_model.svg')
 
     # TODO (NLT): compile the model with appropriate losses, optimizers, callbacks, etc.
     losses = {'generator': gen_loss,
