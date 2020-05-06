@@ -786,6 +786,7 @@ def main():
         objects = deprocess(examples.objects)
         targets = deprocess(examples.targets)
         outputs = deprocess(model.outputs)
+        combined_outputs = deprocess(model.combined_outputs)
 
     def convert(image):
         if a.aspect_ratio != 1.0:
@@ -808,6 +809,8 @@ def main():
         converted_targets = convert(targets)
     with tf.name_scope("convert_outputs"):
         converted_outputs = convert(outputs)
+    with tf.name_scope("convert_combined_outputs"):
+        converted_combined_outputs = convert(combined_outputs)
     with tf.name_scope("encode_images"):
         display_fetches = {
             "paths": examples.paths,
@@ -819,6 +822,9 @@ def main():
                                  dtype=tf.string, name="target_pngs"),
             "outputs": tf.map_fn(tf.image.encode_png, converted_outputs,
                                  dtype=tf.string, name="output_pngs"),
+            "combined_outputs": tf.map_fn(tf.image.encode_png,
+                                          converted_combined_outputs,
+                                          dtype=tf.string, name="output_pngs"),
         }
 
     # summaries
@@ -842,6 +848,11 @@ def main():
         #                                               dtype=tf.float32)
         #tf.summary.image("outputs", summary_outputs)
         tf.summary.image("outputs", outputs)
+    with tf.name_scope("combined_outputs_summary"):
+        #summary_outputs = tf.image.convert_image_dtype(converted_outputs,
+        #                                               dtype=tf.float32)
+        #tf.summary.image("outputs", summary_outputs)
+        tf.summary.image("combined_outputs", combined_outputs)
     with tf.name_scope("predict_real_summary"):
         tf.summary.image("predict_real",
                          tf.image.convert_image_dtype(model.predict_real,
