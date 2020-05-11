@@ -100,8 +100,8 @@ def preprocess(image, add_noise=False):
         # return image * 2 - 1
         if add_noise:
             noise = tf.random_normal(shape=tf.shape(image), mean=0.0,
-                                     stddev=0.5, dtype=tf.float32)
-            return (image, noise)
+                                     stddev=1., dtype=tf.float32)
+            return (tf.image.per_image_standardization(image), noise)
         else:
             return tf.image.per_image_standardization(image)
 
