@@ -498,13 +498,13 @@ def create_model(a, inputs, targets, task_targets):
         # task_targets are [xcenter, ycenter, xmin, xmax, ymin, ymax, class]
         pred_x, pred_y = task_net(targets)
         pred_xy = tf.stack([pred_x, pred_y], axis=1)
-        pred_xy = tf.reshape(pred_xy, (pred_xy.shape[0], pred_xy.shape[1], -1))
+        pred_xy = tf.reshape(pred_xy, (pred_xy.shape[0], pred_xy.shape[1], None))
         xy_loss = mean_squared_error(pred_xy, task_targets[:, 0:2])
         pred_x_fake, pred_y_fake = task_net(fake_img)
         pred_xy_fake = tf.stack([pred_x_fake, pred_y_fake], axis=1)
         pred_xy_fake = tf.reshape(pred_xy_fake, (pred_xy_fake.shape[0],
                                                  pred_xy_fake.shape[1],
-                                                 -1))
+                                                 None))
         xy_loss_fake = mean_squared_error(pred_xy_fake, task_targets[:, 0:2])
         task_loss = xy_loss + xy_loss_fake
 
