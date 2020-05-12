@@ -77,7 +77,7 @@ def build_darknet_model(input_image_shape):
                         {'filter': 1024, 'kernel': 3, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 80}
                         ],
                     do_skip=False)
-    leaky_80 = x
+    leaky_80 = UpSampling2D(4)(x)
 
     # Layer 83 => 86
     x = _conv_block(x, [{'filter': 256, 'kernel': 1, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 84}],
@@ -94,7 +94,7 @@ def build_darknet_model(input_image_shape):
                         {'filter': 512, 'kernel': 3, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 92}
                         ],
                     do_skip=False)
-    leaky_92 = x
+    leaky_92 = UpSampling2D(2)(x)
 
     # Layer 95 => 98
     x = _conv_block(x, [{'filter': 128, 'kernel': 1, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 96}],
