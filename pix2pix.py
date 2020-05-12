@@ -38,7 +38,7 @@ def preprocess(image, add_noise=False):
     Keyword Args:
         add_noise: whether to add Gaussian noise to the image. Default is
             False.
-    
+
     Returns:
         Image shifted to zero mean and unit standard deviation with optional
             Gaussian noise added.
@@ -197,7 +197,7 @@ def _parse_example(serialized_example, a):
     paddings = tf.constant([[0, 0], [0, 0], [0, a.max_inferences]])
     paddings = paddings - (tf.constant([[0, 0], [0, 0], [0, 1]]) * tf.shape(objects)[-1])
     objects = tf.pad(tensor=objects, paddings=paddings, constant_values=0.0)
-    objects = tf.tile(objects, [0, 0, a.num_pred_layers])
+    objects = tf.tile(objects, [1, 1, a.num_pred_layers])
 
     # TODO (NLT): either mask these bboxes to 64x64 images or figure out how to
     # get 100 bboxes per task net output...
