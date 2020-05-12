@@ -493,17 +493,12 @@ def create_model(a, inputs, targets, task_targets):
     with tf.name_scope('task_loss'):
         # TODO (NLT): implement YOLO loss or similar for detection.
         # task_targets are [xcenter, ycenter, xmin, xmax, ymin, ymax, class]
-        pred_xy, pred_class = task_net(targets)
-        pred_xy_fake, pred_class_fake = task_net(fake_img)
-        xy_loss = mean_squared_error(pred_xy, task_targets[:, 0:2])
-        class_loss = sparse_categorical_crossentropy(pred_class,
-                                                     task_targets[:, -1])
-        task_loss_real = xy_loss + class_loss
-        xy_loss_fake = mean_squared_error(pred_xy_fake, task_targets[:, 0:2])
-        class_loss_fake = sparse_categorical_crossentropy(pred_class_fake,
-                                                          task_targets[:, -1])
-        task_loss_fake = xy_loss_fake + class_loss_fake
-        task_loss = task_loss_real + task_loss_fake
+        pred_x, pred_y = task_net(targets)
+        pred_x_fake, pred_y_fake = task_net(fake_img)
+        xy_loss = mean_squared_error([pred_x, pred_y], task_targets[:, 0:2])
+        xy_loss_fake = mean_squared_error([pred_x_fake, pred_y_fake],
+                                          task_targets[:, 0:2])
+        task_loss = xy_loss + xy_loss_fake
 
     model = Model(inputs=[inputs, targets],
                   outputs=[generator.outputs, discriminator.outputs,
