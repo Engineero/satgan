@@ -509,9 +509,11 @@ def create_model(a, inputs, targets, task_targets):
         task_loss = xy_loss + xy_loss_fake
 
     model = Model(inputs=[inputs, targets],
-                  outputs={'generator': generator.outputs,
-                           'discriminator': discriminator.outputs,
-                           'task_net': task_net.outputs})
+                  outputs={'generator': fake_img,
+                           'discriminator': tf.stack([predict_real,
+                                                      predict_fake], axis=1),
+                           'task_net': tf.stack([pred_xy,
+                                                 pred_xy_fake], axis=1)})
 
     # Plot the overall model.
     if a.plot_models:
