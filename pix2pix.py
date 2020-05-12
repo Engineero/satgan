@@ -740,6 +740,12 @@ if __name__ == '__main__':
                         help='Max inferences per image. Default 100.')
     parser.add_argument('--num_pred_layers', default=1, type=int,
                         help='Number of predictor layers to use in network.')
+    parser.add_argument('--gen_weight', default=1., type=float,
+                        help='Relative weight of generator loss.')
+    parser.add_argument('--dsc_weight', default=1., type=float,
+                        help='Relative weight of discriminator loss.')
+    parser.add_argument('--task_weight', default=1., type=float,
+                        help='Relative weight of task loss.')
 
     # export options
     parser.add_argument("--output_filetype", default="png",
