@@ -526,9 +526,9 @@ def create_model(a, inputs, targets, task_targets):
     optimizers = {'generator': 'adam',
                   'discriminator': 'adam',
                   'task_net': 'adam'}
-    metrics = {'generator': 'mse',
-               'discriminator': 'sparse_categorical_crossentropy',
-               'task_net': 'mse'}
+    metrics = {'generator': [gen_loss_GAN, gen_loss_L1],
+               'discriminator': discrim_loss,
+               'task_net': task_loss}
     model.compile(loss=losses,
                   loss_weights=loss_weights,
                   optimizer=optimizers,
