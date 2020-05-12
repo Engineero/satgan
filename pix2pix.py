@@ -427,58 +427,78 @@ def create_task_net(a, input_shape):
     Returns:
         Task network (detection) model.
     """
-    max_inf = a.max_inferences
+    xy_list = []
+    wh_list = []
+    obj_list = []
+    class_list = []
     # Feature pyramid network or darknet or something with res blocks.
     model = build_darknet_model(input_shape[1:])
     # Predictor heads for object centroid, width, height.
-    pred_xy = Conv2D(
-        filters=2,
-        kernel_size=1,
-        strides=1,
-        padding='same',
-        kernel_initializer='he_normal',
-        activation='sigmoid',
-        kernel_regularizer=l1_l2(a.l1_reg_kernel,
-                                 a.l2_reg_kernel),
-        bias_regularizer=l1_l2(a.l1_reg_bias,
-                               a.l2_reg_bias)
-    )(model.output)
-    pred_wh = Conv2D(
-        filters=2,
-        kernel_size=1,
-        strides=1,
-        padding='same',
-        kernel_initializer='he_normal',
-        activation='sigmoid',
-        kernel_regularizer=l1_l2(a.l1_reg_kernel,
-                                 a.l2_reg_kernel),
-        bias_regularizer=l1_l2(a.l1_reg_bias,
-                               a.l2_reg_bias)
-    )(model.output)
-    pred_obj = Conv2D(
-        filters=2,
-        kernel_size=1,
-        strides=1,
-        padding='same',
-        kernel_initializer='he_normal',
-        activation='sigmoid',
-        kernel_regularizer=l1_l2(a.l1_reg_kernel,
-                                 a.l2_reg_kernel),
-        bias_regularizer=l1_l2(a.l1_reg_bias,
-                               a.l2_reg_bias)
-    )(model.output)
-    pred_class = Conv2D(
-        filters=a.num_classes,
-        kernel_size=1,
-        strides=1,
-        padding='same',
-        kernel_initializer='he_normal',
-        activation='sigmoid',
-        kernel_regularizer=l1_l2(a.l1_reg_kernel,
-                                 a.l2_reg_kernel),
-        bias_regularizer=l1_l2(a.l1_reg_bias,
-                               a.l2_reg_bias)
-    )(model.output)
+    for output in model.outputs:
+        pred_xy = Conv2D(
+            filters=2,
+            kernel_size=1,
+            strides=1,
+            padding='same',
+            kernel_initializer='he_normal',
+            activation='sigmoid',
+            kernel_regularizer=l1_l2(a.l1_reg_kernel,
+                                     a.l2_reg_kernel),
+            bias_regularizer=l1_l2(a.l1_reg_bias,
+                                   a.l2_reg_bias)
+        )(output)
+        xy_list.append(pred_xy)
+        pred_wh = Conv2D(
+            filters=2,
+            kernel_size=1,
+            strides=1,
+            padding='same',
+            kernel_initializer='he_normal',
+            activation='sigmoid',
+            kernel_regularizer=l1_l2(a.l1_reg_kernel,
+                                     a.l2_reg_kernel),
+            bias_regularizer=l1_l2(a.l1_reg_bias,
+                                   a.l2_reg_bias)
+        )(output)
+        wh_list.append(pred_wh)
+        pred_obj = Conv2D(
+            filters=2,
+            kernel_size=1,
+            strides=1,
+            padding='same',
+            kernel_initializer='he_normal',
+            activation='sigmoid',
+            kernel_regularizer=l1_l2(a.l1_reg_kernel,
+                                     a.l2_reg_kernel),
+            bias_regularizer=l1_l2(a.l1_reg_bias,
+                                   a.l2_reg_bias)
+        )(output)
+        obj_list.append(pred_obj)
+        pred_class = Conv2D(
+            filters=a.num_classes,
+            kernel_size=1,
+            strides=1,
+            padding='same',
+            kernel_initializer='he_normal',
+            activation='sigmoid',
+            kernel_regularizer=l1_l2(a.l1_reg_kernel,
+                                     a.l2_reg_kernel),
+            bias_regularizer=l1_l2(a.l1_reg_bias,
+                                   a.l2_reg_bias)
+        )(output)
+        class_list.append(pred_class)
+
+    # Combine outputs together.
+    if len(model.outputs) > 1:
+        pred_xy = tf.stack(xy_list, axis=-2, name='stack_xy')
+        pred_wh = tf.stack(wh_list, axis=-2, name='stack_wh')
+        pred_obj = tf.stack(obj_list, axis=-2, name='stack_obj')
+        pred_class = tf.stack(class_list, axis=-2, name='stack_class')
+    else:
+        pred_xy = tf.expand_dims(xy_list[0], axis=-2)
+        pred_wh = tf.expand_dims(wh_list[0], axis=-2)
+        pred_obj = tf.expand_dims(obj_list[0], axis=-2)
+        pred_class = tf.expand_dims(class_list[0], axis=-2)
     return Model(inputs=model.input,
                  outputs=[pred_xy, pred_wh, pred_obj, pred_class])
 
