@@ -103,52 +103,6 @@ def check_image(a, image):
     return image
 
 
-# based on https://github.com/torch/image/blob/9f65c30167b2048ecbe8b7befdc6b2d6d12baee9/generic/image.c
-def rgb_to_lab(a, srgb):
-    with tf.name_scope("rgb_to_lab"):
-        srgb = check_image(a, srgb)
-        srgb_pixels = tf.reshape(srgb, [-1, 3])
-
-        with tf.name_scope("srgb_to_xyz"):
-            linear_mask = tf.cast(srgb_pixels <= 0.04045, dtype=tf.float32)
-            exponential_mask = tf.cast(srgb_pixels > 0.04045, dtype=tf.float32)
-            rgb_pixels = (srgb_pixels / 12.92 * linear_mask) + \
-                (((srgb_pixels + 0.055) / 1.055) ** 2.4) * exponential_mask
-            rgb_to_xyz = tf.constant([
-                #    X        Y          Z
-                [0.412453, 0.212671, 0.019334], # R
-                [0.357580, 0.715160, 0.119193], # G
-                [0.180423, 0.072169, 0.950227], # B
-            ])
-            xyz_pixels = tf.matmul(rgb_pixels, rgb_to_xyz)
-
-        # https://en.wikipedia.org/wiki/Lab_color_space#CIELAB-CIEXYZ_conversions
-        with tf.name_scope("xyz_to_cielab"):
-            # convert to fx = f(X/Xn), fy = f(Y/Yn), fz = f(Z/Zn)
-            # normalize for D65 white point
-            xyz_normalized_pixels = tf.multiply(xyz_pixels,
-                                                [1/0.950456, 1.0, 1/1.088754])
-            epsilon = 6/29
-            linear_mask = tf.cast(xyz_normalized_pixels <= (epsilon**3),
-                                  dtype=tf.float32)
-            exponential_mask = tf.cast(xyz_normalized_pixels > (epsilon**3),
-                                       dtype=tf.float32)
-            fxfyfz_pixels = (xyz_normalized_pixels / (3 * epsilon**2) + 4/29) \
-                * linear_mask + (xyz_normalized_pixels ** (1/3)) \
-                * exponential_mask
-
-            # convert to lab
-            fxfyfz_to_lab = tf.constant([
-                #  l       a       b
-                [  0.0,  500.0,    0.0], # fx
-                [116.0, -500.0,  200.0], # fy
-                [  0.0,    0.0, -200.0], # fz
-            ])
-            lab_pixels = tf.matmul(fxfyfz_pixels, fxfyfz_to_lab) + \
-                tf.constant([-16.0, 0.0, 0.0])
-        return tf.reshape(lab_pixels, tf.shape(srgb))
-
-
 def lab_to_rgb(a, lab):
     with tf.name_scope("lab_to_rgb"):
         lab = check_image(a, lab)
@@ -196,6 +150,7 @@ def lab_to_rgb(a, lab):
 
 def _parse_example(serialized_example, a):
     """Parses a single TFRecord Example for the task network."""
+    # Parse serialized example.
     example = tf.io.parse_example(
         serialized_example,
         {
@@ -213,6 +168,8 @@ def _parse_example(serialized_example, a):
             'xcenter': tf.io.VarLenFeature(dtype=tf.float32),
         }
     )
+
+    # Cast parsed objects into usable types.
     width = tf.cast(example['width'], tf.int32)
     height = tf.cast(example['height'], tf.int32)
     xcenter = tf.cast(tf.sparse.to_dense(example['xcenter']), tf.float32)
@@ -222,8 +179,8 @@ def _parse_example(serialized_example, a):
     ymin = tf.cast(tf.sparse.to_dense(example['ymin']), tf.float32)
     ymax = tf.cast(tf.sparse.to_dense(example['ymax']), tf.float32)
     classes = tf.cast(tf.sparse.to_dense(example['classes']), tf.float32)
-    bboxes = tf.stack([xcenter, ycenter, xmin, xmax, ymin, ymax, classes], axis=1)
-    task_targets = (bboxes, width, height)
+
+    # Parse images and preprocess.
     a_image = tf.sparse.to_dense(example['a_raw'], default_value='')
     a_image = tf.io.decode_raw(a_image, tf.uint16)
     a_image = tf.reshape(a_image, [-1, height[0], width[0], 1])
@@ -232,6 +189,17 @@ def _parse_example(serialized_example, a):
     b_image = tf.io.decode_raw(b_image, tf.uint16)
     b_image = tf.reshape(b_image, [-1, height[0], width[0], 1])
     b_image = preprocess(b_image, add_noise=False)
+
+    # Package things up for output.
+    bboxes = tf.stack([xcenter, ycenter, xmin, xmax, ymin, ymax, classes],
+                      axis=1)
+    # Need to pad bboxes to max bbox length (not all images will have same
+    # number of objects).
+    paddings = tf.constant([[0, a.max_inferences], [0, 0]])
+    paddings = paddings - (tf.constant([[0, 1], [0, 0]]) * tf.shape(bboxes)[0])
+    bboxes = tf.pad(tensor=bboxes, paddings=paddings, constant_values=0.0)
+
+    task_targets = (bboxes, width, height)
     if a.which_direction == 'AtoB':
         return (a_image, (b_image, task_targets))
     else:
