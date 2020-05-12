@@ -322,7 +322,7 @@ def create_generator(a, input_shape, generator_outputs_channels):
         Generator network model.
     """
 
-    x_in = Input(shape=input_shape[1:])  # don't give Input the batch dim
+    x_in = Input(shape=input_shape)
     num_blocks = 8
     num_filters = a.ngf
     # encoder_1: [batch, 256, 256, in_channels] => [batch, 128, 128, ngf]
@@ -368,8 +368,8 @@ def create_discriminator(a, input_shape, target_shape):
     n_layers = 3
 
     # 2x [batch, height, width, in_channels] => [batch, height, width, in_channels * 2]
-    x_in = Input(shape=input_shape[1:])
-    y_in = Input(shape=target_shape[1:])
+    x_in = Input(shape=input_shape)
+    y_in = Input(shape=target_shape)
     input_concat = Concatenate(axis=-1)([x_in, y_in])
 
     # layer_1: [batch, 256, 256, in_channels * 2] => [batch, 128, 128, ndf]
@@ -406,7 +406,7 @@ def create_task_net(a, input_shape):
     x_list = []
     y_list = []
     # Feature pyramid network or darknet or something with res blocks.
-    model = build_darknet_model(input_shape[1:])
+    model = build_darknet_model(input_shape)
     # Predictor heads for object centroid, width, height.
     for _, output in zip(range(a.num_pred_layers), model.outputs):
         pred_x = Conv2D(
@@ -449,7 +449,7 @@ def create_task_net(a, input_shape):
 
 
 def create_model(a, inputs, targets, task_targets):
-    input_shape = inputs.shape.as_list()[1:]
+    input_shape = inputs.shape.as_list()[1:]  # don't give Input the batch dim
     target_shape = targets.shape.as_list()[1:]
     inputs = Input(input_shape)
     targets = Input(target_shape)
