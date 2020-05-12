@@ -25,6 +25,10 @@ from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint
 from tensorflow.keras.utils import plot_model
 
 
+# Define globals.
+EPS = 1e-12
+
+
 def preprocess(image, add_noise=False):
     """Performs image standardization, optinoally adds Gaussian noise.
 
