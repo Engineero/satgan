@@ -402,8 +402,6 @@ def create_task_net(a, input_shape):
         Task network (detection) model.
     """
     xy_list = []
-    wh_list = []
-    obj_list = []
     class_list = []
     # Feature pyramid network or darknet or something with res blocks.
     model = build_darknet_model(input_shape[1:])
@@ -422,32 +420,6 @@ def create_task_net(a, input_shape):
                                    a.l2_reg_bias)
         )(output)
         xy_list.append(pred_xy)
-        pred_wh = Conv2D(
-            filters=2,
-            kernel_size=1,
-            strides=1,
-            padding='same',
-            kernel_initializer='he_normal',
-            activation='sigmoid',
-            kernel_regularizer=l1_l2(a.l1_reg_kernel,
-                                     a.l2_reg_kernel),
-            bias_regularizer=l1_l2(a.l1_reg_bias,
-                                   a.l2_reg_bias)
-        )(output)
-        wh_list.append(pred_wh)
-        pred_obj = Conv2D(
-            filters=2,
-            kernel_size=1,
-            strides=1,
-            padding='same',
-            kernel_initializer='he_normal',
-            activation='sigmoid',
-            kernel_regularizer=l1_l2(a.l1_reg_kernel,
-                                     a.l2_reg_kernel),
-            bias_regularizer=l1_l2(a.l1_reg_bias,
-                                   a.l2_reg_bias)
-        )(output)
-        obj_list.append(pred_obj)
         pred_class = Conv2D(
             filters=a.num_classes,
             kernel_size=1,
@@ -465,16 +437,11 @@ def create_task_net(a, input_shape):
     # Combine outputs together.
     if len(model.outputs) > 1:
         pred_xy = tf.stack(xy_list, axis=-2, name='stack_xy')
-        pred_wh = tf.stack(wh_list, axis=-2, name='stack_wh')
-        pred_obj = tf.stack(obj_list, axis=-2, name='stack_obj')
         pred_class = tf.stack(class_list, axis=-2, name='stack_class')
     else:
         pred_xy = tf.expand_dims(xy_list[0], axis=-2)
-        pred_wh = tf.expand_dims(wh_list[0], axis=-2)
-        pred_obj = tf.expand_dims(obj_list[0], axis=-2)
         pred_class = tf.expand_dims(class_list[0], axis=-2)
-    return Model(inputs=model.input,
-                 outputs=[pred_xy, pred_wh, pred_obj, pred_class])
+    return Model(inputs=model.input, outputs=[pred_xy, pred_class])
 
 
 def create_model(a, inputs, targets, task_targets):
@@ -524,22 +491,16 @@ def create_model(a, inputs, targets, task_targets):
     with tf.name_scope('task_loss'):
         # TODO (NLT): implement YOLO loss or similar for detection.
         # task_targets are [xcenter, ycenter, xmin, xmax, ymin, ymax, class]
-        target_w = task_targets[:, 3] - task_targets[:, 2]
-        target_h = task_targets[:, 5] - task_targets[:, 4]
-        pred_xy, pred_wh, pred_obj, pred_class = task_net(targets)
-        pred_xy_fake, pred_wh_fake, pred_obj_fake, pred_class_fake = \
-            task_net(fake_img)
+        pred_xy, pred_class = task_net(targets)
+        pred_xy_fake, pred_class_fake = task_net(fake_img)
         xy_loss = mean_squared_error(pred_xy, task_targets[:, 0:2])
-        wh_loss = mean_squared_error(pred_wh, [target_w, target_h])
-        obj_loss = sparse_categorical_crossentropy(pred_obj, 1)
-        class_loss = sparse_categorical_crossentropy(pred_class, task_targets[:, -1])
-        task_loss_real = xy_loss + wh_loss + obj_loss + class_loss
+        class_loss = sparse_categorical_crossentropy(pred_class,
+                                                     task_targets[:, -1])
+        task_loss_real = xy_loss + class_loss
         xy_loss_fake = mean_squared_error(pred_xy_fake, task_targets[:, 0:2])
-        wh_loss_fake = mean_squared_error(pred_wh_fake, [target_w, target_h])
-        obj_loss_fake = sparse_categorical_crossentropy(pred_obj_fake, 1)
-        class_loss_fake = sparse_categorical_crossentropy(pred_class_fake, task_targets[:, -1])
-        task_loss_fake = xy_loss_fake + wh_loss_fake + obj_loss_fake + \
-            class_loss_fake
+        class_loss_fake = sparse_categorical_crossentropy(pred_class_fake,
+                                                          task_targets[:, -1])
+        task_loss_fake = xy_loss_fake + class_loss_fake
         task_loss = task_loss_real + task_loss_fake
 
     model = Model(inputs=[inputs, targets],
