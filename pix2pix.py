@@ -197,7 +197,7 @@ def _parse_example(serialized_example, a):
     # Need to pad bboxes to max bbox length (not all images will have same
     # number of objects).
     paddings = tf.constant([[0, 0], [0, 0], [0, a.max_inferences]])
-    paddings = paddings - (tf.constant([[0, 0], [0, 0], [0, 1]]) * tf.shape(bboxes)[0])
+    paddings = paddings - (tf.constant([[0, 0], [0, 0], [0, 1]]) * tf.shape(bboxes)[-1])
     bboxes = tf.pad(tensor=bboxes, paddings=paddings, constant_values=0.0)
 
     task_targets = (bboxes, width, height)
