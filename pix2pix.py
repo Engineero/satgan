@@ -16,7 +16,7 @@ from utils import ops
 from utils.darknet import build_darknet_model
 from tensorflow.keras.layers import (Input, Conv2D, Concatenate,
                                      MaxPooling2D, BatchNormalization,
-                                     LeakyReLU)
+                                     LeakyReLU, GlobalAveragePooling2D)
 from tensorflow.keras.activations import tanh
 from tensorflow.keras.models import Model, load_model
 from tensorflow.keras.regularizers import l1_l2
@@ -178,7 +178,7 @@ def _parse_example(serialized_example, a):
     ycenter = tf.cast(tf.sparse.to_dense(example['ycenter']), tf.float32)
     # ymin = tf.cast(tf.sparse.to_dense(example['ymin']), tf.float32)
     # ymax = tf.cast(tf.sparse.to_dense(example['ymax']), tf.float32)
-    classes = tf.cast(tf.sparse.to_dense(example['classes']), tf.float32)
+    # classes = tf.cast(tf.sparse.to_dense(example['classes']), tf.float32)
 
     # Parse images and preprocess.
     a_image = tf.sparse.to_dense(example['a_raw'], default_value='')
@@ -191,7 +191,7 @@ def _parse_example(serialized_example, a):
     b_image = preprocess(b_image, add_noise=False)
 
     # Package things up for output.
-    objects = tf.stack([xcenter, ycenter, classes], axis=1)
+    objects = tf.stack([xcenter, ycenter], axis=1)
     # Need to pad objects to max inferences (not all images will have same
     # number of objects).
     paddings = tf.constant([[0, 0], [0, 0], [0, a.max_inferences]])
@@ -401,14 +401,15 @@ def create_task_net(a, input_shape):
     Returns:
         Task network (detection) model.
     """
-    xy_list = []
-    class_list = []
+
+    x_list = []
+    y_list = []
     # Feature pyramid network or darknet or something with res blocks.
     model = build_darknet_model(input_shape[1:])
     # Predictor heads for object centroid, width, height.
     for output in model.outputs:
-        pred_xy = Conv2D(
-            filters=2,
+        pred_x = Conv2D(
+            filters=a.max_inferences,
             kernel_size=1,
             strides=1,
             padding='same',
@@ -419,9 +420,10 @@ def create_task_net(a, input_shape):
             bias_regularizer=l1_l2(a.l1_reg_bias,
                                    a.l2_reg_bias)
         )(output)
-        xy_list.append(pred_xy)
-        pred_class = Conv2D(
-            filters=a.num_classes,
+        pred_x = GlobalAveragePooling2D()(pred_x)
+        x_list.append(pred_x)
+        pred_y = Conv2D(
+            filters=a.max_inferences,
             kernel_size=1,
             strides=1,
             padding='same',
@@ -432,22 +434,22 @@ def create_task_net(a, input_shape):
             bias_regularizer=l1_l2(a.l1_reg_bias,
                                    a.l2_reg_bias)
         )(output)
-        class_list.append(pred_class)
+        pred_y = GlobalAveragePooling2D()(pred_y)
+        y_list.append(pred_y)
 
     # Combine outputs together.
     if len(model.outputs) > 1:
-        pred_xy = tf.stack(xy_list, axis=-2, name='stack_xy')
-        pred_class = tf.stack(class_list, axis=-2, name='stack_class')
+        pred_x = tf.stack(x_list, axis=-1, name='stack_x')
+        pred_y = tf.stack(y_list, axis=-1, name='stack_y')
     else:
-        pred_xy = tf.expand_dims(xy_list[0], axis=-2)
-        pred_class = tf.expand_dims(class_list[0], axis=-2)
-    return Model(inputs=model.input, outputs=[pred_xy, pred_class])
+        pred_x = tf.expand_dims(x_list[0], axis=-1)
+        pred_y = tf.expand_dims(y_list[0], axis=-1)
+    return Model(inputs=model.input, outputs=[pred_x, pred_y])
 
 
 def create_model(a, inputs, targets, task_targets):
     input_shape = inputs.shape.as_list()
     target_shape = targets.shape.as_list()
-    task_target_shape = task_targets.shape.as_list()
     with tf.name_scope("generator"):
         out_channels = target_shape[-1]
         generator = create_generator(a, input_shape, out_channels)
