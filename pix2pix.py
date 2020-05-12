@@ -173,11 +173,11 @@ def _parse_example(serialized_example, a):
     width = tf.cast(example['width'], tf.int32)
     height = tf.cast(example['height'], tf.int32)
     xcenter = tf.cast(tf.sparse.to_dense(example['xcenter']), tf.float32)
-    xmin = tf.cast(tf.sparse.to_dense(example['xmin']), tf.float32)
-    xmax = tf.cast(tf.sparse.to_dense(example['xmax']), tf.float32)
+    # xmin = tf.cast(tf.sparse.to_dense(example['xmin']), tf.float32)
+    # xmax = tf.cast(tf.sparse.to_dense(example['xmax']), tf.float32)
     ycenter = tf.cast(tf.sparse.to_dense(example['ycenter']), tf.float32)
-    ymin = tf.cast(tf.sparse.to_dense(example['ymin']), tf.float32)
-    ymax = tf.cast(tf.sparse.to_dense(example['ymax']), tf.float32)
+    # ymin = tf.cast(tf.sparse.to_dense(example['ymin']), tf.float32)
+    # ymax = tf.cast(tf.sparse.to_dense(example['ymax']), tf.float32)
     classes = tf.cast(tf.sparse.to_dense(example['classes']), tf.float32)
 
     # Parse images and preprocess.
@@ -191,15 +191,17 @@ def _parse_example(serialized_example, a):
     b_image = preprocess(b_image, add_noise=False)
 
     # Package things up for output.
-    bboxes = tf.stack([xcenter, ycenter, xmin, xmax, ymin, ymax, classes],
-                      axis=1)
-    # Need to pad bboxes to max bbox length (not all images will have same
+    objects = tf.stack([xcenter, ycenter, classes], axis=1)
+    # Need to pad objects to max inferences (not all images will have same
     # number of objects).
     paddings = tf.constant([[0, 0], [0, 0], [0, a.max_inferences]])
-    paddings = paddings - (tf.constant([[0, 0], [0, 0], [0, 1]]) * tf.shape(bboxes)[-1])
-    bboxes = tf.pad(tensor=bboxes, paddings=paddings, constant_values=0.0)
+    paddings = paddings - (tf.constant([[0, 0], [0, 0], [0, 1]]) * tf.shape(objects)[-1])
+    objects = tf.pad(tensor=objects, paddings=paddings, constant_values=0.0)
 
-    task_targets = (bboxes, width, height)
+    # TODO (NLT): either mask these bboxes to 64x64 images or figure out how to
+    # get 100 bboxes per task net output...
+
+    task_targets = (objects, width, height)
     if a.which_direction == 'AtoB':
         return (a_image, (b_image, task_targets))
     else:
