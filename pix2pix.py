@@ -408,7 +408,7 @@ def create_task_net(a, input_shape):
     # Feature pyramid network or darknet or something with res blocks.
     model = build_darknet_model(input_shape[1:])
     # Predictor heads for object centroid, width, height.
-    for _, output in zip(range(a.num_pred_layers, model.outputs)):
+    for _, output in zip(range(a.num_pred_layers), model.outputs)):
         pred_x = Conv2D(
             filters=a.max_inferences,
             kernel_size=1,
