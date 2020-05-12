@@ -509,8 +509,9 @@ def create_model(a, inputs, targets, task_targets):
         task_loss = xy_loss + xy_loss_fake
 
     model = Model(inputs=[inputs, targets],
-                  outputs=[fake_img, predict_real, predict_fake,
-                           pred_xy, pred_xy_fake])
+                  outputs={'generator': fake_img,
+                           'discriminator': [predict_real, predict_fake],
+                           'task_net': [pred_xy, pred_xy_fake]})
 
     # Plot the overall model.
     if a.plot_models:
@@ -528,7 +529,7 @@ def create_model(a, inputs, targets, task_targets):
                   'task_net': 'adam'}
     metrics = {'generator': [gen_loss_GAN, gen_loss_L1],
                'discriminator': discrim_loss,
-               'task_net': task_loss}
+               'task_net': [task_loss, xy_loss, xy_loss_fake]}
     model.compile(loss=losses,
                   loss_weights=loss_weights,
                   optimizer=optimizers,
