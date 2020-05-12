@@ -197,6 +197,7 @@ def _parse_example(serialized_example, a):
     paddings = tf.constant([[0, 0], [0, 0], [0, a.max_inferences]])
     paddings = paddings - (tf.constant([[0, 0], [0, 0], [0, 1]]) * tf.shape(objects)[-1])
     objects = tf.pad(tensor=objects, paddings=paddings, constant_values=0.0)
+    objects = tf.tile(objects, [0, 0, a.num_pred_layers])
 
     # TODO (NLT): either mask these bboxes to 64x64 images or figure out how to
     # get 100 bboxes per task net output...
@@ -407,7 +408,7 @@ def create_task_net(a, input_shape):
     # Feature pyramid network or darknet or something with res blocks.
     model = build_darknet_model(input_shape[1:])
     # Predictor heads for object centroid, width, height.
-    for output in model.outputs:
+    for _, output in zip(range(a.num_predict_layers, model.outputs)):
         pred_x = Conv2D(
             filters=a.max_inferences,
             kernel_size=1,
@@ -438,7 +439,7 @@ def create_task_net(a, input_shape):
         y_list.append(pred_y)
 
     # Combine outputs together.
-    if len(model.outputs) > 1:
+    if a.num_pred_layers > 1 and len(model.outputs) > 1:
         pred_x = tf.stack(x_list, axis=-1, name='stack_x')
         pred_y = tf.stack(y_list, axis=-1, name='stack_y')
     else:
@@ -735,6 +736,8 @@ if __name__ == '__main__':
                         help='Whether to plot model architectures.')
     parser.add_argument('--max_inferences', default=100, type=int,
                         help='Max inferences per image. Default 100.')
+    parser.add_argument('--num_pred_layers', default=1, type=int,
+                        help='Number of predictor layers to use in network.')
 
     # export options
     parser.add_argument("--output_filetype", default="png",
