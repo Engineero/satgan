@@ -193,7 +193,6 @@ def _parse_example(serialized_example, a):
     # Package things up for output.
     bboxes = tf.stack([xcenter, ycenter, xmin, xmax, ymin, ymax, classes],
                       axis=1)
-    print(f'bboxes shape = {bboxes.shape}')
     # Need to pad bboxes to max bbox length (not all images will have same
     # number of objects).
     paddings = tf.constant([[0, 0], [0, 0], [0, a.max_inferences]])
