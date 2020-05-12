@@ -451,6 +451,8 @@ def create_task_net(a, input_shape):
 def create_model(a, inputs, targets, task_targets):
     input_shape = inputs.shape.as_list()
     target_shape = targets.shape.as_list()
+    inputs = Input(input_shape)
+    targets = Input(target_shape)
     with tf.name_scope("generator"):
         out_channels = target_shape[-1]
         generator = create_generator(a, input_shape, out_channels)
