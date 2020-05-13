@@ -458,7 +458,7 @@ def create_model(a, inputs, targets, task_targets):
         out_channels = target_shape[-1]
         generator = create_generator(a, input_shape, out_channels)
         fake_img = generator(inputs)
-        gen_outputs = tf.reshape(fake_img, shape=fake_img.shape,
+        gen_outputs = tf.reshape(fake_img, shape=[-1, *fake_img.shape[1:]],
                                  name='generator')
 
     # Create two copies of the task network, one for real images (targets
