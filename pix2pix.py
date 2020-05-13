@@ -529,18 +529,18 @@ def create_model(a, inputs, targets, task_targets):
     opt_gen = SGD()
     opt_dsc = SGD()
     opt_task = SGD()
-    losses = {'generator': gen_loss,
-              'discriminator': discrim_loss,
-              'task_net': task_loss}
-    loss_weights = {'generator': a.gen_weight,
-                    'discriminator': a.dsc_weight,
-                    'task_net': a.task_weight}
-    optimizers = {'generator': opt_gen,
-                  'discriminator': opt_dsc,
-                  'task_net': opt_task}
-    metrics = {'generator': [gen_loss_GAN, gen_loss_L1],
-               'discriminator': discrim_loss,
-               'task_net': [task_loss, xy_loss, xy_loss_fake]}
+    losses = {'tf_op_layer_generator_1': gen_loss,
+              'tf_op_layer_discriminator_3': discrim_loss,
+              'tf_op_layer_task_net_2': task_loss}
+    loss_weights = {'tf_op_layer_generator_1': a.gen_weight,
+                    'tf_op_layer_discriminator_3': a.dsc_weight,
+                    'tf_op_layer_task_net_2': a.task_weight}
+    optimizers = {'tf_op_layer_generator_1': opt_gen,
+                  'tf_op_layer_discriminator_3': opt_dsc,
+                  'tf_op_layer_task_net_2': opt_task}
+    metrics = {'tf_op_layer_generator_1': [gen_loss_GAN, gen_loss_L1],
+               'tf_op_layer_discriminator_3': discrim_loss,
+               'tf_op_layer_task_net_2': [task_loss, xy_loss, xy_loss_fake]}
     model.compile(loss=losses,
                   loss_weights=loss_weights,
                   optimizer=Adam(),
