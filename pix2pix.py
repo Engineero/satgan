@@ -451,7 +451,7 @@ def create_task_net(a, input_shape):
 
 
 def create_model(a, train_data):
-    (inputs, targets), (_, task_targets) = next(iter(train_data))
+    (inputs, targets), (_, _, task_targets) = next(iter(train_data))
     input_shape = inputs.shape.as_list()[1:]  # don't give Input the batch dim
     target_shape = targets.shape.as_list()[1:]
     task_targets_shape = task_targets.shape.as_list()[1:]
