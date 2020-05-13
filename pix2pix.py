@@ -23,7 +23,7 @@ from tensorflow.keras.regularizers import l1_l2
 from tensorflow.keras.losses import mean_squared_error, sparse_categorical_crossentropy
 from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint
 from tensorflow.keras.utils import plot_model
-from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.optimizers import Adam, SGD
 
 
 # Define globals.
@@ -521,9 +521,9 @@ def create_model(a, inputs, targets, task_targets):
         plot_model(model, to_file='plots/full_model.svg')
 
     # TODO (NLT): compile the model with appropriate losses, optimizers, callbacks, etc.
-    opt_gen = Adam()
-    opt_dsc = Adam()
-    opt_task = Adam()
+    opt_gen = SGD()
+    opt_dsc = SGD()
+    opt_task = SGD()
     losses = {'generator': gen_loss,
               'discriminator': discrim_loss,
               'task_net': task_loss}
