@@ -206,9 +206,9 @@ def _parse_example(serialized_example, a):
 
     # task_targets = (objects, width, height)
     if a.which_direction == 'AtoB':
-        return (a_image, (b_image, objects))
+        return ((a_image, b_image), (b_image, objects))
     else:
-        return (b_image, (a_image, objects))
+        return ((b_image, a_image), (a_image, objects))
 
 
 def load_examples(a):
@@ -451,7 +451,7 @@ def create_task_net(a, input_shape):
 
 
 def create_model(a, train_data):
-    inputs, (targets, task_targets) = next(iter(train_data))
+    (inputs, targets), (_, task_targets) = next(iter(train_data))
     input_shape = inputs.shape.as_list()[1:]  # don't give Input the batch dim
     target_shape = targets.shape.as_list()[1:]
     task_targets_shape = task_targets.shape.as_list()[1:]
@@ -525,12 +525,12 @@ def create_model(a, train_data):
         def task_loss(y_true, y_pred):
             # TODO (NLT): implement YOLO loss or similar for detection.
             # task_targets are [xcenter, ycenter, xmin, xmax, ymin, ymax, class]
-            xy_loss = mean_squared_error(y_pred[0], y_true[1, :, 0:2])
+            xy_loss = mean_squared_error(y_pred[0], y_true[1])
             xy_loss_fake = mean_squared_error(y_pred[1],
-                                              y_true[1, :, 0:2])
+                                              y_true[1])
             return xy_loss + xy_loss_fake
 
-    model = Model(inputs=[inputs, (targets, task_targets)],
+    model = Model(inputs=[inputs, targets],
                   outputs=[gen_outputs, discrim_outputs, task_outputs])
 
     # Plot the overall model.
@@ -635,8 +635,8 @@ def main(a):
 
     # Train the model.
     history = model.fit(
-        x=train_data.dataset,
-        validation_data=val_data.dataset,
+        x=train_data,
+        validation_data=val_data,
         verbose=2,
         callbacks=callbacks,
         epochs=a.max_epochs,
@@ -647,7 +647,7 @@ def main(a):
     if test_data is not None:
         model = load_model(a.output_dir)  # load the best model
         test_losses = model.evaluate(
-            x=test_data.dataset,
+            x=test_data,
             batch_size=a.batch_size,
             verbose=1,
             callbacks=[tensorboard_callback],
