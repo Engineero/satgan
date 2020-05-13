@@ -204,11 +204,11 @@ def _parse_example(serialized_example, a):
     # TODO (NLT): either mask these bboxes to 64x64 images or figure out how to
     # get 100 bboxes per task net output...
 
-    task_targets = (objects, width, height)
+    # task_targets = (objects, width, height)
     if a.which_direction == 'AtoB':
-        return (a_image, (b_image, task_targets))
+        return (a_image, (b_image, objects))
     else:
-        return (b_image, (a_image, task_targets))
+        return (b_image, (a_image, objects))
 
 
 def load_examples(a):
@@ -450,11 +450,14 @@ def create_task_net(a, input_shape):
     return Model(inputs=model.input, outputs=[pred_x, pred_y], name='task_net')
 
 
-def create_model(a, inputs, targets, task_targets):
+def create_model(a, train_data):
+    inputs, targets, task_targets = next(iter(train_data))
     input_shape = inputs.shape.as_list()[1:]  # don't give Input the batch dim
     target_shape = targets.shape.as_list()[1:]
+    task_targets_shape = task_targets.shape.as_list()[1:]
     inputs = Input(input_shape)
     targets = Input(target_shape)
+    task_targets = Input(task_targets_shape)
     with tf.name_scope("generator"):
         out_channels = target_shape[-1]
         generator = create_generator(a, input_shape, out_channels)
@@ -514,7 +517,7 @@ def create_model(a, inputs, targets, task_targets):
             # predict_fake => 1
             # abs(targets - outputs) => 0
             # gen_loss_GAN = tf.reduce_mean(-tf.math.log(y_pred[1] + EPS))
-            gen_loss_L1 = mean_absolute_error(y_true, y_pred[0])
+            gen_loss_L1 = mean_absolute_error(y_true[0], y_pred[0])
             # gen_loss = gen_loss_GAN * a.gan_weight + gen_loss_L1 * a.l1_weight
             return gen_loss_L1
 
@@ -522,12 +525,12 @@ def create_model(a, inputs, targets, task_targets):
         def task_loss(y_true, y_pred):
             # TODO (NLT): implement YOLO loss or similar for detection.
             # task_targets are [xcenter, ycenter, xmin, xmax, ymin, ymax, class]
-            xy_loss = mean_squared_error(y_pred[0], y_true[:, 0:2])
+            xy_loss = mean_squared_error(y_pred[0], y_true[1, :, 0:2])
             xy_loss_fake = mean_squared_error(y_pred[1],
-                                              y_true[:, 0:2])
+                                              y_true[1, :, 0:2])
             return xy_loss + xy_loss_fake
 
-    model = Model(inputs=[inputs, targets],
+    model = Model(inputs=[inputs, (targets, task_targets)],
                   outputs=[gen_outputs, discrim_outputs, task_outputs])
 
     # Plot the overall model.
@@ -625,10 +628,9 @@ def main(a):
 
     # Build data generators.
     train_data, val_data, test_data = load_examples(a)
-    inputs, (targets, (task_targets, width, height)) = next(iter(train_data))
 
     # Build the model.
-    model = create_model(a, inputs, targets, task_targets)
+    model = create_model(a, train_data)
     print(f'Overall model summary:\n{model.summary()}')
 
     # Train the model.
