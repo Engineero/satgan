@@ -206,9 +206,9 @@ def _parse_example(serialized_example, a):
 
     # task_targets = (objects, width, height)
     if a.which_direction == 'AtoB':
-        return ((a_image, b_image), (b_image, objects))
+        return ((a_image, b_image), (b_image, 0, objects))
     else:
-        return ((b_image, a_image), (a_image, objects))
+        return ((b_image, a_image), (a_image, 0, objects))
 
 
 def load_examples(a):
