@@ -519,7 +519,7 @@ def create_model(a, inputs, targets, task_targets):
         task_loss = xy_loss + xy_loss_fake
 
     model = Model(inputs=[inputs, targets],
-                  outputs=[gen_outputs, descrim_outputs, task_outputs])
+                  outputs=[gen_outputs, discrim_outputs, task_outputs])
 
     # Plot the overall model.
     if a.plot_models:
