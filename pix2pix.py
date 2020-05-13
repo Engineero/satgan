@@ -459,6 +459,8 @@ def create_model(a, inputs, targets, task_targets):
         out_channels = target_shape[-1]
         generator = create_generator(a, input_shape, out_channels)
         fake_img = generator(inputs)
+        gen_outputs = tf.reshape(fake_img, [-1, *fake_img.shape],
+                                 name='generator')
 
     # Create two copies of the task network, one for real images (targets
     # input to this method) and one for generated images (outputs from
@@ -488,8 +490,6 @@ def create_model(a, inputs, targets, task_targets):
         predict_fake = discriminator([inputs, fake_img])
         discrim_outputs = tf.stack([predict_real, predict_fake], axis=0,
                                    name='discriminator')
-        gen_outputs = tf.stack([fake_img, predict_fake], axis=0,
-                               name='generator')
 
     # Plot the sub-models.
     if a.plot_models:
@@ -510,10 +510,10 @@ def create_model(a, inputs, targets, task_targets):
         def generator_loss(y_true, y_pred):
             # predict_fake => 1
             # abs(targets - outputs) => 0
-            gen_loss_GAN = tf.reduce_mean(-tf.math.log(y_pred[1] + EPS))
+            # gen_loss_GAN = tf.reduce_mean(-tf.math.log(y_pred[1] + EPS))
             gen_loss_L1 = mean_absolute_error(y_true, y_pred[0])
-            gen_loss = gen_loss_GAN * a.gan_weight + gen_loss_L1 * a.l1_weight
-            return gen_loss
+            # gen_loss = gen_loss_GAN * a.gan_weight + gen_loss_L1 * a.l1_weight
+            return gen_loss_L1
 
     with tf.name_scope('task_loss'):
         def task_loss(y_true, y_pred):
