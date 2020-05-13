@@ -511,10 +511,8 @@ def create_model(a, inputs, targets, task_targets):
 
     model = Model(inputs=[inputs, targets],
                   outputs={'generator': fake_img,
-                           'discriminator': tf.stack([predict_real,
-                                                      predict_fake], axis=1),
-                           'task_net': tf.stack([pred_xy,
-                                                 pred_xy_fake], axis=1)})
+                           'discriminator': [predict_real, predict_fake],
+                           'task_net': [pred_xy, pred_xy_fake]})
 
     # Plot the overall model.
     if a.plot_models:
