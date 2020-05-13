@@ -538,7 +538,7 @@ def create_model(a, inputs, targets, task_targets):
                'task_net': [task_loss, xy_loss, xy_loss_fake]}
     model.compile(loss=losses,
                   loss_weights=loss_weights,
-                  optimizer=optimizers,
+                  optimizer=Adam(),
                   metrics=metrics)
     return model
 
