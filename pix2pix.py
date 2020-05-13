@@ -635,8 +635,8 @@ def main(a):
 
     # Train the model.
     history = model.fit(
-        x=train_data,
-        validation_data=val_data,
+        x=train_data.dataset,
+        validation_data=val_data.dataset,
         verbose=2,
         callbacks=callbacks,
         epochs=a.max_epochs,
@@ -647,7 +647,7 @@ def main(a):
     if test_data is not None:
         model = load_model(a.output_dir)  # load the best model
         test_losses = model.evaluate(
-            x=test_data,
+            x=test_data.dataset,
             batch_size=a.batch_size,
             verbose=1,
             callbacks=[tensorboard_callback],
