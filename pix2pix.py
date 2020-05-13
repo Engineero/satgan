@@ -637,7 +637,6 @@ def main(a):
         validation_data=val_data,
         verbose=2,
         callbacks=callbacks,
-        batch_size=a.batch_size,
         epochs=a.max_epochs,
         shuffle=True,
     )
