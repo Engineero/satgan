@@ -458,6 +458,7 @@ def create_model(a, inputs, targets, task_targets):
     with tf.name_scope("generator"):
         out_channels = target_shape[-1]
         generator = create_generator(a, input_shape, out_channels)
+        print(f'Generator model summary:\n{generator.summary()}')
         fake_img = generator(inputs)
         gen_outputs = tf.reshape(fake_img, [-1, *fake_img.shape[1:]],
                                  name='generator')
@@ -468,6 +469,7 @@ def create_model(a, inputs, targets, task_targets):
     # both.
     with tf.name_scope('task_net'):
         task_net = create_task_net(a, input_shape)
+        print(f'Task Net model summary:\n{task_net.summary()}')
         pred_x, pred_y = task_net(targets)
         pred_xy = tf.stack([pred_x, pred_y], axis=1)
         pred_xy = tf.reshape(pred_xy, [a.batch_size, pred_xy.shape[1], -1],
@@ -486,6 +488,7 @@ def create_model(a, inputs, targets, task_targets):
     with tf.name_scope("discriminator"):
         # TODO (NLT): figure out discriminator loss, interaction with Keras changes.
         discriminator = create_discriminator(a, input_shape, target_shape)
+        print(f'Discriminator model summary\n:{discriminator.summary()}')
         predict_real = discriminator([inputs, targets])
         predict_fake = discriminator([inputs, fake_img])
         discrim_outputs = tf.stack([predict_real, predict_fake], axis=0,
@@ -626,6 +629,7 @@ def main(a):
 
     # Build the model.
     model = create_model(a, inputs, targets, task_targets)
+    print(f'Overall model summary:\n{model.summary()}')
 
     # Train the model.
     history = model.fit(
