@@ -352,7 +352,7 @@ def create_generator(a, input_shape, generator_outputs_channels):
         x = ops.deconv(x, filters=generator_outputs_channels, padding='same',
                        scope='g_logit')
         x = tanh(x)
-        return Model(inputs=x_in, outputs=x)
+        return Model(inputs=x_in, outputs=x, name='generator')
 
 
 def create_discriminator(a, input_shape, target_shape):
@@ -391,7 +391,7 @@ def create_discriminator(a, input_shape, target_shape):
                           scope=f'layer_{n_layers + 1}')
     x = tf.nn.sigmoid(x, name='discriminator')
 
-    return Model(inputs=[x_in, y_in], outputs=x)
+    return Model(inputs=[x_in, y_in], outputs=x, name='discriminator')
 
 
 def create_task_net(a, input_shape):
@@ -446,7 +446,7 @@ def create_task_net(a, input_shape):
     else:
         pred_x = tf.expand_dims(x_list[0], axis=-1)
         pred_y = tf.expand_dims(y_list[0], axis=-1)
-    return Model(inputs=model.input, outputs=[pred_x, pred_y])
+    return Model(inputs=model.input, outputs=[pred_x, pred_y], name='task_net')
 
 
 def create_model(a, inputs, targets, task_targets):
@@ -510,9 +510,7 @@ def create_model(a, inputs, targets, task_targets):
         task_loss = xy_loss + xy_loss_fake
 
     model = Model(inputs=[inputs, targets],
-                  outputs={'generator': fake_img,
-                           'discriminator': [predict_real, predict_fake],
-                           'task_net': [pred_xy, pred_xy_fake]})
+                  outputs=[generator, discriminator, task_net])
 
     # Plot the overall model.
     if a.plot_models:
