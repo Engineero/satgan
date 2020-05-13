@@ -20,7 +20,8 @@ from tensorflow.keras.layers import (Input, Conv2D, Concatenate,
 from tensorflow.keras.activations import tanh
 from tensorflow.keras.models import Model, load_model
 from tensorflow.keras.regularizers import l1_l2
-from tensorflow.keras.losses import mean_squared_error, sparse_categorical_crossentropy
+from tensorflow.keras.losses import (mean_squared_error, mean_absolute_error,
+                                     sparse_categorical_crossentropy)
 from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint
 from tensorflow.keras.utils import plot_model
 from tensorflow.keras.optimizers import Adam, SGD
@@ -458,8 +459,6 @@ def create_model(a, inputs, targets, task_targets):
         out_channels = target_shape[-1]
         generator = create_generator(a, input_shape, out_channels)
         fake_img = generator(inputs)
-        gen_outputs = tf.reshape(fake_img, shape=[-1, *fake_img.shape[1:]],
-                                 name='generator')
 
     # Create two copies of the task network, one for real images (targets
     # input to this method) and one for generated images (outputs from
@@ -489,6 +488,8 @@ def create_model(a, inputs, targets, task_targets):
         predict_fake = discriminator([inputs, fake_img])
         discrim_outputs = tf.stack([predict_real, predict_fake], axis=0,
                                    name='discriminator')
+        gen_outputs = tf.stack([fake_img, predict_fake], axis=0,
+                               name='generator')
 
     # Plot the sub-models.
     if a.plot_models:
@@ -497,26 +498,31 @@ def create_model(a, inputs, targets, task_targets):
         plot_model(discriminator, to_file='plots/discriminator.svg')
 
     with tf.name_scope("discriminator_loss"):
-        # minimizing -tf.log will try to get inputs to 1
-        # predict_real => 1
-        # predict_fake => 0
-        discrim_loss = tf.reduce_mean(-(tf.math.log(discrim_outputs[0] + EPS) \
-                       + tf.math.log(1 - discrim_outputs[1] + EPS)))
+        def discriminator_loss(y_true, y_pred):
+            # minimizing -tf.log will try to get inputs to 1
+            # predict_real => 1
+            # predict_fake => 0
+            discrim_loss = tf.reduce_mean(-(tf.math.log(y_pred[0] + EPS) \
+                           + tf.math.log(1 - y_pred[1] + EPS)))
+            return discrim_loss
 
     with tf.name_scope("generator_loss"):
-        # predict_fake => 1
-        # abs(targets - outputs) => 0
-        gen_loss_GAN = tf.reduce_mean(-tf.math.log(predict_fake + EPS))
-        gen_loss_L1 = tf.reduce_mean(tf.abs(targets - fake_img))
-        gen_loss = gen_loss_GAN * a.gan_weight + gen_loss_L1 * a.l1_weight
+        def generator_loss(y_true, y_pred):
+            # predict_fake => 1
+            # abs(targets - outputs) => 0
+            gen_loss_GAN = tf.reduce_mean(-tf.math.log(y_pred[1] + EPS))
+            gen_loss_L1 = mean_absolute_error(y_true, y_pred[0])
+            gen_loss = gen_loss_GAN * a.gan_weight + gen_loss_L1 * a.l1_weight
+            return gen_loss
 
     with tf.name_scope('task_loss'):
-        # TODO (NLT): implement YOLO loss or similar for detection.
-        # task_targets are [xcenter, ycenter, xmin, xmax, ymin, ymax, class]
-        xy_loss = mean_squared_error(task_outputs[0], task_targets[:, 0:2])
-        xy_loss_fake = mean_squared_error(task_outputs[1],
-                                          task_targets[:, 0:2])
-        task_loss = xy_loss + xy_loss_fake
+        def task_loss(y_true, y_pred):
+            # TODO (NLT): implement YOLO loss or similar for detection.
+            # task_targets are [xcenter, ycenter, xmin, xmax, ymin, ymax, class]
+            xy_loss = mean_squared_error(y_pred[0], y_true[:, 0:2])
+            xy_loss_fake = mean_squared_error(y_pred[1],
+                                              y_true[:, 0:2])
+            return xy_loss + xy_loss_fake
 
     model = Model(inputs=[inputs, targets],
                   outputs=[gen_outputs, discrim_outputs, task_outputs])
@@ -529,8 +535,8 @@ def create_model(a, inputs, targets, task_targets):
     opt_gen = SGD()
     opt_dsc = SGD()
     opt_task = SGD()
-    losses = {'tf_op_layer_generator_1': gen_loss,
-              'tf_op_layer_discriminator_3': discrim_loss,
+    losses = {'tf_op_layer_generator_1': generator_loss,
+              'tf_op_layer_discriminator_3': discriminator_loss,
               'tf_op_layer_task_net_2': task_loss}
     loss_weights = {'tf_op_layer_generator_1': a.gen_weight,
                     'tf_op_layer_discriminator_3': a.dsc_weight,
@@ -538,13 +544,9 @@ def create_model(a, inputs, targets, task_targets):
     optimizers = {'tf_op_layer_generator_1': opt_gen,
                   'tf_op_layer_discriminator_3': opt_dsc,
                   'tf_op_layer_task_net_2': opt_task}
-    metrics = {'tf_op_layer_generator_1': [gen_loss_GAN, gen_loss_L1],
-               'tf_op_layer_discriminator_3': discrim_loss,
-               'tf_op_layer_task_net_2': [task_loss, xy_loss, xy_loss_fake]}
     model.compile(loss=losses,
                   loss_weights=loss_weights,
-                  optimizer=Adam(),
-                  metrics=metrics)
+                  optimizer=Adam())
     return model
 
 
