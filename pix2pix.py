@@ -458,6 +458,8 @@ def create_model(a, inputs, targets, task_targets):
         out_channels = target_shape[-1]
         generator = create_generator(a, input_shape, out_channels)
         fake_img = generator(inputs)
+        gen_outputs = tf.reshape(fake_img, shape=fake_img.shape,
+                                 name='generator')
 
     # Create two copies of the task network, one for real images (targets
     # input to this method) and one for generated images (outputs from
@@ -465,6 +467,18 @@ def create_model(a, inputs, targets, task_targets):
     # both.
     with tf.name_scope('task_net'):
         task_net = create_task_net(a, input_shape)
+        pred_x, pred_y = task_net(targets)
+        pred_xy = tf.stack([pred_x, pred_y], axis=1)
+        pred_xy = tf.reshape(pred_xy, [a.batch_size, pred_xy.shape[1], -1],
+                             name='pred_xy')
+        pred_x_fake, pred_y_fake = task_net(fake_img)
+        pred_xy_fake = tf.stack([pred_x_fake, pred_y_fake], axis=1)
+        pred_xy_fake = tf.reshape(pred_xy_fake, [a.batch_size,
+                                                 pred_xy_fake.shape[1],
+                                                 -1],
+                                  name='pred_xy_fake')
+        task_outputs = tf.stack([pred_xy, pred_xy_fake], axis=0,
+                                name='task_net')
 
     # Create two copies of discriminator, one for real pairs and one for fake
     # pairs they share the same underlying variables
@@ -473,6 +487,8 @@ def create_model(a, inputs, targets, task_targets):
         discriminator = create_discriminator(a, input_shape, target_shape)
         predict_real = discriminator([inputs, targets])
         predict_fake = discriminator([inputs, fake_img])
+        discrim_outputs = tf.stack([predict_real, predict_fake], axis=0,
+                                   name='discriminator')
 
     # Plot the sub-models.
     if a.plot_models:
@@ -484,8 +500,8 @@ def create_model(a, inputs, targets, task_targets):
         # minimizing -tf.log will try to get inputs to 1
         # predict_real => 1
         # predict_fake => 0
-        discrim_loss = tf.reduce_mean(-(tf.math.log(predict_real + EPS) + \
-                       tf.math.log(1 - predict_fake + EPS)))
+        discrim_loss = tf.reduce_mean(-(tf.math.log(discrim_outputs[0] + EPS) \
+                       + tf.math.log(1 - discrim_outputs[1] + EPS)))
 
     with tf.name_scope("generator_loss"):
         # predict_fake => 1
@@ -497,22 +513,13 @@ def create_model(a, inputs, targets, task_targets):
     with tf.name_scope('task_loss'):
         # TODO (NLT): implement YOLO loss or similar for detection.
         # task_targets are [xcenter, ycenter, xmin, xmax, ymin, ymax, class]
-        pred_x, pred_y = task_net(targets)
-        pred_xy = tf.stack([pred_x, pred_y], axis=1)
-        pred_xy = tf.reshape(pred_xy, [a.batch_size, pred_xy.shape[1], -1])
-        xy_loss = mean_squared_error(pred_xy, task_targets[:, 0:2])
-        pred_x_fake, pred_y_fake = task_net(fake_img)
-        pred_xy_fake = tf.stack([pred_x_fake, pred_y_fake], axis=1)
-        pred_xy_fake = tf.reshape(pred_xy_fake, [a.batch_size,
-                                                 pred_xy_fake.shape[1],
-                                                 -1])
-        xy_loss_fake = mean_squared_error(pred_xy_fake, task_targets[:, 0:2])
+        xy_loss = mean_squared_error(task_outputs[0], task_targets[:, 0:2])
+        xy_loss_fake = mean_squared_error(task_outputs[1],
+                                          task_targets[:, 0:2])
         task_loss = xy_loss + xy_loss_fake
 
     model = Model(inputs=[inputs, targets],
-                  outputs=[generator.outputs,
-                           discriminator.outputs,
-                           task_net.outputs])
+                  outputs=[gen_outputs, descrim_outputs, task_outputs])
 
     # Plot the overall model.
     if a.plot_models:
