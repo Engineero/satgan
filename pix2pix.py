@@ -511,8 +511,8 @@ def create_model(a, train_data):
             # minimizing -tf.log will try to get inputs to 1
             # predict_real => 1
             # predict_fake => 0
-            discrim_loss = tf.reduce_mean(-(tf.math.log(y_pred[1][0] + EPS) \
-                           + tf.math.log(1 - y_pred[1][1] + EPS)))
+            discrim_loss = tf.reduce_mean(-(tf.math.log(y_pred[0] + EPS) \
+                           + tf.math.log(1 - y_pred[1] + EPS)))
             return discrim_loss
 
     with tf.name_scope("generator_loss"):
@@ -528,13 +528,15 @@ def create_model(a, train_data):
         def task_loss(y_true, y_pred):
             # TODO (NLT): implement YOLO loss or similar for detection.
             # task_targets are [xcenter, ycenter, xmin, xmax, ymin, ymax, class]
-            xy_loss = mean_squared_error(y_pred[2][0], y_true[1])
-            xy_loss_fake = mean_squared_error(y_pred[2][1],
+            xy_loss = mean_squared_error(y_pred[0], y_true[1])
+            xy_loss_fake = mean_squared_error(y_pred[1],
                                               y_true[1])
             return xy_loss + xy_loss_fake
 
     model = Model(inputs=[inputs, targets],
-                  outputs=[gen_outputs, discrim_outputs, task_outputs])
+                  outputs={'tf_op_layer_generator_1': gen_outputs,
+                           'tf_op_layer_discriminator_3': discrim_outputs,
+                           'tf_op_layer_task_net_2': task_outputs})
 
     # Plot the overall model.
     if a.plot_models:
