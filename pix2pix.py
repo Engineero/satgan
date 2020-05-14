@@ -509,12 +509,8 @@ def create_model(a, train_data):
             # minimizing -tf.log will try to get inputs to 1
             # predict_real => 1
             # predict_fake => 0
-            # discrim_loss = tf.reduce_mean(-(tf.math.log(y_pred[0] + EPS) \
-            #                + tf.math.log(1 - y_pred[1] + EPS)))
             predict_real = tf.reshape(y_pred[0], [-1, 2])
             predict_fake = tf.reshape(y_pred[1], [-1, 2])
-            print(f'predict_real shape = {predict_real.shape}')
-            print(f'predict_fake shape = {predict_fake.shape}')
             real_loss = binary_crossentropy(
                 tf.one_hot(tf.ones_like(predict_real[:, 0], dtype=tf.int32),
                            depth=2),
