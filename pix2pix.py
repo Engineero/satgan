@@ -514,11 +514,11 @@ def create_model(a, train_data):
             predict_real = y_pred[0]
             predict_fake = y_pred[1]
             real_loss = sparse_categorical_crossentropy(
-                tf.ones(shape=[-1, *predict_real.shape[1:]]),
+                tf.ones(shape=[a.batch_size, *predict_real.shape[1:]]),
                 predict_real
             )
             fake_loss = sparse_categorical_crossentropy(
-                tf.zeros(shape=[-1, predict_fake.shape[1:]]),
+                tf.zeros(shape=[a.batch_size, predict_fake.shape[1:]]),
                 predict_fake
             )
             return real_loss + fake_loss
