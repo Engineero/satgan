@@ -614,9 +614,8 @@ def main(a):
             histogram_freq=0,
             batch_size=a.batch_size,
             write_graph=True,
-            write_grads=True,
             write_images=True,
-            update_freq=a.batch_size * 200,
+            update_freq=100,
         )
         callbacks.append(tensorboard_callback)
     model_checkpoint = ModelCheckpoint(
