@@ -20,7 +20,7 @@ class SaveImagesCallback(Callback):
         self.log_dir = log_dir
         self.update_freq = update_freq
         self.seen = 0
-    
+
     def _encode_image(self, numpy_image):
         """Encode images for saving to TensorBoard."""
         height, width, channels = numpy_image.shape
@@ -37,35 +37,30 @@ class SaveImagesCallback(Callback):
         logs = logs or {}
         self.seen += 1
         if self.seen % self.update_freq == 0:
-            fake_image = self.model.outputs['generator']
+            fake_image = self.model.outputs[0]
             blank_image, target_image = self.model.inputs
-            predict_real, predict_fake = self.model.outputs['tf_op_layer_discriminator_3']
+            predict_real, predict_fake = self.model.outputs[1]
 
             # Create image summaries.
             tf.summary.image(
                 name=f'images/fake_image/{self.seen}',
                 data=fake_image,
-                step=self.seen
             )
             tf.summary.image(
                 name=f'images/blank_image/{self.seen}',
                 data=blank_image,
-                step=self.seen
             )
             tf.summary.image(
                 name=f'images/target_image/{self.seen}',
                 data=target_image,
-                step=self.seen
             )
             tf.summary.image(
                 name=f'images/predict_real/{self.seen}',
                 data=predict_real,
-                step=self.seen
             )
             tf.summary.image(
                 name=f'images/predict_fake/{self.seen}',
                 data=predict_fake,
-                step=self.seen
             )
 
             # self.writer.add_summary(tf.Summary(value=summary_str),
