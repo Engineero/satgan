@@ -466,8 +466,8 @@ def create_model(a, train_data):
         generator = create_generator(a, input_shape, out_channels)
         print(f'Generator model summary:\n{generator.summary()}')
         fake_img = generator(inputs)
-        gen_outputs = tf.reshape(fake_img, [-1, *fake_img.shape[1:]],
-                                 name='generator')
+        # gen_outputs = tf.reshape(fake_img, [-1, *fake_img.shape[1:]],
+        #                          name='generator')
 
     # Create two copies of the task network, one for real images (targets
     # input to this method) and one for generated images (outputs from
@@ -534,7 +534,7 @@ def create_model(a, train_data):
             return xy_loss + xy_loss_fake
 
     model = Model(inputs=[inputs, targets],
-                  outputs={'tf_op_layer_generator_1': gen_outputs,
+                  outputs={'generator': fake_img,
                            'tf_op_layer_discriminator_3': discrim_outputs,
                            'tf_op_layer_task_net_2': task_outputs})
 
@@ -546,13 +546,13 @@ def create_model(a, train_data):
     opt_gen = SGD()
     opt_dsc = SGD()
     opt_task = SGD()
-    losses = {'tf_op_layer_generator_1': generator_loss,
+    losses = {'generator': generator_loss,
               'tf_op_layer_discriminator_3': discriminator_loss,
               'tf_op_layer_task_net_2': task_loss}
-    loss_weights = {'tf_op_layer_generator_1': a.gen_weight,
+    loss_weights = {'generator': a.gen_weight,
                     'tf_op_layer_discriminator_3': a.dsc_weight,
                     'tf_op_layer_task_net_2': a.task_weight}
-    optimizers = {'tf_op_layer_generator_1': opt_gen,
+    optimizers = {'generator': opt_gen,
                   'tf_op_layer_discriminator_3': opt_dsc,
                   'tf_op_layer_task_net_2': opt_task}
     model.compile(loss=losses,
