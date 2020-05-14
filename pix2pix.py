@@ -466,8 +466,6 @@ def create_model(a, train_data):
         generator = create_generator(a, input_shape, out_channels)
         print(f'Generator model summary:\n{generator.summary()}')
         fake_img = generator(inputs)
-        # gen_outputs = tf.reshape(fake_img, [-1, *fake_img.shape[1:]],
-        #                          name='generator')
 
     # Create two copies of the task network, one for real images (targets
     # input to this method) and one for generated images (outputs from
@@ -511,9 +509,19 @@ def create_model(a, train_data):
             # minimizing -tf.log will try to get inputs to 1
             # predict_real => 1
             # predict_fake => 0
-            discrim_loss = tf.reduce_mean(-(tf.math.log(y_pred[0] + EPS) \
-                           + tf.math.log(1 - y_pred[1] + EPS)))
-            return discrim_loss
+            # discrim_loss = tf.reduce_mean(-(tf.math.log(y_pred[0] + EPS) \
+            #                + tf.math.log(1 - y_pred[1] + EPS)))
+            predict_real = y_pred[0]
+            predict_fake = y_pred[1]
+            real_loss = sparse_categorical_crossentropy(
+                tf.ones(shape=predict_real.shape),
+                predict_real
+            )
+            fake_loss = sparse_categorical_crossentropy(
+                tf.zeros(shape=predict_fake.shape),
+                predict_fake
+            )
+            return real_loss + fake_loss
 
     with tf.name_scope("generator_loss"):
         def generator_loss(y_true, y_pred):
