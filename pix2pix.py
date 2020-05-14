@@ -520,7 +520,7 @@ def create_model(a, train_data):
             # predict_fake => 1
             # abs(targets - outputs) => 0
             # gen_loss_GAN = tf.reduce_mean(-tf.math.log(y_pred[1] + EPS))
-            gen_loss_L1 = mean_absolute_error(y_true[0], y_pred[0])
+            gen_loss_L1 = mean_absolute_error(y_true[0], y_pred)
             # gen_loss = gen_loss_GAN * a.gan_weight + gen_loss_L1 * a.l1_weight
             return gen_loss_L1
 
