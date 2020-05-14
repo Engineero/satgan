@@ -258,20 +258,23 @@ def load_examples(a):
         test_data = None
 
     # Specify transformations on datasets.
-    train_data = train_data.shuffle(a.buffer_size).batch(a.batch_size)
+    train_data = train_data.shuffle(a.buffer_size)
+    train_data = train_data.batch(a.batch_size, drop_remainder=True)
     train_data = train_data.map(
         lambda x: _parse_example(x, a)
     )
     train_data = train_data.repeat(a.max_epochs)
 
-    valid_data = valid_data.shuffle(a.buffer_size).batch(a.batch_size)
+    valid_data = valid_data.shuffle(a.buffer_size)
+    valid_data = valid_data.batch(a.batch_size, drop_remainder=True)
     valid_data = valid_data.map(
         lambda x: _parse_example(x, a)
     )
     valid_data = valid_data.repeat(a.max_epochs)
 
     if a.test_dir is not None:
-        test_data = test_data.shuffle(a.buffer_size).batch(a.batch_size)
+        test_data = test_data.shuffle(a.buffer_size)
+        test_data = test_data.batch(a.batch_size, drop_remainder=True)
         test_data = test_data.map(
             lambda x: _parse_example(x, a)
         )
@@ -637,7 +640,7 @@ def main(a):
     history = model.fit(
         x=train_data,
         validation_data=val_data,
-        verbose=2,
+        verbose=1,
         callbacks=callbacks,
         epochs=a.max_epochs,
         shuffle=True,
