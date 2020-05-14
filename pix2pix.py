@@ -21,7 +21,7 @@ from tensorflow.keras.activations import tanh
 from tensorflow.keras.models import Model, load_model
 from tensorflow.keras.regularizers import l1_l2
 from tensorflow.keras.losses import (mean_squared_error, mean_absolute_error,
-                                     sparse_categorical_crossentropy)
+                                     binary_crossentropy)
 from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint
 from tensorflow.keras.utils import plot_model
 from tensorflow.keras.optimizers import Adam, SGD
@@ -391,9 +391,9 @@ def create_discriminator(a, input_shape, target_shape):
         x = BatchNormalization()(x)
 
     # layer_5: [batch, 31, 31, ndf * 8] => [batch, 30, 30, 1]
-    x = ops.down_resblock(x, filters=1, to_down=False, sn=a.spec_norm,
+    x = ops.down_resblock(x, filters=2, to_down=False, sn=a.spec_norm,
                           scope=f'layer_{n_layers + 1}')
-    x = tf.nn.sigmoid(x, name='discriminator')
+    x = tf.nn.softmax(x, name='discriminator')
 
     return Model(inputs=[x_in, y_in], outputs=x, name='discriminator')
 
@@ -511,14 +511,18 @@ def create_model(a, train_data):
             # predict_fake => 0
             # discrim_loss = tf.reduce_mean(-(tf.math.log(y_pred[0] + EPS) \
             #                + tf.math.log(1 - y_pred[1] + EPS)))
-            predict_real = y_pred[0]
-            predict_fake = y_pred[1]
-            real_loss = sparse_categorical_crossentropy(
-                tf.ones(shape=[a.batch_size, *predict_real.shape[1:]]),
+            predict_real = tf.reshape(y_pred[0], [-1, 2])
+            predict_fake = tf.reshape(y_pred[1], [-1, 2])
+            print(f'predict_real shape = {predict_real.shape}')
+            print(f'predict_fake shape = {predict_fake.shape}')
+            real_loss = binary_crossentropy(
+                tf.one_hot(tf.ones_like(predict_real[:, 0], dtype=tf.int32),
+                           depth=2),
                 predict_real
             )
-            fake_loss = sparse_categorical_crossentropy(
-                tf.zeros(shape=[a.batch_size, predict_fake.shape[1:]]),
+            fake_loss = binary_crossentropy(
+                tf.one_hot(tf.zeros_like(predict_fake[:, 0], dtype=tf.int32),
+                           depth=2),
                 predict_fake
             )
             return real_loss + fake_loss
