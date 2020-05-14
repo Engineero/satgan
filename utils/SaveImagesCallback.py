@@ -37,29 +37,36 @@ class SaveImagesCallback(Callback):
         logs = logs or {}
         self.seen += 1
         if self.seen % self.update_freq == 0:
-            summary_str = []
             fake_image = self.model.outputs['generator']
             blank_image, target_image = self.model.inputs
             predict_real, predict_fake = self.model.outputs['tf_op_layer_discriminator_3']
-            summary_str.append(
-                tf.Summary.Value(tag=f'images/fake_image/{batch}'),
-                                 image=self._encode_image(fake_image)
+
+            # Create image summaries.
+            tf.summary.image(
+                name=f'images/fake_image/{self.seen}',
+                data=fake_image,
+                step=self.seen
             )
-            summary_str.append(
-                tf.Summary.Value(tag=f'images/blank_image/{batch}'),
-                                 image=self._encode_image(blank_image)
+            tf.summary.image(
+                name=f'images/blank_image/{self.seen}',
+                data=blank_image,
+                step=self.seen
             )
-            summary_str.append(
-                tf.Summary.Value(tag=f'images/target_image/{batch}'),
-                                 image=self._encode_image(target_image)
+            tf.summary.image(
+                name=f'images/target_image/{self.seen}',
+                data=target_image,
+                step=self.seen
             )
-            summary_str.append(
-                tf.Summary.Value(tag=f'images/predict_real/{batch}'),
-                                 image=self._encode_image(predict_real)
+            tf.summary.image(
+                name=f'images/predict_real/{self.seen}',
+                data=predict_real,
+                step=self.seen
             )
-            summary_str.append(
-                tf.Summary.Value(tag=f'images/predict_fake/{batch}'),
-                                 image=self._encode_image(predict_fake)
+            tf.summary.image(
+                name=f'images/predict_fake/{self.seen}',
+                data=predict_fake,
+                step=self.seen
             )
-            self.writer.add_summary(tf.Summary(value=summary_str),
-                                    global_step=self.seen)
+
+            # self.writer.add_summary(tf.Summary(value=summary_str),
+            #                         global_step=self.seen)
