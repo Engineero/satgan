@@ -14,6 +14,7 @@ import time
 from pathlib import Path
 from utils import ops
 from utils.darknet import build_darknet_model
+from utils.SaveImagesCallback import SaveImagesCallback
 from tensorflow.keras.layers import (Input, Conv2D, Concatenate,
                                      MaxPooling2D, BatchNormalization,
                                      LeakyReLU, GlobalAveragePooling2D)
@@ -625,9 +626,14 @@ def main(a):
             batch_size=a.batch_size,
             write_graph=True,
             write_images=True,
-            update_freq=100,
+            update_freq=a.summary_freq,
         )
         callbacks.append(tensorboard_callback)
+        saveimages_callback = SaveImagesCallback(
+            log_dir=tensorboard_path.as_posix(),
+            update_freq=a.summary_freq
+        )
+        callbacks.append(saveimages_callback)
     model_checkpoint = ModelCheckpoint(
         output_path.as_posix(),
         monitor='val_loss',
@@ -699,9 +705,7 @@ if __name__ == '__main__':
                         help="number of training steps (0 to disable)")
     parser.add_argument("--max_epochs", type=int, help="number of training epochs")
     parser.add_argument("--summary_freq", type=int, default=100,
-                        help="update summaries every summary_freq steps")
-    parser.add_argument("--progress_freq", type=int, default=50,
-                        help="display progress every progress_freq steps")
+                        help="Update summaries every summary_freq steps")
     parser.add_argument("--trace_freq", type=int, default=0,
                         help="trace execution every trace_freq steps")
     parser.add_argument("--display_freq", type=int, default=0,

@@ -7,7 +7,7 @@ Date Created: 2020-05-14
 
 
 import tensorflow as tf
-from tensorflow.keras.callbacks import callback
+from tensorflow.keras.callbacks import Callback
 from PIL import Image
 from io import BytesIO
 
@@ -15,10 +15,10 @@ from io import BytesIO
 class SaveImagesCallback(Callback):
     """Saves model output images to TensorBoard directory."""
 
-    def __init__(self, log_dir, update_frequency):
+    def __init__(self, log_dir, update_freq):
         super().__init__()
         self.log_dir = log_dir
-        self.update_frequency = update_frequency
+        self.update_freq = update_freq
         self.seen = 0
     
     def _encode_image(self, numpy_image):
@@ -36,7 +36,7 @@ class SaveImagesCallback(Callback):
     def on_batch_end(self, batch, logs=None):
         logs = logs or {}
         self.seen += 1
-        if self.seen % self.update_frequency == 0:
+        if self.seen % self.update_freq == 0:
             summary_str = []
             fake_image = self.model.outputs['generator']
             blank_image, target_image = self.model.inputs
