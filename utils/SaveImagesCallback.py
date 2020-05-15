@@ -13,25 +13,22 @@ from io import BytesIO
 
 
 class SaveImagesCallback(Callback):
-    """Saves model output images to TensorBoard directory."""
+    """Saves model output images to TensorBoard directory.
+    
+    Args:
+        log_dir: directory in which images will be stored.
+        wrtier: tf.summary file writer object.
 
-    def __init__(self, log_dir, update_freq):
+    Keyword Args:
+        update_freq: frequency with which to update. Default is every batch.
+    """
+
+    def __init__(self, log_dir, writer, update_freq=1):
         super().__init__()
         self.log_dir = log_dir
+        self.writer = writer
         self.update_freq = update_freq
         self.seen = 0
-
-    def _encode_image(self, numpy_image):
-        """Encode images for saving to TensorBoard."""
-        height, width, channels = numpy_image.shape
-        image = Image.fromarray(numpy_image)
-        output = BytesIO
-        image.save(output, format='png')
-        image_string = output.getvalue()
-        output.close()
-        return tf.Summary.Image(height=height, width=width,
-                                colorspace=channels,
-                                encoded_image_string=image_string)
 
     def on_batch_end(self, batch, logs=None):
         logs = logs or {}
@@ -42,26 +39,25 @@ class SaveImagesCallback(Callback):
             predict_real, predict_fake = self.model.outputs[1]
 
             # Create image summaries.
-            tf.summary.image(
-                name=f'images/fake_image/{self.seen}',
-                data=fake_image,
-            )
-            tf.summary.image(
-                name=f'images/blank_image/{self.seen}',
-                data=blank_image,
-            )
-            tf.summary.image(
-                name=f'images/target_image/{self.seen}',
-                data=target_image,
-            )
-            tf.summary.image(
-                name=f'images/predict_real/{self.seen}',
-                data=predict_real,
-            )
-            tf.summary.image(
-                name=f'images/predict_fake/{self.seen}',
-                data=predict_fake,
-            )
-
-            # self.writer.add_summary(tf.Summary(value=summary_str),
-            #                         global_step=self.seen)
+            with self.writer.as_default():
+                tf.summary.image(
+                    name=f'images/fake_image/{self.seen}',
+                    data=fake_image,
+                )
+                tf.summary.image(
+                    name=f'images/blank_image/{self.seen}',
+                    data=blank_image,
+                )
+                tf.summary.image(
+                    name=f'images/target_image/{self.seen}',
+                    data=target_image,
+                )
+                tf.summary.image(
+                    name=f'images/predict_real/{self.seen}',
+                    data=predict_real,
+                )
+                tf.summary.image(
+                    name=f'images/predict_fake/{self.seen}',
+                    data=predict_fake,
+                )
+            self.writer.flush()

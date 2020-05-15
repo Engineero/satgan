@@ -617,6 +617,7 @@ def main(a):
     callbacks = []
     output_path = Path(a.output_dir).resolve()
     output_path.mkdir(parents=True, exist_ok=True)
+    writer = tf.summary.create_file_writer(output_path)
     if a.tensorboard_dir is not None:
         tensorboard_path = Path(a.tensorboard_dir).resolve()
         tensorboard_path.mkdir(parents=True, exist_ok=True)
@@ -631,7 +632,8 @@ def main(a):
         callbacks.append(tensorboard_callback)
         saveimages_callback = SaveImagesCallback(
             log_dir=tensorboard_path.as_posix(),
-            update_freq=a.summary_freq
+            update_freq=a.summary_freq,
+            writer=writer
         )
         callbacks.append(saveimages_callback)
     model_checkpoint = ModelCheckpoint(
