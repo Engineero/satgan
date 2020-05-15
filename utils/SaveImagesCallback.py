@@ -8,6 +8,7 @@ Date Created: 2020-05-14
 
 import tensorflow as tf
 from tensorflow.keras.callbacks import Callback
+import tensorflow.keras.backend as K
 from PIL import Image
 from io import BytesIO
 
@@ -28,6 +29,7 @@ class SaveImagesCallback(Callback):
         self.log_dir = log_dir
         self.writer = writer
         self.update_freq = update_freq
+        self.session = K.get_session()
         self.seen = 0
 
     def on_batch_end(self, batch, logs=None):
@@ -39,25 +41,26 @@ class SaveImagesCallback(Callback):
             predict_real, predict_fake = self.model.outputs[1]
 
             # Create image summaries.
-            with self.writer.as_default():
-                tf.summary.image(
-                    name=f'images/fake_image/{self.seen}',
-                    data=fake_image.eval(),
-                )
-                tf.summary.image(
-                    name=f'images/blank_image/{self.seen}',
-                    data=blank_image.eval(),
-                )
-                tf.summary.image(
-                    name=f'images/target_image/{self.seen}',
-                    data=target_image.eval(),
-                )
-                tf.summary.image(
-                    name=f'images/predict_real/{self.seen}',
-                    data=predict_real.eval(),
-                )
-                tf.summary.image(
-                    name=f'images/predict_fake/{self.seen}',
-                    data=predict_fake.eval(),
-                )
-            self.writer.flush()
+            with self.session.as_default():
+                with self.writer.as_default():
+                    tf.summary.image(
+                        name=f'images/fake_image/{self.seen}',
+                        data=fake_image.eval(),
+                    )
+                    tf.summary.image(
+                        name=f'images/blank_image/{self.seen}',
+                        data=blank_image.eval(),
+                    )
+                    tf.summary.image(
+                        name=f'images/target_image/{self.seen}',
+                        data=target_image.eval(),
+                    )
+                    tf.summary.image(
+                        name=f'images/predict_real/{self.seen}',
+                        data=predict_real.eval(),
+                    )
+                    tf.summary.image(
+                        name=f'images/predict_fake/{self.seen}',
+                        data=predict_fake.eval(),
+                    )
+                self.writer.flush()
