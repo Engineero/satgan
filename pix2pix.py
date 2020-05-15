@@ -543,9 +543,7 @@ def create_model(a, train_data):
             return xy_loss + xy_loss_fake
 
     model = Model(inputs=[inputs, targets],
-                  outputs={'generator': fake_img,
-                           'tf_op_layer_discriminator_3': discrim_outputs,
-                           'tf_op_layer_task_net_2': task_outputs})
+                  outputs=[fake_img, discrim_outputs, task_outputs})
 
     # Plot the overall model.
     if a.plot_models:
