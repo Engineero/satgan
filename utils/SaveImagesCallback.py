@@ -8,7 +8,7 @@ Date Created: 2020-05-14
 
 import tensorflow as tf
 from tensorflow.keras.callbacks import Callback
-import tensorflow.keras.backend as K
+import tensorflow.compat.v1.keras.backend as K
 from PIL import Image
 from io import BytesIO
 
