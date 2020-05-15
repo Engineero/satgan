@@ -654,28 +654,29 @@ def main(a):
     train_data, val_data, test_data = load_examples(a)
 
     # Build the model.
-    model = create_model(a, train_data)
-    print(f'Overall model summary:\n{model.summary()}')
+    with sess.as_default():
+        model = create_model(a, train_data)
+        print(f'Overall model summary:\n{model.summary()}')
 
-    # Train the model.
-    history = model.fit(
-        x=train_data,
-        validation_data=val_data,
-        verbose=1,
-        callbacks=callbacks,
-        epochs=a.max_epochs,
-        shuffle=True,
-    )
-
-    # Test the model.
-    if test_data is not None:
-        model = load_model(a.output_dir)  # load the best model
-        test_losses = model.evaluate(
-            x=test_data,
-            batch_size=a.batch_size,
+        # Train the model.
+        history = model.fit(
+            x=train_data,
+            validation_data=val_data,
             verbose=1,
-            callbacks=[tensorboard_callback],
+            callbacks=callbacks,
+            epochs=a.max_epochs,
+            shuffle=True,
         )
+
+        # Test the model.
+        if test_data is not None:
+            model = load_model(a.output_dir)  # load the best model
+            test_losses = model.evaluate(
+                x=test_data,
+                batch_size=a.batch_size,
+                verbose=1,
+                callbacks=[tensorboard_callback],
+            )
 
 
 if __name__ == '__main__':
