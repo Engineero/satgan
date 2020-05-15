@@ -564,8 +564,7 @@ def create_model(a, train_data):
                   'tf_op_layer_task_net_2': opt_task}
     model.compile(loss=losses,
                   loss_weights=loss_weights,
-                  optimizer=Adam(),
-                  run_eagerly=True)
+                  optimizer=Adam())
     return model
 
 
