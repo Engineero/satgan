@@ -28,6 +28,7 @@ from tensorflow.keras.utils import plot_model
 from tensorflow.keras.optimizers import Adam, SGD
 
 
+
 # Define globals.
 EPS = 1e-12
 
@@ -617,6 +618,7 @@ def main(a):
     callbacks = []
     output_path = Path(a.output_dir).resolve()
     output_path.mkdir(parents=True, exist_ok=True)
+    sess = K.get_session()
     writer = tf.summary.create_file_writer(output_path.as_posix())
     if a.tensorboard_dir is not None:
         tensorboard_path = Path(a.tensorboard_dir).resolve()
@@ -632,8 +634,9 @@ def main(a):
         callbacks.append(tensorboard_callback)
         saveimages_callback = SaveImagesCallback(
             log_dir=tensorboard_path.as_posix(),
+            writer=writer,
+            sess=sess,
             update_freq=a.summary_freq,
-            writer=writer
         )
         callbacks.append(saveimages_callback)
     model_checkpoint = ModelCheckpoint(
