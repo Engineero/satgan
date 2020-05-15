@@ -26,8 +26,6 @@ from tensorflow.keras.losses import (mean_squared_error, mean_absolute_error,
 from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint
 from tensorflow.keras.utils import plot_model
 from tensorflow.keras.optimizers import Adam, SGD
-import tensorflow.compat.v1.keras.backend as K
-
 
 
 # Define globals.
@@ -619,7 +617,6 @@ def main(a):
     callbacks = []
     output_path = Path(a.output_dir).resolve()
     output_path.mkdir(parents=True, exist_ok=True)
-    sess = K.get_session()
     writer = tf.summary.create_file_writer(output_path.as_posix())
     if a.tensorboard_dir is not None:
         tensorboard_path = Path(a.tensorboard_dir).resolve()
@@ -636,7 +633,6 @@ def main(a):
         saveimages_callback = SaveImagesCallback(
             log_dir=tensorboard_path.as_posix(),
             writer=writer,
-            sess=sess,
             update_freq=a.summary_freq,
         )
         callbacks.append(saveimages_callback)
@@ -654,29 +650,28 @@ def main(a):
     train_data, val_data, test_data = load_examples(a)
 
     # Build the model.
-    with sess.as_default():
-        model = create_model(a, train_data)
-        print(f'Overall model summary:\n{model.summary()}')
+    model = create_model(a, train_data)
+    print(f'Overall model summary:\n{model.summary()}')
 
-        # Train the model.
-        history = model.fit(
-            x=train_data,
-            validation_data=val_data,
+    # Train the model.
+    history = model.fit(
+        x=train_data,
+        validation_data=val_data,
+        verbose=1,
+        callbacks=callbacks,
+        epochs=a.max_epochs,
+        shuffle=True,
+    )
+
+    # Test the model.
+    if test_data is not None:
+        model = load_model(a.output_dir)  # load the best model
+        test_losses = model.evaluate(
+            x=test_data,
+            batch_size=a.batch_size,
             verbose=1,
-            callbacks=callbacks,
-            epochs=a.max_epochs,
-            shuffle=True,
+            callbacks=[tensorboard_callback],
         )
-
-        # Test the model.
-        if test_data is not None:
-            model = load_model(a.output_dir)  # load the best model
-            test_losses = model.evaluate(
-                x=test_data,
-                batch_size=a.batch_size,
-                verbose=1,
-                callbacks=[tensorboard_callback],
-            )
 
 
 if __name__ == '__main__':
