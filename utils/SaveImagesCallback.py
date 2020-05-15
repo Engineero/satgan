@@ -37,6 +37,11 @@ class SaveImagesCallback(Callback):
             fake_image = self.model.outputs[0]
             blank_image, target_image = self.model.inputs
             predict_real, predict_fake = self.model.outputs[1]
+            print(f'fake_image shape: {fake_image.shape}')
+            print(f'blank_image shape: {blank_image.shape}')
+            print(f'target_image shape: {target_image.shape}')
+            print(f'predict_real shape: {predict_real.shape}')
+            print(f'predict_fake shape: {predict_fake.shape}')
 
             # Create image summaries.
             with self.writer.as_default():
