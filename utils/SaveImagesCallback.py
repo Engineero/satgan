@@ -42,27 +42,22 @@ class SaveImagesCallback(Callback):
             with self.writer.as_default():
                 tf.summary.image(
                     name=f'fake_image_{self.seen}',
-                    data=fake_image,
-                    step=self.seen,
+                    data=tf.cast(fake_image * 255, tf.int32),
                 )
                 tf.summary.image(
                     name=f'blank_image_{self.seen}',
-                    data=blank_image,
-                    step=self.seen,
+                    data=tf.cast(blank_image * 255, tf.int32),
                 )
                 tf.summary.image(
                     name=f'target_image_{self.seen}',
-                    data=target_image,
-                    step=self.seen,
+                    data=tf.cast(target_image * 255, tf.int32),
                 )
                 tf.summary.image(
                     name=f'predict_real_{self.seen}',
-                    data=predict_real,
-                    step=self.seen,
+                    data=tf.cast(predict_real * 255, tf.int32),
                 )
                 tf.summary.image(
                     name=f'predict_fake_{self.seen}',
-                    data=predict_fake,
-                    step=self.seen,
+                    data=tf.cast(predict_fake * 255, tf.int32),
                 )
             self.writer.flush()
