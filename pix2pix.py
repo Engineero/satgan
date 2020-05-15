@@ -543,7 +543,7 @@ def create_model(a, train_data):
             return xy_loss + xy_loss_fake
 
     model = Model(inputs=[inputs, targets],
-                  outputs=[fake_img, discrim_outputs, task_outputs})
+                  outputs=[fake_img, discrim_outputs, task_outputs])
 
     # Plot the overall model.
     if a.plot_models:
