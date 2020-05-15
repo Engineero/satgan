@@ -26,6 +26,7 @@ from tensorflow.keras.losses import (mean_squared_error, mean_absolute_error,
 from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint
 from tensorflow.keras.utils import plot_model
 from tensorflow.keras.optimizers import Adam, SGD
+import tensorflow.compat.v1.keras.backend as K
 
 
 
