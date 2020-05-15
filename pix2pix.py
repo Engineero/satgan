@@ -617,7 +617,7 @@ def main(a):
     callbacks = []
     output_path = Path(a.output_dir).resolve()
     output_path.mkdir(parents=True, exist_ok=True)
-    writer = tf.summary.create_file_writer(output_path)
+    writer = tf.summary.create_file_writer(output_path.as_posix())
     if a.tensorboard_dir is not None:
         tensorboard_path = Path(a.tensorboard_dir).resolve()
         tensorboard_path.mkdir(parents=True, exist_ok=True)
