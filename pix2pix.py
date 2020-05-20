@@ -31,7 +31,7 @@ from tensorflow.keras.optimizers import Adam, SGD
 
 # Define globals.
 EPS = 1e-12
-tf.logging.set_verbosity(tf.logging.ERROR)
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 
 def preprocess(image, add_noise=False):
