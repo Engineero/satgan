@@ -687,14 +687,22 @@ def main(a):
                     )
 
                     # Create object bboxes and summarize task outputs, targets
-                    bboxes_real = tf.stack([task_outputs[0][1] - 0.02,
-                                            task_outputs[0][0] - 0.02,
-                                            task_outputs[0][1] + 0.02,
-                                            task_outputs[0][0] + 0.02], axis=-1)
-                    bboxes_fake = tf.stack([task_outputs[1][1] - 0.02,
-                                            task_outputs[1][0] - 0.02,
-                                            task_outputs[1][1] + 0.02,
-                                            task_outputs[1][0] + 0.02], axis=-1)
+                    print(f'task outputs shape: {task_outputs.shape}')
+                    print(f'task targets shape: {task_targets.shape}')
+                    task_real = task_outputs[0]
+                    task_fake = task_outputs[1]
+                    bboxes_real = tf.stack([task_real[:, 1] - 0.02,
+                                            task_real[:, 0] - 0.02,
+                                            task_real[:, 1] + 0.02,
+                                            task_real[:, 0] + 0.02], axis=1)
+                    bboxes_fake = tf.stack([task_fake[:, 1] - 0.02,
+                                            task_fake[:, 0] - 0.02,
+                                            task_fake[:, 1] + 0.02,
+                                            task_fake[:, 0] + 0.02], axis=1)
+                    print(f'target shape: {targets.shape}')
+                    print(f'target bbox shape: {bboxes_real.shape}')
+                    print(f'fake image shape: {fake_img.shape}')
+                    print(f'fake bbox shape: {bboxes_fake.shape}')
                     target_bboxes = tf.image.draw_bounding_boxes(
                         images=targets,
                         boxes=bboxes_real,
