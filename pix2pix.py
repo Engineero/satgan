@@ -649,17 +649,17 @@ def main(a):
                 bool_mask,
                 tf.math.reduce_mean(
                     tf.math.square(task_targets - task_outputs[0]),
-                    axis=-1
+                    axis=1
                 ),
-                0.
+                tf.zeros_like(bool_mask, dtype=tf.float32)
             )
             xy_loss_fake = tf.where(
                 bool_mask,
                 tf.math.reduce_mean(
                     tf.math.square(task_targets - task_outputs[1]),
-                    axis=-1
+                    axis=1
                 ),
-                0.
+                tf.zeros_like(bool_mask, dtype=tf.float32)
             )
             return tf.reduce_mean(xy_loss + xy_loss_fake)
 
