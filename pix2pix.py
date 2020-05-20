@@ -605,7 +605,7 @@ def main(a):
 
     with tf.name_scope("compute_loss"):
         @tf.function
-        def compute_loss(model, data):
+        def compute_loss(model, data, step):
             (inputs, targets), (_, _, task_targets) = data
             fake_img, discrim_outputs, task_outputs = model([inputs, targets])
             discrim_loss = calc_discriminator_loss(discrim_outputs)
@@ -613,17 +613,21 @@ def main(a):
             task_loss = calc_task_loss(task_targets, task_outputs)
             total_loss = a.dsc_weight * discrim_loss + \
                 a.gen_weight * gen_loss + a.task_weight * task_loss
-            tf.summary.scalar(name='discriminator_loss', data=discrim_loss)
-            tf.summary.scalar(name='generator_loss', data=gen_loss)
-            tf.summary.scalar(name='task_loss', data=task_loss)
-            tf.summary.scalar(name='total_loss', data=total_loss)
+            tf.summary.scalar(name='discriminator_loss', data=discrim_loss,
+                              step=step)
+            tf.summary.scalar(name='generator_loss', data=gen_loss,
+                              step=step)
+            tf.summary.scalar(name='task_loss', data=task_loss,
+                              step=step)
+            tf.summary.scalar(name='total_loss', data=total_loss,
+                              step=step)
             return total_loss
         
     with tf.name_scope('apply_gradients'):
         @tf.function
-        def compute_apply_gradients(model, data, optimizer):
+        def compute_apply_gradients(model, data, optimizer, step):
             with tf.GradientTape() as tape:
-                loss = compute_loss(model, data)
+                loss = compute_loss(model, data, step)
             gradients = tape.gradient(loss, model.trainable_variables)
             optimizer.apply_gradients(zip(gradients,
                                           model.trainable_variables))
@@ -676,7 +680,7 @@ def main(a):
             epoch_start = time.time()
             for batch_num, batch in enumerate(train_data):
                 batches_seen += 1
-                compute_apply_gradients(model, batch, optimizer)
+                compute_apply_gradients(model, batch, optimizer, batches_seen)
                 # Save summary images, statistics.
                 if batch_num % a.summary_freq == 0:
                     print(f'Writing outputs for batch {batch_num}.')
