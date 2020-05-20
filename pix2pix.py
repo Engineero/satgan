@@ -395,7 +395,7 @@ def create_discriminator(a, input_shape, target_shape):
     # layer_5: [batch, 31, 31, ndf * 8] => [batch, 30, 30, 1]
     x = ops.down_resblock(x, filters=1, to_down=False, sn=a.spec_norm,
                           scope=f'layer_{n_layers + 1}')
-    x = tf.nn.tanh(x, name='discriminator')
+    x = tf.nn.sigmoid(x, name='discriminator')
 
     return Model(inputs=[x_in, y_in], outputs=x, name='discriminator')
 
