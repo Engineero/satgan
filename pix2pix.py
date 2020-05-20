@@ -629,9 +629,11 @@ def main(a):
         @tf.function
         def calc_task_loss(task_targets, task_outputs):
             # task_targets are [xcenter, ycenter]
-            xy_loss = mean_squared_error(task_outputs[0], task_targets)
-            xy_loss_fake = mean_squared_error(task_outputs[1],
-                                              task_targets)
+            task_targets = task_targets * (task_targets != 0)
+            real_outputs = task_outputs * (task_targets != 0)
+            fake_outputs = task_outputs * (task_targets != 0)
+            xy_loss = mean_squared_error(real_outputs, task_targets)
+            xy_loss_fake = mean_squared_error(fake_outputs, task_targets)
             return tf.reduce_mean(xy_loss + xy_loss_fake)
 
     # Train the model.
