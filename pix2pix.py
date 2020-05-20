@@ -647,12 +647,18 @@ def main(a):
             # xy_loss_fake = mean_squared_error(fake_outputs, masked_targets)
             xy_loss = tf.where(
                 bool_mask,
-                mean_squared_error(task_outputs[0], task_targets),
+                tf.math.reduce_mean(
+                    tf.math.square(task_targets - task_outputs[0]),
+                    axis=-1
+                ),
                 0.
             )
             xy_loss_fake = tf.where(
                 bool_mask,
-                mean_squared_error(task_outputs[1], task_targets),
+                tf.math.reduce_mean(
+                    tf.math.square(task_targets - task_outputs[1]),
+                    axis=-1
+                ),
                 0.
             )
             return tf.reduce_mean(xy_loss + xy_loss_fake)
