@@ -629,8 +629,8 @@ def main(a):
         @tf.function
         def calc_task_loss(task_targets, task_outputs):
             # task_targets are [xcenter, ycenter]
-            bool_mask = (task_targets[:, 0] != 0 or task_targets[:, 1] != 0)
-            bool_mask = tf.stack([bool_mask, bool_mask], axis=1)
+            target_sum = tf.math.reduce_sum(tf.math.abs(task_targets), axis=1)
+            bool_mask = (target_sum[:, 0] != 0)
             # bool_mask = tf.expand_dims(bool_mask, axis=1)
             print(f'bool mask shape: {bool_mask.shape}')
             print(f'task targets shape: {task_targets.shape}')
