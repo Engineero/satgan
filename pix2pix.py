@@ -679,7 +679,7 @@ def main(a):
             print(f'Training epoch {epoch+1} of {a.max_epochs}...')
             epoch_start = time.time()
             for batch_num, batch in enumerate(train_data):
-                batches_seen += 1
+                batches_seen.assign_add(1)
                 compute_apply_gradients(model, batch, optimizer, batches_seen)
                 # Save summary images, statistics.
                 if batch_num % a.summary_freq == 0:
