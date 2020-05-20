@@ -685,7 +685,38 @@ def main(a):
                         data=discrim_outputs[1],
                         step=batches_seen,
                     )
-                    # TODO (NLT): summarize task outputs, targets
+
+                    # Create object bboxes and summarize task outputs, targets
+                    bboxes_real = tf.stack([task_outputs[0][1] - 0.02,
+                                            task_outputs[0][0] - 0.02,
+                                            task_outputs[0][1] + 0.02,
+                                            task_outputs[0][0] + 0.02])
+                    bboxes_fake = tf.stack([task_outputs[1][1] - 0.02,
+                                            task_outputs[1][0] - 0.02,
+                                            task_outputs[1][1] + 0.02,
+                                            task_outputs[1][0] + 0.02])
+                    target_bboxes = tf.image.draw_bounding_boxes(
+                        images=targets,
+                        bboxes=bboxes_real,
+                        colors=np.array([[0., 1., 0.]])
+                    )
+                    generated_bboxes = tf.image.draw_bounding_boxes(
+                        images=fake_img,
+                        bboxes=bboxes_fake,
+                        colors=np.array([[0., 1., 0.]])
+                    )
+
+                    # Save task outputs.
+                    tf.summary.image(
+                        name='task_real',
+                        data=target_bboxes,
+                        step=batches_seen,
+                    )
+                    tf.summary.image(
+                        name='task_fake',
+                        data=generated_bboxes,
+                        step=batches_seen,
+                    )
                 writer.flush()
 
         epoch_time = time.time() - epoch_start
