@@ -644,7 +644,7 @@ def main(a):
                            depth=2),
                 predict_fake
             )
-            return real_loss + fake_loss
+            return tf.reduce_mean(real_loss + fake_loss)
 
     with tf.name_scope("generator_loss"):
         @tf.function
@@ -674,6 +674,7 @@ def main(a):
             compute_apply_gradients(model, batch, optimizer)
             # Save summary images, statistics.
             if batch_num % a.summary_freq == 0:
+                print(f'Writing outputs for batch {batch_num}.')
                 (inputs, targets), (_, _, task_targets) = batch
                 fake_img, discrim_outputs, task_outputs = model([inputs, targets])
                 tf.summary.image(
@@ -682,19 +683,19 @@ def main(a):
                 )
                 tf.summary.image(
                     name='blank_image',
-                    data=tf.cast(blank_image * 255, tf.int32),
+                    data=tf.cast(batch[0][0] * 255, tf.int32),
                 )
                 tf.summary.image(
                     name='target_image',
-                    data=tf.cast(target_image * 255, tf.int32),
+                    data=tf.cast(batch[0][1] * 255, tf.int32),
                 )
                 tf.summary.image(
                     name='predict_real',
-                    data=tf.cast(predict_real * 255, tf.int32),
+                    data=tf.cast(discrim_outputs[0] * 255, tf.int32),
                 )
                 tf.summary.image(
                     name='predict_fake',
-                    data=tf.cast(predict_fake * 255, tf.int32),
+                    data=tf.cast(discrim_outputs[1] * 255, tf.int32),
                 )
                 # TODO (NLT): summarize task outputs, targets
 
