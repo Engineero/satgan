@@ -690,11 +690,11 @@ def main(a):
                     bboxes_real = tf.stack([task_outputs[0][1] - 0.02,
                                             task_outputs[0][0] - 0.02,
                                             task_outputs[0][1] + 0.02,
-                                            task_outputs[0][0] + 0.02])
+                                            task_outputs[0][0] + 0.02], axis=-1)
                     bboxes_fake = tf.stack([task_outputs[1][1] - 0.02,
                                             task_outputs[1][0] - 0.02,
                                             task_outputs[1][1] + 0.02,
-                                            task_outputs[1][0] + 0.02])
+                                            task_outputs[1][0] + 0.02], axis=-1)
                     target_bboxes = tf.image.draw_bounding_boxes(
                         images=targets,
                         boxes=bboxes_real,
