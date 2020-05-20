@@ -611,18 +611,6 @@ def main(a):
             # discrim_outputs[1] = predict_fake => 0
             real_loss = -tf.math.log(discrim_outputs[0] + EPS)
             fake_loss = -tf.math.log(1 - discrim_outputs[1] + EPS)
-            # predict_real = tf.reshape(discrim_outputs[0], [-1, 2])
-            # predict_fake = tf.reshape(discrim_outputs[1], [-1, 2])
-            # real_loss = binary_crossentropy(
-            #     tf.one_hot(tf.ones_like(predict_real[:, 0], dtype=tf.int32),
-            #                depth=2),
-            #     predict_real
-            # )
-            # fake_loss = binary_crossentropy(
-            #     tf.one_hot(tf.zeros_like(predict_fake[:, 0], dtype=tf.int32),
-            #                depth=2),
-            #     predict_fake
-            # )
             return tf.reduce_mean(real_loss + fake_loss)
 
     with tf.name_scope("generator_loss"):
@@ -694,11 +682,11 @@ def main(a):
                     bboxes_real = tf.stack([task_real[:, 1] - 0.02,
                                             task_real[:, 0] - 0.02,
                                             task_real[:, 1] + 0.02,
-                                            task_real[:, 0] + 0.02], axis=1)
+                                            task_real[:, 0] + 0.02], axis=-1)
                     bboxes_fake = tf.stack([task_fake[:, 1] - 0.02,
                                             task_fake[:, 0] - 0.02,
                                             task_fake[:, 1] + 0.02,
-                                            task_fake[:, 0] + 0.02], axis=1)
+                                            task_fake[:, 0] + 0.02], axis=-1)
                     print(f'target shape: {targets.shape}')
                     print(f'target bbox shape: {bboxes_real.shape}')
                     print(f'fake image shape: {fake_img.shape}')
