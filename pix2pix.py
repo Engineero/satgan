@@ -670,41 +670,41 @@ def main(a):
 
     # Train the model.
     batches_seen = 0
-    for epoch in range(a.max_epochs):
-        print(f'Training epoch {epoch+1} of {a.max_epochs}...')
-        epoch_start = time.time()
-        for batch_num, batch in enumerate(train_data):
-            batches_seen += 1
-            compute_apply_gradients(model, batch, optimizer)
-            # Save summary images, statistics.
-            if batch_num % a.summary_freq == 0:
-                with writer.as_default():
+    with writer.as_default():
+        for epoch in range(a.max_epochs):
+            print(f'Training epoch {epoch+1} of {a.max_epochs}...')
+            epoch_start = time.time()
+            for batch_num, batch in enumerate(train_data):
+                batches_seen += 1
+                compute_apply_gradients(model, batch, optimizer)
+                # Save summary images, statistics.
+                if batch_num % a.summary_freq == 0:
                     print(f'Writing outputs for batch {batch_num}.')
                     (inputs, targets), (_, _, task_targets) = batch
                     fake_img, discrim_outputs, task_outputs = model([inputs, targets])
                     tf.summary.image(
                         name='fake_image',
-                        data=tf.cast(fake_img * 255, tf.int32),
+                        data=fake_img,
                         step=batches_seen,
                     )
                     tf.summary.image(
                         name='blank_image',
-                        data=tf.cast(batch[0][0] * 255, tf.int32),
+                        data=batch[0][0],
                         step=batches_seen,
                     )
                     tf.summary.image(
                         name='target_image',
-                        data=tf.cast(batch[0][1] * 255, tf.int32),
+                        data=batch[0][1],
                         step=batches_seen,
                     )
                     tf.summary.image(
                         name='predict_real',
-                        data=tf.cast(discrim_outputs[0] * 255, tf.int32),
+                        data=discrim_outputs[0],
                         step=batches_seen,
                     )
                     tf.summary.image(
                         name='predict_fake',
-                        data=tf.cast(discrim_outputs[1] * 255, tf.int32),
+                        data=discrim_outputs[1],
                         step=batches_seen,
                     )
                     # TODO (NLT): summarize task outputs, targets
