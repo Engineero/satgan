@@ -580,7 +580,7 @@ def main(a):
             (inputs, targets), (_, _, task_targets) = data
             fake_img, discrim_outputs, task_outputs = model([inputs, targets])
             discrim_loss = calc_discriminator_loss(discrim_outputs)
-            gen_loss = calc_generator_loss(targets, fake_img)
+            gen_loss = calc_generator_loss(targets, fake_img, discrim_outputs)
             task_loss = calc_task_loss(task_targets, task_outputs)
             total_loss = a.dsc_weight * discrim_loss + \
                 a.gen_weight * gen_loss + a.task_weight * task_loss
