@@ -31,6 +31,7 @@ from tensorflow.keras.optimizers import Adam, SGD
 
 # Define globals.
 EPS = 1e-12
+tf.logging.set_verbosity(tf.logging.ERROR)
 
 
 def preprocess(image, add_noise=False):
@@ -645,7 +646,7 @@ def main(a):
             )
             xy_loss = mean_squared_error(real_outputs, masked_targets)
             xy_loss_fake = mean_squared_error(fake_outputs, masked_targets)
-            return tf.reduce_mean(xy_loss + xy_loss_fake)
+            return tf.reduce_mean(0. + xy_loss + xy_loss_fake)
 
     # Train the model.
     batches_seen = tf.Variable(0, dtype=tf.int64)
