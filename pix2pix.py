@@ -654,7 +654,7 @@ def main(a):
             # gen_loss_GAN = tf.reduce_mean(-tf.math.log(y_pred[1] + EPS))
             gen_loss_L1 = mean_absolute_error(targets, fake_img)
             # gen_loss = gen_loss_GAN * a.gan_weight + gen_loss_L1 * a.l1_weight
-            return gen_loss_L1
+            return tf.reduce_mean(gen_loss_L1)
 
     with tf.name_scope('task_loss'):
         @tf.function
@@ -664,7 +664,7 @@ def main(a):
             xy_loss = mean_squared_error(task_outputs[0], task_targets)
             xy_loss_fake = mean_squared_error(task_outputs[1],
                                               task_targets)
-            return xy_loss + xy_loss_fake
+            return tf.reduce_mean(xy_loss + xy_loss_fake)
 
     # Train the model.
     for epoch in range(a.max_epochs):
