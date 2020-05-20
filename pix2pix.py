@@ -630,6 +630,11 @@ def main(a):
         def calc_task_loss(task_targets, task_outputs):
             # task_targets are [xcenter, ycenter]
             bool_mask = (task_targets[:, 0] != 0 or task_targets[:, 1] != 0)
+            bool_mask = tf.stack([bool_mask, bool_mask], axis=1)
+            # bool_mask = tf.expand_dims(bool_mask, axis=1)
+            print(f'bool mask shape: {bool_mask.shape}')
+            print(f'task targets shape: {task_targets.shape}')
+            print(f'task outputs shape: {task_outputs.shape}')
             task_targets = tf.boolean_mask(task_targets, bool_mask)
             real_outputs = tf.boolean_mask(task_outputs[0], bool_mask)
             fake_outputs = tf.boolean_mask(task_outputs[1], bool_mask)
