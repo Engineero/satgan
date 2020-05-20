@@ -393,9 +393,9 @@ def create_discriminator(a, input_shape, target_shape):
         x = BatchNormalization()(x)
 
     # layer_5: [batch, 31, 31, ndf * 8] => [batch, 30, 30, 1]
-    x = ops.down_resblock(x, filters=2, to_down=False, sn=a.spec_norm,
+    x = ops.down_resblock(x, filters=1, to_down=False, sn=a.spec_norm,
                           scope=f'layer_{n_layers + 1}')
-    x = tf.nn.softmax(x, name='discriminator')
+    x = tf.nn.tanh(x, name='discriminator')
 
     return Model(inputs=[x_in, y_in], outputs=x, name='discriminator')
 
@@ -607,12 +607,12 @@ def main(a):
         @tf.function
         def calc_discriminator_loss(discrim_outputs):
             # minimizing -tf.log will try to get inputs to 1
-            # predict_real => 1
-            # predict_fake => 0
-            predict_real = tf.reshape(discrim_outputs[0], [-1, 2])
-            predict_fake = tf.reshape(discrim_outputs[1], [-1, 2])
-            real_loss = -tf.math.log(predict_real + EPS)
-            fake_loss = -tf.math.log(1 - predict_fake + EPS)
+            # discrim_outputs[0] = predict_real => 1
+            # discrim_outputs[1] = predict_fake => 0
+            real_loss = -tf.math.log(discrim_outputs[0] + EPS)
+            fake_loss = -tf.math.log(1 - discrim_outputs[1] + EPS)
+            # predict_real = tf.reshape(discrim_outputs[0], [-1, 2])
+            # predict_fake = tf.reshape(discrim_outputs[1], [-1, 2])
             # real_loss = binary_crossentropy(
             #     tf.one_hot(tf.ones_like(predict_real[:, 0], dtype=tf.int32),
             #                depth=2),
