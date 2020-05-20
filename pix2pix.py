@@ -669,10 +669,12 @@ def main(a):
             return tf.reduce_mean(xy_loss + xy_loss_fake)
 
     # Train the model.
+    batches_seen = 0
     for epoch in range(a.max_epochs):
         print(f'Training epoch {epoch+1} of {a.max_epochs}...')
         epoch_start = time.time()
         for batch_num, batch in enumerate(train_data):
+            batches_seen += 1
             compute_apply_gradients(model, batch, optimizer)
             # Save summary images, statistics.
             if batch_num % a.summary_freq == 0:
@@ -683,22 +685,27 @@ def main(a):
                     tf.summary.image(
                         name='fake_image',
                         data=tf.cast(fake_img * 255, tf.int32),
+                        step=batches_seen,
                     )
                     tf.summary.image(
                         name='blank_image',
                         data=tf.cast(batch[0][0] * 255, tf.int32),
+                        step=batches_seen,
                     )
                     tf.summary.image(
                         name='target_image',
                         data=tf.cast(batch[0][1] * 255, tf.int32),
+                        step=batches_seen,
                     )
                     tf.summary.image(
                         name='predict_real',
                         data=tf.cast(discrim_outputs[0] * 255, tf.int32),
+                        step=batches_seen,
                     )
                     tf.summary.image(
                         name='predict_fake',
                         data=tf.cast(discrim_outputs[1] * 255, tf.int32),
+                        step=batches_seen,
                     )
                     # TODO (NLT): summarize task outputs, targets
                 writer.flush()
