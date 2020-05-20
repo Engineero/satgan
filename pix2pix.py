@@ -563,36 +563,6 @@ def main(a):
     output_path.mkdir(parents=True, exist_ok=True)
     writer = tf.summary.create_file_writer(output_path.as_posix())
 
-    # Set up the callbacks.
-    # callbacks = []
-    # if a.tensorboard_dir is not None:
-    #     tensorboard_path = Path(a.tensorboard_dir).resolve()
-    #     tensorboard_path.mkdir(parents=True, exist_ok=True)
-    #     tensorboard_callback = TensorBoard(
-    #         log_dir=tensorboard_path.as_posix(),
-    #         histogram_freq=0,
-    #         batch_size=a.batch_size,
-    #         write_graph=True,
-    #         write_images=True,
-    #         update_freq=a.summary_freq,
-    #     )
-    #     callbacks.append(tensorboard_callback)
-    #     saveimages_callback = SaveImagesCallback(
-    #         log_dir=tensorboard_path.as_posix(),
-    #         writer=writer,
-    #         update_freq=a.summary_freq,
-    #     )
-    #     callbacks.append(saveimages_callback)
-    # model_checkpoint = ModelCheckpoint(
-    #     output_path.as_posix(),
-    #     monitor='val_loss',
-    #     verbose=1,
-    #     save_best_only=True,
-    #     save_weights_only=False,
-    #     mode='min',
-    # )
-    # callbacks.append(model_checkpoint)
-
     # Build data generators.
     train_data, val_data, test_data = load_examples(a)
 
@@ -603,6 +573,7 @@ def main(a):
     # Define the optimizer.
     optimizer = Adam()
 
+    # Define model losses and helpers for computing and applying gradients.
     with tf.name_scope("compute_loss"):
         @tf.function
         def compute_loss(model, data, step):
@@ -654,19 +625,20 @@ def main(a):
 
     with tf.name_scope("generator_loss"):
         @tf.function
-        def calc_generator_loss(targets, fake_img):
+        def calc_generator_loss(targets, fake_img, discrim_outputs):
             # predict_fake => 1
             # abs(targets - outputs) => 0
-            # gen_loss_GAN = tf.reduce_mean(-tf.math.log(y_pred[1] + EPS))
-            gen_loss_L1 = mean_absolute_error(targets, fake_img)
-            # gen_loss = gen_loss_GAN * a.gan_weight + gen_loss_L1 * a.l1_weight
-            return tf.reduce_mean(gen_loss_L1)
+            gen_loss_GAN = tf.reduce_mean(
+                -tf.math.log(discrim_outputs[1] + EPS)
+            )
+            gen_loss_L1 = tf.reduce_mean(mean_absolute_error(targets,
+                                                             fake_img))
+            return a.gan_weight * gen_loss_GAN + a.l1_weight * gen_loss_L1
 
     with tf.name_scope('task_loss'):
         @tf.function
         def calc_task_loss(task_targets, task_outputs):
-            # TODO (NLT): implement YOLO loss or similar for detection.
-            # task_targets are [xcenter, ycenter, xmin, xmax, ymin, ymax, class]
+            # task_targets are [xcenter, ycenter]
             xy_loss = mean_squared_error(task_outputs[0], task_targets)
             xy_loss_fake = mean_squared_error(task_outputs[1],
                                               task_targets)
