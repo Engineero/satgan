@@ -200,7 +200,7 @@ def _parse_example(serialized_example, a):
     # number of objects).
     paddings = tf.constant([[0, 0], [0, 0], [0, a.max_inferences]])
     paddings = paddings - (tf.constant([[0, 0], [0, 0], [0, 1]]) * tf.shape(objects)[-1])
-    objects = tf.pad(tensor=objects, paddings=paddings, constant_values=0.0)
+    objects = tf.pad(tensor=objects, paddings=paddings, constant_values=-1.0)
     objects = tf.tile(objects, [1, 1, a.num_pred_layers])
 
     # TODO (NLT): either mask these bboxes to 64x64 images or figure out how to
@@ -629,7 +629,7 @@ def main(a):
         @tf.function
         def calc_task_loss(task_targets, task_outputs):
             # task_targets are [xcenter, ycenter]
-            target_sum = tf.math.reduce_sum(tf.math.abs(task_targets), axis=1)
+            target_sum = tf.math.reduce_sum(tf.math.abs(task_targets + 1.), axis=1)
             bool_mask = (target_sum != 0)
             masked_targets = tf.boolean_mask(
                 tf.transpose(task_targets, perm=[0, 2, 1]),
@@ -688,32 +688,20 @@ def main(a):
                     )
 
                     # Create object bboxes and summarize task outputs, targets
-                    target_sum = tf.math.reduce_sum(tf.math.abs(task_targets), axis=1)
-                    bool_mask = (target_sum != 0)
-                    masked_targets = tf.boolean_mask(
-                        tf.transpose(task_targets, perm=[0, 2, 1]),
-                        bool_mask
-                    )
-                    masked_real = tf.boolean_mask(
-                        tf.transpose(task_outputs[0], perm=[0, 2, 1]),
-                        bool_mask
-                    )
-                    masked_fake = tf.boolean_mask(
-                        tf.transpose(task_outputs[1], perm=[0, 2, 1]),
-                        bool_mask
-                    )
-                    true_bboxes = tf.stack([masked_targets[:, 1] - 0.02,
-                                            masked_targets[:, 0] - 0.02,
-                                            masked_targets[:, 1] + 0.02,
-                                            masked_targets[:, 0] + 0.02], axis=-1)
-                    bboxes_real = tf.stack([masked_real[:, 1] - 0.02,
-                                            masked_real[:, 0] - 0.02,
-                                            masked_real[:, 1] + 0.02,
-                                            masked_real[:, 0] + 0.02], axis=-1)
-                    bboxes_fake = tf.stack([masked_fake[:, 1] - 0.02,
-                                            masked_fake[:, 0] - 0.02,
-                                            masked_fake[:, 1] + 0.02,
-                                            masked_fake[:, 0] + 0.02], axis=-1)
+                    real_detects = task_outputs[0]
+                    fake_detects = task_outputs[1]
+                    true_bboxes = tf.stack([task_targets[:, 1] - 0.02,
+                                            task_targets[:, 0] - 0.02,
+                                            task_targets[:, 1] + 0.02,
+                                            task_targets[:, 0] + 0.02], axis=-1)
+                    bboxes_real = tf.stack([real_detects[:, 1] - 0.02,
+                                            real_detects[:, 0] - 0.02,
+                                            real_detects[:, 1] + 0.02,
+                                            real_detects[:, 0] + 0.02], axis=-1)
+                    bboxes_fake = tf.stack([fake_detects[:, 1] - 0.02,
+                                            fake_detects[:, 0] - 0.02,
+                                            fake_detects[:, 1] + 0.02,
+                                            fake_detects[:, 0] + 0.02], axis=-1)
                     target_bboxes = tf.image.draw_bounding_boxes(
                         images=tf.image.grayscale_to_rgb(targets),
                         boxes=bboxes_real,
