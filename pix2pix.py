@@ -611,16 +611,18 @@ def main(a):
             # predict_fake => 0
             predict_real = tf.reshape(discrim_outputs[0], [-1, 2])
             predict_fake = tf.reshape(discrim_outputs[1], [-1, 2])
-            real_loss = binary_crossentropy(
-                tf.one_hot(tf.ones_like(predict_real[:, 0], dtype=tf.int32),
-                           depth=2),
-                predict_real
-            )
-            fake_loss = binary_crossentropy(
-                tf.one_hot(tf.zeros_like(predict_fake[:, 0], dtype=tf.int32),
-                           depth=2),
-                predict_fake
-            )
+            real_loss = -tf.log(predict_real + EPS)
+            fake_loss = -tf.log(1 - predict_fake + EPS)
+            # real_loss = binary_crossentropy(
+            #     tf.one_hot(tf.ones_like(predict_real[:, 0], dtype=tf.int32),
+            #                depth=2),
+            #     predict_real
+            # )
+            # fake_loss = binary_crossentropy(
+            #     tf.one_hot(tf.zeros_like(predict_fake[:, 0], dtype=tf.int32),
+            #                depth=2),
+            #     predict_fake
+            # )
             return tf.reduce_mean(real_loss + fake_loss)
 
     with tf.name_scope("generator_loss"):
