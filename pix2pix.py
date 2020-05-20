@@ -31,7 +31,6 @@ from tensorflow.keras.optimizers import Adam, SGD
 
 # Define globals.
 EPS = 1e-12
-tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 
 def preprocess(image, add_noise=False):
@@ -632,21 +631,31 @@ def main(a):
             # task_targets are [xcenter, ycenter]
             target_sum = tf.math.reduce_sum(tf.math.abs(task_targets + 1.), axis=1)
             bool_mask = (target_sum != 0)
-            masked_targets = tf.boolean_mask(
-                tf.transpose(task_targets, perm=[0, 2, 1]),
-                bool_mask
+            # masked_targets = tf.boolean_mask(
+            #     tf.transpose(task_targets, perm=[0, 2, 1]),
+            #     bool_mask
+            # )
+            # real_outputs = tf.boolean_mask(
+            #     tf.transpose(task_outputs[0], perm=[0, 2, 1]),
+            #     bool_mask
+            # )
+            # fake_outputs = tf.boolean_mask(
+            #     tf.transpose(task_outputs[1], perm=[0, 2, 1]),
+            #     bool_mask
+            # )
+            # xy_loss = mean_squared_error(real_outputs, masked_targets)
+            # xy_loss_fake = mean_squared_error(fake_outputs, masked_targets)
+            xy_loss = tf.where(
+                bool_mask,
+                mean_squared_error(task_outputs[0], task_targets),
+                0.
             )
-            real_outputs = tf.boolean_mask(
-                tf.transpose(task_outputs[0], perm=[0, 2, 1]),
-                bool_mask
+            xy_loss_fake = tf.where(
+                bool_mask,
+                mean_squared_error(task_outputs[1], task_targets),
+                0.
             )
-            fake_outputs = tf.boolean_mask(
-                tf.transpose(task_outputs[1], perm=[0, 2, 1]),
-                bool_mask
-            )
-            xy_loss = mean_squared_error(real_outputs, masked_targets)
-            xy_loss_fake = mean_squared_error(fake_outputs, masked_targets)
-            return tf.reduce_mean(0. + xy_loss + xy_loss_fake)
+            return tf.reduce_mean(xy_loss + xy_loss_fake)
 
     # Train the model.
     batches_seen = tf.Variable(0, dtype=tf.int64)
