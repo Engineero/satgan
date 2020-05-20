@@ -673,7 +673,7 @@ def main(a):
             return tf.reduce_mean(xy_loss + xy_loss_fake)
 
     # Train the model.
-    batches_seen = 0
+    batches_seen = tf.Variable(0, dtype=tf.int32)
     with writer.as_default():
         for epoch in range(a.max_epochs):
             print(f'Training epoch {epoch+1} of {a.max_epochs}...')
