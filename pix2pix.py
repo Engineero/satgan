@@ -692,12 +692,12 @@ def main(a):
                     print(f'fake image shape: {fake_img.shape}')
                     print(f'fake bbox shape: {bboxes_fake.shape}')
                     target_bboxes = tf.image.draw_bounding_boxes(
-                        images=targets,
+                        images=tf.image.grayscale_to_rgb(targets),
                         boxes=bboxes_real,
                         colors=np.array([[0., 1., 0.]])
                     )
                     generated_bboxes = tf.image.draw_bounding_boxes(
-                        images=fake_img,
+                        images=tf.image.grayscale_to_rgb(fake_img),
                         boxes=bboxes_fake,
                         colors=np.array([[0., 1., 0.]])
                     )
