@@ -629,9 +629,10 @@ def main(a):
         @tf.function
         def calc_task_loss(task_targets, task_outputs):
             # task_targets are [xcenter, ycenter]
-            task_targets = task_targets * (task_targets != 0)
-            real_outputs = task_outputs * (task_targets != 0)
-            fake_outputs = task_outputs * (task_targets != 0)
+            bool_mask = (task_targets[:, 0] != 0 or task_targets[:, 1] != 0)
+            task_targets = tf.boolean_mask(task_targets, bool_mask)
+            real_outputs = tf.boolean_mask(task_outputs[0], bool_mask)
+            fake_outputs = tf.boolean_mask(task_outputs[1], bool_mask)
             xy_loss = mean_squared_error(real_outputs, task_targets)
             xy_loss_fake = mean_squared_error(fake_outputs, task_targets)
             return tf.reduce_mean(xy_loss + xy_loss_fake)
