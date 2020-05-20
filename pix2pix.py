@@ -631,11 +631,6 @@ def main(a):
             # task_targets are [xcenter, ycenter]
             target_sum = tf.math.reduce_sum(tf.math.abs(task_targets), axis=1)
             bool_mask = (target_sum != 0)
-            # bool_mask = tf.expand_dims(bool_mask, axis=1)
-            print(f'target sum shape: {target_sum.shape}')
-            print(f'bool mask shape: {bool_mask.shape}')
-            print(f'task targets shape: {task_targets.shape}')
-            print(f'task outputs shape: {task_outputs.shape}')
             masked_targets = tf.boolean_mask(
                 tf.transpose(task_targets, perm=[0, 2, 1]),
                 bool_mask
