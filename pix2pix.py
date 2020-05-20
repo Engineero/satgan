@@ -697,12 +697,12 @@ def main(a):
                                             task_outputs[1][0] + 0.02])
                     target_bboxes = tf.image.draw_bounding_boxes(
                         images=targets,
-                        bboxes=bboxes_real,
+                        boxes=bboxes_real,
                         colors=np.array([[0., 1., 0.]])
                     )
                     generated_bboxes = tf.image.draw_bounding_boxes(
                         images=fake_img,
-                        bboxes=bboxes_fake,
+                        boxes=bboxes_fake,
                         colors=np.array([[0., 1., 0.]])
                     )
 
