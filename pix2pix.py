@@ -558,38 +558,40 @@ def append_index(a, filesets, step=False):
 
 
 def main(a):
-    # Set up the callbacks.
-    callbacks = []
+    # Set up the summary writer.
     output_path = Path(a.output_dir).resolve()
     output_path.mkdir(parents=True, exist_ok=True)
     writer = tf.summary.create_file_writer(output_path.as_posix())
-    if a.tensorboard_dir is not None:
-        tensorboard_path = Path(a.tensorboard_dir).resolve()
-        tensorboard_path.mkdir(parents=True, exist_ok=True)
-        tensorboard_callback = TensorBoard(
-            log_dir=tensorboard_path.as_posix(),
-            histogram_freq=0,
-            batch_size=a.batch_size,
-            write_graph=True,
-            write_images=True,
-            update_freq=a.summary_freq,
-        )
-        callbacks.append(tensorboard_callback)
-        saveimages_callback = SaveImagesCallback(
-            log_dir=tensorboard_path.as_posix(),
-            writer=writer,
-            update_freq=a.summary_freq,
-        )
-        callbacks.append(saveimages_callback)
-    model_checkpoint = ModelCheckpoint(
-        output_path.as_posix(),
-        monitor='val_loss',
-        verbose=1,
-        save_best_only=True,
-        save_weights_only=False,
-        mode='min',
-    )
-    callbacks.append(model_checkpoint)
+
+    # Set up the callbacks.
+    # callbacks = []
+    # if a.tensorboard_dir is not None:
+    #     tensorboard_path = Path(a.tensorboard_dir).resolve()
+    #     tensorboard_path.mkdir(parents=True, exist_ok=True)
+    #     tensorboard_callback = TensorBoard(
+    #         log_dir=tensorboard_path.as_posix(),
+    #         histogram_freq=0,
+    #         batch_size=a.batch_size,
+    #         write_graph=True,
+    #         write_images=True,
+    #         update_freq=a.summary_freq,
+    #     )
+    #     callbacks.append(tensorboard_callback)
+    #     saveimages_callback = SaveImagesCallback(
+    #         log_dir=tensorboard_path.as_posix(),
+    #         writer=writer,
+    #         update_freq=a.summary_freq,
+    #     )
+    #     callbacks.append(saveimages_callback)
+    # model_checkpoint = ModelCheckpoint(
+    #     output_path.as_posix(),
+    #     monitor='val_loss',
+    #     verbose=1,
+    #     save_best_only=True,
+    #     save_weights_only=False,
+    #     mode='min',
+    # )
+    # callbacks.append(model_checkpoint)
 
     # Build data generators.
     train_data, val_data, test_data = load_examples(a)
@@ -674,30 +676,32 @@ def main(a):
             compute_apply_gradients(model, batch, optimizer)
             # Save summary images, statistics.
             if batch_num % a.summary_freq == 0:
-                print(f'Writing outputs for batch {batch_num}.')
-                (inputs, targets), (_, _, task_targets) = batch
-                fake_img, discrim_outputs, task_outputs = model([inputs, targets])
-                tf.summary.image(
-                    name='fake_image',
-                    data=tf.cast(fake_img * 255, tf.int32),
-                )
-                tf.summary.image(
-                    name='blank_image',
-                    data=tf.cast(batch[0][0] * 255, tf.int32),
-                )
-                tf.summary.image(
-                    name='target_image',
-                    data=tf.cast(batch[0][1] * 255, tf.int32),
-                )
-                tf.summary.image(
-                    name='predict_real',
-                    data=tf.cast(discrim_outputs[0] * 255, tf.int32),
-                )
-                tf.summary.image(
-                    name='predict_fake',
-                    data=tf.cast(discrim_outputs[1] * 255, tf.int32),
-                )
-                # TODO (NLT): summarize task outputs, targets
+                with writer.as_default():
+                    print(f'Writing outputs for batch {batch_num}.')
+                    (inputs, targets), (_, _, task_targets) = batch
+                    fake_img, discrim_outputs, task_outputs = model([inputs, targets])
+                    tf.summary.image(
+                        name='fake_image',
+                        data=tf.cast(fake_img * 255, tf.int32),
+                    )
+                    tf.summary.image(
+                        name='blank_image',
+                        data=tf.cast(batch[0][0] * 255, tf.int32),
+                    )
+                    tf.summary.image(
+                        name='target_image',
+                        data=tf.cast(batch[0][1] * 255, tf.int32),
+                    )
+                    tf.summary.image(
+                        name='predict_real',
+                        data=tf.cast(discrim_outputs[0] * 255, tf.int32),
+                    )
+                    tf.summary.image(
+                        name='predict_fake',
+                        data=tf.cast(discrim_outputs[1] * 255, tf.int32),
+                    )
+                    # TODO (NLT): summarize task outputs, targets
+                writer.flush()
 
         epoch_time = time.time() - epoch_start
         print(f'Epoch {epoch+1} completed in {epoch_time}.')
