@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import time
 import tensorflow as tf
 import numpy as np
 import argparse
@@ -499,72 +500,18 @@ def create_model(a, train_data):
         discrim_outputs = tf.stack([predict_real, predict_fake], axis=0,
                                    name='discriminator')
 
-    # Plot the sub-models.
+    model = Model(inputs=[inputs, targets],
+                  outputs=[fake_img, discrim_outputs, task_outputs])
+
+    # Plot the sub-models and overall model.
     if a.plot_models:
         plot_model(generator, to_file='plots/generator.svg')
         plot_model(task_net, to_file='plots/task_net.svg')
         plot_model(discriminator, to_file='plots/discriminator.svg')
-
-    with tf.name_scope("discriminator_loss"):
-        def discriminator_loss(y_true, y_pred):
-            # minimizing -tf.log will try to get inputs to 1
-            # predict_real => 1
-            # predict_fake => 0
-            predict_real = tf.reshape(y_pred[0], [-1, 2])
-            predict_fake = tf.reshape(y_pred[1], [-1, 2])
-            real_loss = binary_crossentropy(
-                tf.one_hot(tf.ones_like(predict_real[:, 0], dtype=tf.int32),
-                           depth=2),
-                predict_real
-            )
-            fake_loss = binary_crossentropy(
-                tf.one_hot(tf.zeros_like(predict_fake[:, 0], dtype=tf.int32),
-                           depth=2),
-                predict_fake
-            )
-            return real_loss + fake_loss
-
-    with tf.name_scope("generator_loss"):
-        def generator_loss(y_true, y_pred):
-            # predict_fake => 1
-            # abs(targets - outputs) => 0
-            # gen_loss_GAN = tf.reduce_mean(-tf.math.log(y_pred[1] + EPS))
-            gen_loss_L1 = mean_absolute_error(y_true[0], y_pred)
-            # gen_loss = gen_loss_GAN * a.gan_weight + gen_loss_L1 * a.l1_weight
-            return gen_loss_L1
-
-    with tf.name_scope('task_loss'):
-        def task_loss(y_true, y_pred):
-            # TODO (NLT): implement YOLO loss or similar for detection.
-            # task_targets are [xcenter, ycenter, xmin, xmax, ymin, ymax, class]
-            xy_loss = mean_squared_error(y_pred[0], y_true[1])
-            xy_loss_fake = mean_squared_error(y_pred[1],
-                                              y_true[1])
-            return xy_loss + xy_loss_fake
-
-    model = Model(inputs=[inputs, targets],
-                  outputs=[fake_img, discrim_outputs, task_outputs])
-
-    # Plot the overall model.
-    if a.plot_models:
         plot_model(model, to_file='plots/full_model.svg')
 
-    # TODO (NLT): compile the model with appropriate losses, optimizers, callbacks, etc.
-    opt_gen = SGD()
-    opt_dsc = SGD()
-    opt_task = SGD()
-    losses = {'generator': generator_loss,
-              'tf_op_layer_discriminator_3': discriminator_loss,
-              'tf_op_layer_task_net_2': task_loss}
-    loss_weights = {'generator': a.gen_weight,
-                    'tf_op_layer_discriminator_3': a.dsc_weight,
-                    'tf_op_layer_task_net_2': a.task_weight}
-    optimizers = {'generator': opt_gen,
-                  'tf_op_layer_discriminator_3': opt_dsc,
-                  'tf_op_layer_task_net_2': opt_task}
-    model.compile(loss=losses,
-                  loss_weights=loss_weights,
-                  optimizer=Adam())
+    # Return the model. We'll define losses and a training loop back in the
+    # main function.
     return model
 
 
@@ -651,25 +598,111 @@ def main(a):
     model = create_model(a, train_data)
     print(f'Overall model summary:\n{model.summary()}')
 
-    # Train the model.
-    history = model.fit(
-        x=train_data,
-        validation_data=val_data,
-        verbose=1,
-        callbacks=callbacks,
-        epochs=a.max_epochs,
-        shuffle=True,
-    )
+    # Define the optimizer.
+    optimizer = Adam()
 
-    # Test the model.
-    if test_data is not None:
-        model = load_model(a.output_dir)  # load the best model
-        test_losses = model.evaluate(
-            x=test_data,
-            batch_size=a.batch_size,
-            verbose=1,
-            callbacks=[tensorboard_callback],
-        )
+    with tf.name_scope("compute_loss"):
+        @tf.function
+        def compute_loss(model, data):
+            (inputs, targets), (_, _, task_targets) = data
+            fake_img, discrim_outputs, task_outputs = model([inputs, targets])
+            discrim_loss = calc_discriminator_loss(discrim_outputs)
+            gen_loss = calc_generator_loss(targets, fake_img)
+            task_loss = calc_task_loss(task_targets, task_outputs)
+            total_loss = a.dsc_weight * discrim_loss + \
+                a.gen_weight * gen_loss + a.task_weight * task_loss
+            tf.summary.scalar(name='discriminator_loss', data=discrim_loss)
+            tf.summary.scalar(name='generator_loss', data=gen_loss)
+            tf.summary.scalar(name='task_loss', data=task_loss)
+            tf.summary.scalar(name='total_loss', data=total_loss)
+            return total_loss
+        
+    with tf.name_scope('apply_gradients'):
+        @tf.function
+        def compute_apply_gradients(model, data, optimizer):
+            with tf.GradientTape() as tape:
+                loss = compute_loss(model, data)
+            gradients = tape.gradient(loss, model.trainable_variables)
+            optimizer.apply_gradients(zip(gradients,
+                                          model.trainable_variables))
+
+    with tf.name_scope("discriminator_loss"):
+        @tf.function
+        def calc_discriminator_loss(discrim_outputs):
+            # minimizing -tf.log will try to get inputs to 1
+            # predict_real => 1
+            # predict_fake => 0
+            predict_real = tf.reshape(discrim_outputs[0], [-1, 2])
+            predict_fake = tf.reshape(discrim_outputs[1], [-1, 2])
+            real_loss = binary_crossentropy(
+                tf.one_hot(tf.ones_like(predict_real[:, 0], dtype=tf.int32),
+                           depth=2),
+                predict_real
+            )
+            fake_loss = binary_crossentropy(
+                tf.one_hot(tf.zeros_like(predict_fake[:, 0], dtype=tf.int32),
+                           depth=2),
+                predict_fake
+            )
+            return real_loss + fake_loss
+
+    with tf.name_scope("generator_loss"):
+        @tf.function
+        def calc_generator_loss(targets, fake_img):
+            # predict_fake => 1
+            # abs(targets - outputs) => 0
+            # gen_loss_GAN = tf.reduce_mean(-tf.math.log(y_pred[1] + EPS))
+            gen_loss_L1 = mean_absolute_error(targets, fake_img)
+            # gen_loss = gen_loss_GAN * a.gan_weight + gen_loss_L1 * a.l1_weight
+            return gen_loss_L1
+
+    with tf.name_scope('task_loss'):
+        @tf.function
+        def calc_task_loss(task_targets, task_outputs):
+            # TODO (NLT): implement YOLO loss or similar for detection.
+            # task_targets are [xcenter, ycenter, xmin, xmax, ymin, ymax, class]
+            xy_loss = mean_squared_error(task_outputs[0], task_targets)
+            xy_loss_fake = mean_squared_error(task_outputs[1],
+                                              task_targets)
+            return xy_loss + xy_loss_fake
+
+    # Train the model.
+    for epoch in range(a.max_epochs):
+        print(f'Training epoch {epoch+1} of {a.max_epochs}...')
+        epoch_start = time.time()
+        for batch_num, batch in enumerate(train_data):
+            compute_apply_gradients(model, batch, optimizer)
+            # Save summary images, statistics.
+            if batch_num % a.summary_freq == 0:
+                (inputs, targets), (_, _, task_targets) = batch
+                fake_img, discrim_outputs, task_outputs = model([inputs, targets])
+                tf.summary.image(
+                    name='fake_image',
+                    data=tf.cast(fake_img * 255, tf.int32),
+                )
+                tf.summary.image(
+                    name='blank_image',
+                    data=tf.cast(blank_image * 255, tf.int32),
+                )
+                tf.summary.image(
+                    name='target_image',
+                    data=tf.cast(target_image * 255, tf.int32),
+                )
+                tf.summary.image(
+                    name='predict_real',
+                    data=tf.cast(predict_real * 255, tf.int32),
+                )
+                tf.summary.image(
+                    name='predict_fake',
+                    data=tf.cast(predict_fake * 255, tf.int32),
+                )
+                # TODO (NLT): summarize task outputs, targets
+
+        epoch_time = time.time() - epoch_start
+        print(f'Epoch {epoch+1} completed in {epoch_time}.')
+        # TODO (NLT): test on validation data, save best model, early stopping...
+
+    # TODO (NLT): Test the model.
 
 
 if __name__ == '__main__':
@@ -701,7 +734,7 @@ if __name__ == '__main__':
         default=None,
         help="directory with checkpoint to resume training from or use for testing"
     )
-    parser.add_argument("--max_steps", type=int,
+    parser.add_argument("--max_steps", type=int, default=0
                         help="number of training steps (0 to disable)")
     parser.add_argument("--max_epochs", type=int, help="number of training epochs")
     parser.add_argument("--summary_freq", type=int, default=100,
