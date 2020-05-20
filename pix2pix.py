@@ -636,11 +636,20 @@ def main(a):
             print(f'bool mask shape: {bool_mask.shape}')
             print(f'task targets shape: {task_targets.shape}')
             print(f'task outputs shape: {task_outputs.shape}')
-            task_targets = tf.boolean_mask(task_targets, bool_mask)
-            real_outputs = tf.boolean_mask(task_outputs[0], bool_mask)
-            fake_outputs = tf.boolean_mask(task_outputs[1], bool_mask)
-            xy_loss = mean_squared_error(real_outputs, task_targets)
-            xy_loss_fake = mean_squared_error(fake_outputs, task_targets)
+            masked_targets = tf.boolean_mask(
+                tf.transpose(task_targets, perm=[0, 2, 1]),
+                bool_mask
+            )
+            real_outputs = tf.boolean_mask(
+                tf.transpose(task_outputs[0], perm=[0, 2, 1]),
+                bool_mask
+            )
+            fake_outputs = tf.boolean_mask(
+                tf.transpose(task_outputs[1], perm=[0, 2, 1]),
+                bool_mask
+            )
+            xy_loss = mean_squared_error(real_outputs, masked_targets)
+            xy_loss_fake = mean_squared_error(fake_outputs, masked_targets)
             return tf.reduce_mean(xy_loss + xy_loss_fake)
 
     # Train the model.
