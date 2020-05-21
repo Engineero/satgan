@@ -420,48 +420,6 @@ def create_model(a, train_data):
     return model
 
 
-def save_images(a, fetches, step=None):
-    image_dir = Path(a.output_dir).resolve() / 'images'
-    image_dir.mkdir(parents=True, exist_ok=True)
-    filesets = []
-    for i, in_path in enumerate(fetches["paths"]):
-        name = Path(in_path.decode("utf8")).stem
-        fileset = {"name": name, "step": step}
-        for kind in ["inputs", "outputs", "targets"]:
-            filename = name + "-" + kind + ".png"
-            if step is not None:
-                filename = "%08d-%s" % (step, filename)
-            fileset[kind] = filename
-            out_path = image_dir / filename
-            contents = fetches[kind][i]
-            with open(out_path.as_posix(), "wb") as f:
-                f.write(contents)
-        filesets.append(fileset)
-    return filesets
-
-
-def append_index(a, filesets, step=False):
-    index_path = Path(a.output_dir).resolve() / 'index.html'
-    first_line = False
-    if not index_path.is_dir():
-        first_line = True
-    with open(index_path.as_posix(), 'a+') as index:
-        if first_line:
-            index.write("<html><body><table><tr>")
-            if step:
-                index.write("<th>step</th>")
-            index.write("<th>name</th><th>input</th><th>output</th><th>target</th></tr>")
-        for fileset in filesets:
-            index.write("<tr>")
-            if step:
-                index.write("<td>%d</td>" % fileset["step"])
-            index.write("<td>%s</td>" % fileset["name"])
-            for kind in ["inputs", "outputs", "targets"]:
-                index.write("<td><img src='images/%s'></td>" % fileset[kind])
-            index.write("</tr>")
-    return index_path
-
-
 def main(a):
     # Set up the summary writer.
     output_path = Path(a.output_dir).resolve()
