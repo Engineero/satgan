@@ -497,13 +497,13 @@ def main(a):
                               step=step)
             tf.summary.scalar(name='total_loss', data=total_loss,
                               step=step)
-            return total_loss
+            return total_loss, discrim_loss, gen_loss, task_loss
         
     with tf.name_scope('apply_gradients'):
         @tf.function
         def compute_apply_gradients(model, data, optimizer, step):
             with tf.GradientTape() as tape:
-                loss = compute_loss(model, data, step)
+                loss, _, _, _ = compute_loss(model, data, step)
             gradients = tape.gradient(loss, model.trainable_variables)
             optimizer.apply_gradients(zip(gradients,
                                           model.trainable_variables))
@@ -641,13 +641,42 @@ def main(a):
                         data=generated_bboxes,
                         step=batches_seen,
                     )
+
+                    # Compute batch losses.
+                    total_loss, discrim_loss, gen_loss, task_loss = \
+                        compute_loss(model, batch, batches_seen)
+                    print(f'Batch {batches_seen} performance\n',
+                          f'total loss: {total_loss:.4f}\t',
+                          f'discriminator loss: {discrim_loss:.4f}\t',
+                          f'generator loss: {gen_loss:.4f}\t',
+                          f'task loss: {task_loss:.4f}\t')
                 writer.flush()
 
         epoch_time = time.time() - epoch_start
         print(f'Epoch {epoch+1} completed in {epoch_time}.')
-        # TODO (NLT): test on validation data, save best model, early stopping...
 
-    # TODO (NLT): Test the model.
+        # Eval on validation data, save best model, early stopping...
+        total_loss, discrim_loss, gen_loss, task_loss = \
+            compute_loss(model, val_data, batches_seen)
+        print(f'Epoch {epoch} performance\ntotal loss: {total_loss:.4f}\t',
+              f'discriminator loss: {discrim_loss:.4f}\t',
+              f'generator loss: {gen_loss:.4f}\t',
+              f'task loss: {task_loss:.4f}\t')
+        if epoch == 0:
+            min_loss = total_loss
+        if total_loss <= min_loss and a.output_dir is not None:
+            model.save(a.output_dir) 
+        # TODO (NLT): add in early stopping.
+
+    # Test the best saved model or current model if not saving.
+    if a.output_dir is not None:
+        model = load_model(a.output_dir)
+    total_loss, discrim_loss, gen_loss, task_loss = \
+        compute_loss(model, test_data, batches_seen)
+    print(f'Test performance\ntotal loss: {total_loss:.4f}\t',
+          f'discriminator loss: {discrim_loss:.4f}\t',
+          f'generator loss: {gen_loss:.4f}\t',
+          f'task loss: {task_loss:.4f}\t')
 
 
 if __name__ == '__main__':
