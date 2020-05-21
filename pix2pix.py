@@ -627,6 +627,8 @@ def main(a):
         if epoch == 0:
             min_loss = total_loss
         if total_loss <= min_loss and a.output_dir is not None:
+            print(f'Saving model with total loss {total_loss:.4f} ',
+                  f'to {a.output_dir}.')
             model.save(a.output_dir) 
         # TODO (NLT): add in early stopping.
 
