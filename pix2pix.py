@@ -561,7 +561,6 @@ def main(a):
             print(f'Training epoch {epoch+1} of {a.max_epochs}...')
             epoch_start = time.time()
             for batch_num, batch in enumerate(train_data):
-                batches_seen.assign_add(1)
                 compute_apply_gradients(model, batch, optimizer, batches_seen)
                 # Save summary images, statistics.
                 if batch_num % a.summary_freq == 0:
@@ -645,20 +644,21 @@ def main(a):
                     # Compute batch losses.
                     total_loss, discrim_loss, gen_loss, task_loss = \
                         compute_loss(model, batch, batches_seen)
-                    print(f'Batch {batches_seen} performance\n',
+                    print(f'Batch {batch_num} performance\n',
                           f'total loss: {total_loss:.4f}\t',
                           f'discriminator loss: {discrim_loss:.4f}\t',
                           f'generator loss: {gen_loss:.4f}\t',
                           f'task loss: {task_loss:.4f}\t')
+                batches_seen.assign_add(1)
                 writer.flush()
 
         epoch_time = time.time() - epoch_start
-        print(f'Epoch {epoch+1} completed in {epoch_time}.')
+        print(f'Epoch {epoch+1} completed in {epoch_time}.\n')
 
         # Eval on validation data, save best model, early stopping...
         total_loss, discrim_loss, gen_loss, task_loss = \
             compute_loss(model, val_data, batches_seen)
-        print(f'Epoch {epoch} performance\ntotal loss: {total_loss:.4f}\t',
+        print(f'Epoch {epoch+1} performance\ntotal loss: {total_loss:.4f}\t',
               f'discriminator loss: {discrim_loss:.4f}\t',
               f'generator loss: {gen_loss:.4f}\t',
               f'task loss: {task_loss:.4f}\t')
