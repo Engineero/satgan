@@ -514,9 +514,13 @@ def main(a):
             # minimizing -tf.log will try to get inputs to 1
             # discrim_outputs[0] = predict_real => 1
             # discrim_outputs[1] = predict_fake => 0
-            real_loss = -tf.math.log(discrim_outputs[0] + EPS)
-            fake_loss = -tf.math.log(1 - discrim_outputs[1] + EPS)
-            return tf.reduce_mean(real_loss + fake_loss)
+            real_loss = tf.reduce_mean(
+                -tf.math.log(discrim_outputs[0] + EPS)
+            )
+            fake_loss = tf.reduce_mean(
+                -tf.math.log(1 - discrim_outputs[1] + EPS)
+            )
+            return real_loss + fake_loss
 
     with tf.name_scope("generator_loss"):
         @tf.function
@@ -552,7 +556,7 @@ def main(a):
                 ),
                 tf.zeros_like(bool_mask, dtype=tf.float32)
             )
-            return tf.reduce_mean(xy_loss + xy_loss_fake)
+            return tf.reduce_sum(xy_loss + xy_loss_fake)
 
     # Train the model.
     batches_seen = tf.Variable(0, dtype=tf.int64)
