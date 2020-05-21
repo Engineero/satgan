@@ -57,101 +57,6 @@ def preprocess(image, add_noise=False):
         return result
 
 
-def deprocess(image):
-    with tf.name_scope("deprocess"):
-        # [-1, 1] => [0, 1]
-        # return (image + 1) / 2
-        return image
-
-
-def preprocess_lab(lab):
-    with tf.name_scope("preprocess_lab"):
-        L_chan, a_chan, b_chan = tf.unstack(lab, axis=2)
-        # L_chan: black and white with input range [0, 100]
-        # a_chan/b_chan: color channels with input range ~[-110, 110], not exact
-        # [0, 100] => [-1, 1],  ~[-110, 110] => [-1, 1]
-        return [L_chan / 50 - 1, a_chan / 110, b_chan / 110]
-
-
-def deprocess_lab(L_chan, a_chan, b_chan):
-    with tf.name_scope("deprocess_lab"):
-        # this is axis=3 instead of axis=2 because we process individual images but deprocess batches
-        return tf.stack(
-            [(L_chan + 1) / 2 * 100, a_chan * 110, b_chan * 110],
-            axis=3
-        )
-
-
-def augment(a, image, brightness):
-    # (a, b) color channels, combine with L channel and convert to rgb
-    a_chan, b_chan = tf.unstack(image, axis=3)
-    L_chan = tf.squeeze(brightness, axis=3)
-    lab = deprocess_lab(L_chan, a_chan, b_chan)
-    rgb = lab_to_rgb(a, lab)
-    return rgb
-
-
-def check_image(a, image):
-    assertion = tf.assert_equal(tf.shape(image)[-1], 3,
-                                message="image must have 3 color channels")
-    with tf.control_dependencies([assertion]):
-        image = tf.identity(image)
-
-    if image.get_shape().ndims not in (3, 4):
-        raise ValueError("image must be either 3 or 4 dimensions")
-
-    # make the last dimension a.n_channels so that you can unstack the colors
-    shape = list(image.get_shape())
-    shape[-1] = a.n_channels
-    image.set_shape(shape)
-    return image
-
-
-def lab_to_rgb(a, lab):
-    with tf.name_scope("lab_to_rgb"):
-        lab = check_image(a, lab)
-        lab_pixels = tf.reshape(lab, [-1, 3])
-
-        # https://en.wikipedia.org/wiki/Lab_color_space#CIELAB-CIEXYZ_conversions
-        with tf.name_scope("cielab_to_xyz"):
-            # convert to fxfyfz
-            lab_to_fxfyfz = tf.constant([
-                #   fx      fy        fz
-                [1/116.0, 1/116.0,  1/116.0], # l
-                [1/500.0,     0.0,      0.0], # a
-                [    0.0,     0.0, -1/200.0], # b
-            ])
-            fxfyfz_pixels = tf.matmul(
-                lab_pixels + tf.constant([16.0, 0.0, 0.0]),
-                lab_to_fxfyfz
-            )
-            # convert to xyz
-            epsilon = 6/29
-            linear_mask = tf.cast(fxfyfz_pixels <= epsilon, dtype=tf.float32)
-            exponential_mask = tf.cast(fxfyfz_pixels > epsilon,
-                                       dtype=tf.float32)
-            xyz_pixels = (3 * epsilon**2 * (fxfyfz_pixels - 4/29)) * \
-                linear_mask + (fxfyfz_pixels ** 3) * exponential_mask
-            # denormalize for D65 white point
-            xyz_pixels = tf.multiply(xyz_pixels, [0.950456, 1.0, 1.088754])
-
-        with tf.name_scope("xyz_to_srgb"):
-            xyz_to_rgb = tf.constant([
-                #     r           g          b
-                [ 3.2404542, -0.9692660,  0.0556434], # x
-                [-1.5371385,  1.8760108, -0.2040259], # y
-                [-0.4985314,  0.0415560,  1.0572252], # z
-            ])
-            rgb_pixels = tf.matmul(xyz_pixels, xyz_to_rgb)
-            # avoid a slightly negative number messing up the conversion
-            rgb_pixels = tf.clip_by_value(rgb_pixels, 0.0, 1.0)
-            linear_mask = tf.cast(rgb_pixels <= 0.0031308, dtype=tf.float32)
-            exponential_mask = tf.cast(rgb_pixels > 0.0031308, dtype=tf.float32)
-            srgb_pixels = (rgb_pixels * 12.92 * linear_mask) + \
-                ((rgb_pixels ** (1/2.4) * 1.055) - 0.055) * exponential_mask
-        return tf.reshape(srgb_pixels, tf.shape(lab))
-
-
 def _parse_example(serialized_example, a):
     """Parses a single TFRecord Example for the task network."""
     # Parse serialized example.
@@ -631,20 +536,6 @@ def main(a):
             # task_targets are [xcenter, ycenter]
             target_sum = tf.math.reduce_sum(tf.math.abs(task_targets + 1.), axis=1)
             bool_mask = (target_sum != 0)
-            # masked_targets = tf.boolean_mask(
-            #     tf.transpose(task_targets, perm=[0, 2, 1]),
-            #     bool_mask
-            # )
-            # real_outputs = tf.boolean_mask(
-            #     tf.transpose(task_outputs[0], perm=[0, 2, 1]),
-            #     bool_mask
-            # )
-            # fake_outputs = tf.boolean_mask(
-            #     tf.transpose(task_outputs[1], perm=[0, 2, 1]),
-            #     bool_mask
-            # )
-            # xy_loss = mean_squared_error(real_outputs, masked_targets)
-            # xy_loss_fake = mean_squared_error(fake_outputs, masked_targets)
             xy_loss = tf.where(
                 bool_mask,
                 tf.math.reduce_mean(
