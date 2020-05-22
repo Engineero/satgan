@@ -437,15 +437,21 @@ def main(a):
     # Define model losses and helpers for computing and applying gradients.
     with tf.name_scope("compute_total_loss"):
         @tf.function
-        def compute_total_loss(model_inputs, model_outputs, step):
-            discrim_loss = calc_discriminator_loss(model_inputs, model_outputs, step)
+        def compute_total_loss(model_inputs, model_outputs, step,
+                               return_all=False):
+            discrim_loss = calc_discriminator_loss(model_inputs,
+                                                   model_outputs,
+                                                   step)
             gen_loss = calc_generator_loss(model_inputs, model_outputs, step)
             task_loss = calc_task_loss(model_inputs, model_outputs, step)
             total_loss = a.dsc_weight * discrim_loss + \
                 a.gen_weight * gen_loss + a.task_weight * task_loss
             tf.summary.scalar(name='total_loss', data=total_loss,
                               step=step)
-            return total_loss
+            if return_all:
+                return total_loss, discrim_loss, gen_loss, task_loss
+            else:
+                return total_loss
 
     with tf.name_scope('apply_gradients'):
         @tf.function
@@ -708,7 +714,8 @@ def main(a):
                     total_loss, discrim_loss, gen_loss, task_loss = \
                         compute_total_loss(model_inputs,
                                            model_outputs,
-                                           batches_seen)
+                                           batches_seen,
+                                           return_all=True)
                     print(f'Batch {batch_num} performance\n',
                           f'total loss: {total_loss:.4f}\t',
                           f'discriminator loss: {discrim_loss:.4f}\t',
@@ -741,7 +748,8 @@ def main(a):
                 total_loss, discrim_loss, gen_loss, task_loss = \
                     compute_total_loss(model_inputs,
                                        model_outputs,
-                                       batches_seen)
+                                       batches_seen,
+                                       return_all=True)
                 if epoch == 0:
                     min_loss = total_loss
                     epochs_without_improvement = 0
@@ -784,7 +792,10 @@ def main(a):
             model_outputs = (fake_img, discrim_outputs, task_outputs)
 
             total_loss, discrim_loss, gen_loss, task_loss = \
-                compute_total_loss(model_inputs, model_outputs, batches_seen)
+                compute_total_loss(model_inputs,
+                                   model_outputs,
+                                   batches_seen,
+                                   return_all=True)
             for m, loss in zip(mean_list, [total_loss,
                                            discrim_loss,
                                            gen_loss,
