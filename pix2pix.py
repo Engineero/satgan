@@ -561,23 +561,23 @@ def main(a):
             task_outputs = model_outputs[2]
             target_sum = tf.math.reduce_sum(tf.math.abs(task_targets + 1.), axis=1)
             bool_mask = (target_sum != 0)
-            xy_loss = tf.where(
+            xy_loss = tf.reduce_sum(tf.where(
                 bool_mask,
                 tf.math.reduce_mean(
                     tf.math.square(task_targets - task_outputs[0]),
                     axis=1
                 ),
                 tf.zeros_like(bool_mask, dtype=tf.float32)
-            )
-            xy_loss_fake = tf.where(
+            ))
+            xy_loss_fake = tf.reduce_sum(tf.where(
                 bool_mask,
                 tf.math.reduce_mean(
                     tf.math.square(task_targets - task_outputs[1]),
                     axis=1
                 ),
                 tf.zeros_like(bool_mask, dtype=tf.float32)
-            )
-            task_loss = tf.reduce_sum(xy_loss + xy_loss_fake)
+            ))
+            task_loss = xy_loss + xy_loss_fake
 
             # Write summaries.
             tf.summary.scalar(name='task_real_loss', data=xy_loss,
