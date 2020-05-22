@@ -621,18 +621,15 @@ def main(a):
         for epoch in range(a.max_epochs):
             print(f'Training epoch {epoch+1} of {a.max_epochs}...')
             epoch_start = time.time()
+
             for batch_num, batch in enumerate(train_data):
-                compute_apply_gradients(model,
-                                        batch,
-                                        optimizer_list,
-                                        loss_list,
-                                        batches_seen,
-                                        loss_weight_list=loss_weights)
                 # Save summary images, statistics.
                 if batch_num % a.summary_freq == 0:
                     print(f'Writing outputs for batch {batch_num}.')
                     (inputs, targets), (_, _, task_targets) = batch
                     fake_img, discrim_outputs, task_outputs = model([inputs, targets])
+                    model_inputs = (inputs, targets, task_targets)
+                    model_outputs = (fake_img, discrim_outputs, task_outputs)
                     tf.summary.image(
                         name='fake_image',
                         data=fake_img,
@@ -708,12 +705,6 @@ def main(a):
                     )
 
                     # Compute batch losses.
-                    (inputs, targets), (_, _, task_targets) = batch
-                    fake_img, discrim_outputs, task_outputs = model([inputs,
-                                                                     targets])
-                    model_inputs = (inputs, targets, task_targets)
-                    model_outputs = (fake_img, discrim_outputs, task_outputs)
-
                     total_loss, discrim_loss, gen_loss, task_loss = \
                         compute_total_loss(model_inputs,
                                            model_outputs,
@@ -723,6 +714,14 @@ def main(a):
                           f'discriminator loss: {discrim_loss:.4f}\t',
                           f'generator loss: {gen_loss:.4f}\t',
                           f'task loss: {task_loss:.4f}\t')
+                
+                # Update the model.
+                compute_apply_gradients(model,
+                                        batch,
+                                        optimizer_list,
+                                        loss_list,
+                                        batches_seen,
+                                        loss_weight_list=loss_weights)
                 batches_seen.assign_add(1)
                 writer.flush()
 
