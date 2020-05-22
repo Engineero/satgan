@@ -720,7 +720,7 @@ def main(a):
                           f'discriminator loss: {discrim_loss:.4f}\t',
                           f'generator loss: {gen_loss:.4f}\t',
                           f'task loss: {task_loss:.4f}\t')
-                
+
                 # Update the model.
                 compute_apply_gradients(model,
                                         batch,
