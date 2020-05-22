@@ -446,7 +446,7 @@ def main(a):
             tf.summary.scalar(name='total_loss', data=total_loss,
                               step=step)
             return total_loss
-        
+
     with tf.name_scope('apply_gradients'):
         @tf.function
         def compute_apply_gradients(model, data, optimizer_list,
@@ -454,7 +454,7 @@ def main(a):
                                     loss_weight_list=None):
             """Computes and applies gradients with optional lists of
             optimizers and corresponding loss functions.
-            
+
             Args:
                 model: the TF model to optimize.
                 data: data on which to train the model.
@@ -469,10 +469,6 @@ def main(a):
                     Default is None which applies even weight to all losses.
             """
 
-            (inputs, targets), (_, _, task_targets) = data
-            fake_img, discrim_outputs, task_outputs = model([inputs, targets])
-            model_inputs = (inputs, targets, task_targets)
-            model_outputs = (fake_img, discrim_outputs, task_outputs)
             if not isinstance(optimizer_list, list):
                 optimizer_list = [optimizer_list]
             if not isinstance(loss_function_list, list):
@@ -484,22 +480,36 @@ def main(a):
                                                             loss_function_list,
                                                             loss_weight_list):
                     with tf.GradientTape() as tape:
+                        (inputs, targets), (_, _, task_targets) = data
+                        fake_img, discrim_outputs, task_outputs = \
+                            model([inputs, targets])
+                        model_inputs = (inputs, targets, task_targets)
+                        model_outputs = (fake_img,
+                                         discrim_outputs,
+                                         task_outputs)
                         loss = weight * loss_function(model_inputs,
                                                       model_outputs,
                                                       step)
-                    gradients = tape.gradient(loss, tape.watched_variables())
-                    optimizer.apply_gradients(zip(gradients,
-                                                  tape.watched_variables()))
+                    watched = tape.watched_variables()
+                    gradients = tape.gradient(loss, watched)
+                    optimizer.apply_gradients(zip(gradients, watched))
             else:
                 for optimizer, loss_function in zip(optimizer_list,
                                                     loss_function_list):
                     with tf.GradientTape() as tape:
+                        (inputs, targets), (_, _, task_targets) = data
+                        fake_img, discrim_outputs, task_outputs = \
+                            model([inputs, targets])
+                        model_inputs = (inputs, targets, task_targets)
+                        model_outputs = (fake_img,
+                                         discrim_outputs,
+                                         task_outputs)
                         loss = loss_function(model_inputs,
                                              model_outputs,
                                              step)
-                    gradients = tape.gradient(loss, tape.watched_variables())
+                    gradients = tape.gradient(loss, model.trainable_variables)
                     optimizer.apply_gradients(zip(gradients,
-                                                  tape.watched_variables()))
+                                                  model.trainable_variables))
 
     with tf.name_scope("discriminator_loss"):
         @tf.function
@@ -587,12 +597,17 @@ def main(a):
 
 
     # Define the optimizer, losses, and weights.
-    optimizer_gen = Adam()
-    optimizer_discrim = Adam()
-    optimizer_task = Adam()
-    optimizer_list = [optimizer_gen, optimizer_discrim, optimizer_task]
-    loss_list = [calc_generator_loss, calc_discriminator_loss, calc_task_loss]
-    loss_weights = [a.gen_weight, a.dsc_weight, a.task_weight]
+    if a.multi_optim:
+        optimizer_gen = Adam()
+        optimizer_discrim = Adam()
+        optimizer_task = Adam()
+        optimizer_list = [optimizer_gen, optimizer_discrim, optimizer_task]
+        loss_list = [calc_generator_loss, calc_discriminator_loss, calc_task_loss]
+        loss_weights = [a.gen_weight, a.dsc_weight, a.task_weight]
+    else:
+        optimizer_list = [Adam()]
+        loss_list = [compute_total_loss]
+        loss_weights = None
 
     # Train the model.
     batches_seen = tf.Variable(0, dtype=tf.int64)
@@ -607,7 +622,7 @@ def main(a):
             print(f'Training epoch {epoch+1} of {a.max_epochs}...')
             epoch_start = time.time()
             for batch_num, batch in enumerate(train_data):
-                compute_apply_gradients(model, 
+                compute_apply_gradients(model,
                                         batch,
                                         optimizer_list,
                                         loss_list,
@@ -693,8 +708,16 @@ def main(a):
                     )
 
                     # Compute batch losses.
+                    (inputs, targets), (_, _, task_targets) = batch
+                    fake_img, discrim_outputs, task_outputs = model([inputs,
+                                                                     targets])
+                    model_inputs = (inputs, targets, task_targets)
+                    model_outputs = (fake_img, discrim_outputs, task_outputs)
+
                     total_loss, discrim_loss, gen_loss, task_loss = \
-                        compute_loss(model, batch, batches_seen)
+                        compute_total_loss(model_inputs,
+                                           model_outputs,
+                                           batches_seen)
                     print(f'Batch {batch_num} performance\n',
                           f'total loss: {total_loss:.4f}\t',
                           f'discriminator loss: {discrim_loss:.4f}\t',
@@ -710,8 +733,16 @@ def main(a):
             for m in mean_list:
                 m.reset_states()
             for batch in val_data:
+                (inputs, targets), (_, _, task_targets) = batch
+                fake_img, discrim_outputs, task_outputs = model([inputs,
+                                                                 targets])
+                model_inputs = (inputs, targets, task_targets)
+                model_outputs = (fake_img, discrim_outputs, task_outputs)
+
                 total_loss, discrim_loss, gen_loss, task_loss = \
-                    compute_loss(model, batch, batches_seen)
+                    compute_total_loss(model_inputs,
+                                       model_outputs,
+                                       batches_seen)
                 if epoch == 0:
                     min_loss = total_loss
                     epochs_without_improvement = 0
@@ -725,7 +756,7 @@ def main(a):
                 min_loss = mean_list[0].result().numpy()
                 print(f'Saving model with total loss {min_loss:.4f} ',
                       f'to {a.output_dir}.')
-                model.save(a.output_dir) 
+                model.save(a.output_dir)
                 epochs_without_improvement = 0
             else:
                 epochs_without_improvement += 1
@@ -747,8 +778,14 @@ def main(a):
         for m in mean_list:
             m.reset_states()
         for batch in test_data:
+            (inputs, targets), (_, _, task_targets) = batch
+            fake_img, discrim_outputs, task_outputs = model([inputs,
+                                                             targets])
+            model_inputs = (inputs, targets, task_targets)
+            model_outputs = (fake_img, discrim_outputs, task_outputs)
+
             total_loss, discrim_loss, gen_loss, task_loss = \
-                compute_loss(model, batch, batches_seen)
+                compute_total_loss(model_inputs, model_outputs, batches_seen)
             for m, loss in zip(mean_list, [total_loss,
                                            discrim_loss,
                                            gen_loss,
@@ -847,13 +884,13 @@ if __name__ == '__main__':
     parser.add_argument('--num_classes', type=int, default=1,
                         help='Number of classes in the data.')
     parser.add_argument('--l1_reg_kernel', type=float, default=0.,
-                        help='L1 regularization term for kernels')                   
+                        help='L1 regularization term for kernels')
     parser.add_argument('--l2_reg_kernel', type=float, default=0.,
-                        help='L2 regularization term for kernels')                   
+                        help='L2 regularization term for kernels')
     parser.add_argument('--l1_reg_bias', type=float, default=0.,
-                        help='L1 regularization term for bias')                   
+                        help='L1 regularization term for bias')
     parser.add_argument('--l2_reg_bias', type=float, default=0.,
-                        help='L2 regularization term for bias')                   
+                        help='L2 regularization term for bias')
     parser.add_argument('--buffer_size', type=int, default=512,
                         help='Buffer size for shuffling input data.')
     parser.add_argument('--spec_norm', default=False, action='store_true',
@@ -872,6 +909,8 @@ if __name__ == '__main__':
                         help='Relative weight of task loss.')
     parser.add_argument('--early_stop_patience', default=10, type=int,
                         help='Early stopping patience, epochs. Default 10.')
+    parser.add_argument('--multi_optim', default=False, action='store_true',
+                        help='Whether to use separate optimizers for each loss.')
 
     # export options
     parser.add_argument("--output_filetype", default="png",
