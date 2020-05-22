@@ -173,7 +173,7 @@ def load_examples(a):
     train_data = train_data.repeat(a.max_epochs)
 
     valid_data = valid_data.shuffle(a.buffer_size)
-    valid_data = valid_data.batch(a.batch_size, drop_remainder=True)
+    # valid_data = valid_data.batch(a.batch_size, drop_remainder=True)
     valid_data = valid_data.map(
         lambda x: _parse_example(x, a)
     )
@@ -181,7 +181,7 @@ def load_examples(a):
 
     if a.test_dir is not None:
         test_data = test_data.shuffle(a.buffer_size)
-        test_data = test_data.batch(a.batch_size, drop_remainder=True)
+        # test_data = test_data.batch(a.batch_size, drop_remainder=True)
         test_data = test_data.map(
             lambda x: _parse_example(x, a)
         )
