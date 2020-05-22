@@ -435,68 +435,133 @@ def main(a):
     print(f'Overall model summary:\n{model.summary()}')
 
     # Define the optimizer.
-    optimizer = Adam()
+    optimizer_gen = Adam()
+    optimizer_discrim = Adam()
+    optimizer_task = Adam()
+    optimizer_list = [optimizer_gen, optimizer_discrim, optimizer_task]
+    loss_list = [calc_generator_loss, calc_discriminator_loss, calc_task_loss]
+    loss_weights = [a.gen_weight, a.dsc_weight, a.task_weight]
 
     # Define model losses and helpers for computing and applying gradients.
-    with tf.name_scope("compute_loss"):
+    with tf.name_scope("compute_total_loss"):
         @tf.function
-        def compute_loss(model, data, step):
-            (inputs, targets), (_, _, task_targets) = data
-            fake_img, discrim_outputs, task_outputs = model([inputs, targets])
-            discrim_loss = calc_discriminator_loss(discrim_outputs)
-            gen_loss = calc_generator_loss(targets, fake_img, discrim_outputs)
-            task_loss = calc_task_loss(task_targets, task_outputs)
+        def compute_total_loss(model_inputs, model_outputs, step):
+            discrim_loss = calc_discriminator_loss(model_inputs, model_outputs, step)
+            gen_loss = calc_generator_loss(model_inputs, model_outputs, step)
+            task_loss = calc_task_loss(model_inputs, model_outputs, step)
             total_loss = a.dsc_weight * discrim_loss + \
                 a.gen_weight * gen_loss + a.task_weight * task_loss
-            tf.summary.scalar(name='discriminator_loss', data=discrim_loss,
-                              step=step)
-            tf.summary.scalar(name='generator_loss', data=gen_loss,
-                              step=step)
-            tf.summary.scalar(name='task_loss', data=task_loss,
-                              step=step)
             tf.summary.scalar(name='total_loss', data=total_loss,
                               step=step)
-            return total_loss, discrim_loss, gen_loss, task_loss
+            return total_loss
         
     with tf.name_scope('apply_gradients'):
         @tf.function
-        def compute_apply_gradients(model, data, optimizer, step):
-            with tf.GradientTape() as tape:
-                loss, _, _, _ = compute_loss(model, data, step)
-            gradients = tape.gradient(loss, model.trainable_variables)
-            optimizer.apply_gradients(zip(gradients,
-                                          model.trainable_variables))
+        def compute_apply_gradients(model, data, optimizer_list,
+                                    loss_function_list, step,
+                                    loss_weight_list=None):
+            """Computes and applies gradients with optional lists of
+            optimizers and corresponding loss functions.
+            
+            Args:
+                model: the TF model to optimize.
+                data: data on which to train the model.
+                optimizer_list: list of optimizers or single optimizer for
+                    full model.
+                loss_function_list: list of loss functions or single loss
+                    function for full model.
+                step: training step.
+
+            Keyword Args:
+                loss_weight_list: weights associated with loss function.
+                    Default is None which applies even weight to all losses.
+            """
+
+            (inputs, targets), (_, _, task_targets) = data
+            fake_img, discrim_outputs, task_outputs = model([inputs, targets])
+            model_inputs = (inputs, targets, task_targets)
+            model_outputs = (fake_img, discrim_outputs, task_outputs)
+            if not isinstance(optimizer_list, list):
+                optimizer_list = [optimizer_list]
+            if not isinstance(loss_function_list, list):
+                loss_function_list = [loss_function_list]
+            if loss_weight_list is not None:
+                if not isinstance(loss_weight_list, list):
+                    loss_weight_list = [loss_weight_list]
+                for optimizer, loss_function, weight in zip(optimizer_list,
+                                                            loss_function_list,
+                                                            loss_weight_list):
+                    with tf.GradientTape() as tape:
+                        loss = weight * loss_function(model_inputs,
+                                                      model_outputs,
+                                                      step)
+                    gradients = tape.gradient(loss, model.trainable_variables)
+                    optimizer.apply_gradients(zip(gradients,
+                                                  model.trainable_variables))
+            else:
+                for optimizer, loss_function in zip(optimizer_list,
+                                                    loss_function_list):
+                    with tf.GradientTape() as tape:
+                        loss = loss_function(model_inputs, model_outputs, step)
+                    gradients = tape.gradient(loss, model.trainable_variables)
+                    optimizer.apply_gradients(zip(gradients,
+                                                  model.trainable_variables))
 
     with tf.name_scope("discriminator_loss"):
         @tf.function
-        def calc_discriminator_loss(discrim_outputs):
+        def calc_discriminator_loss(model_inputs, model_outputs, step):
             # minimizing -tf.log will try to get inputs to 1
             # discrim_outputs[0] = predict_real => 1
             # discrim_outputs[1] = predict_fake => 0
+            discrim_outputs = model_outputs[1]
             real_loss = tf.reduce_mean(
                 -tf.math.log(discrim_outputs[0] + EPS)
             )
             fake_loss = tf.reduce_mean(
                 -tf.math.log(1 - discrim_outputs[1] + EPS)
             )
-            return real_loss + fake_loss
+            discrim_loss = real_loss + fake_loss
+
+            # Write summaries.
+            tf.summary.scalar(name='discrim_real_loss', data=real_loss,
+                              step=step)
+            tf.summary.scalar(name='discrim_fake_loss', data=fake_loss,
+                              step=step)
+            tf.summary.scalar(name='discrim_total_loss',
+                              data=discrim_loss,
+                              step=step)
+            return discrim_loss
 
     with tf.name_scope("generator_loss"):
         @tf.function
-        def calc_generator_loss(targets, fake_img, discrim_outputs):
+        def calc_generator_loss(model_inputs, model_outputs, step):
             # predict_fake => 1
             # abs(targets - outputs) => 0
+            fake_img = model_outputs[0]
+            discrim_outputs = model_outputs[1]
+            targets = model_inputs[1]
             gen_loss_GAN = tf.reduce_mean(
                 -tf.math.log(discrim_outputs[1] + EPS)
             )
             gen_loss_L1 = tf.reduce_mean(mean_absolute_error(targets,
                                                              fake_img))
-            return a.gan_weight * gen_loss_GAN + a.l1_weight * gen_loss_L1
+            gen_loss = a.gan_weight * gen_loss_GAN + a.l1_weight * gen_loss_L1
+
+            # Write summaries.
+            tf.summary.scalar(name='gen_L1_loss', data=gen_loss_L1,
+                              step=step)
+            tf.summary.scalar(name='gen_GAN_loss', data=gen_loss_GAN,
+                              step=step)
+            tf.summary.scalar(name='gen_total_loss', data=gen_loss,
+                              step=step)
+            return gen_loss
 
     with tf.name_scope('task_loss'):
         @tf.function
-        def calc_task_loss(task_targets, task_outputs):
+        def calc_task_loss(model_inputs, model_outputs, step):
             # task_targets are [xcenter, ycenter]
+            task_targets = model_inputs[2]
+            task_outputs = model_outputs[2]
             target_sum = tf.math.reduce_sum(tf.math.abs(task_targets + 1.), axis=1)
             bool_mask = (target_sum != 0)
             xy_loss = tf.where(
@@ -515,7 +580,16 @@ def main(a):
                 ),
                 tf.zeros_like(bool_mask, dtype=tf.float32)
             )
-            return tf.reduce_sum(xy_loss + xy_loss_fake)
+            task_loss = tf.reduce_sum(xy_loss + xy_loss_fake)
+
+            # Write summaries.
+            tf.summary.scalar(name='task_real_loss', data=xy_loss,
+                              step=step)
+            tf.summary.scalar(name='task_fake_loss', data=xy_loss_fake,
+                              step=step)
+            tf.summary.scalar(name='task_loss', data=task_loss,
+                              step=step)
+            return task_loss
 
     # Train the model.
     batches_seen = tf.Variable(0, dtype=tf.int64)
@@ -530,7 +604,12 @@ def main(a):
             print(f'Training epoch {epoch+1} of {a.max_epochs}...')
             epoch_start = time.time()
             for batch_num, batch in enumerate(train_data):
-                compute_apply_gradients(model, batch, optimizer, batches_seen)
+                compute_apply_gradients(model, 
+                                        batch,
+                                        optimizer_list,
+                                        loss_list,
+                                        batches_seen,
+                                        loss_weight_list=loss_weights)
                 # Save summary images, statistics.
                 if batch_num % a.summary_freq == 0:
                     print(f'Writing outputs for batch {batch_num}.')
