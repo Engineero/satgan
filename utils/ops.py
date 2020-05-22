@@ -30,6 +30,7 @@ def conv(x, filters, kernel_size=(1, 1), strides=(1, 1), padding='valid',
     Returns:
         Convolutional block output.
     """
+
     if separable:
         conv_op = SeparableConv2D
     else:
@@ -66,22 +67,16 @@ def deconv(x, filters, kernel_size=(4, 4), strides=(2, 2), padding='same',
         Deconvolutional block output.
     """
 
+    conv_op = Conv2DTranspose(filters,
+                              kernel_size=kernel_size,
+                              strides=strides,
+                              padding=padding,
+                              use_bias=use_bias)
+    if sn:
+        conv_op = SpectralNormalization(conv_op)
+
     with tf.name_scope(scope):
-        if sn:
-            x = SpectralNormalization(
-                Conv2DTranspose(filters,
-                                kernel_size=kernel_size,
-                                strides=strides,
-                                padding=padding,
-                                use_bias=use_bias)(x)
-            )
-        else:
-            x = Conv2DTranspose(filters,
-                                kernel_size=kernel_size,
-                                strides=strides,
-                                padding=padding,
-                                use_bias=use_bias)(x)
-        return x
+        return conv_op(x)
 
 
 def fully_connected(x, units, activation=None, use_bias=True, sn=False,
@@ -102,14 +97,12 @@ def fully_connected(x, units, activation=None, use_bias=True, sn=False,
         Dense layer output.
     """
 
+    op = Dense(units, activation=activation, use_bias=use_bias)
+    if sn:
+        op = SpectralNormalization(op)
+
     with tf.name_scope(scope):
-        if sn:
-            x = SpectralNormalization(
-                Dense(units, activation=activation, use_bias=use_bias)(x)
-            )
-        else:
-            x = Dense(units, activation=activation, use_bias=use_bias)(x)
-        return x
+        return op(x)
 
 
 def hw_flatten(x) :
