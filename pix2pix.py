@@ -434,14 +434,6 @@ def main(a):
     model = create_model(a, train_data)
     print(f'Overall model summary:\n{model.summary()}')
 
-    # Define the optimizer.
-    optimizer_gen = Adam()
-    optimizer_discrim = Adam()
-    optimizer_task = Adam()
-    optimizer_list = [optimizer_gen, optimizer_discrim, optimizer_task]
-    loss_list = [calc_generator_loss, calc_discriminator_loss, calc_task_loss]
-    loss_weights = [a.gen_weight, a.dsc_weight, a.task_weight]
-
     # Define model losses and helpers for computing and applying gradients.
     with tf.name_scope("compute_total_loss"):
         @tf.function
@@ -590,6 +582,15 @@ def main(a):
             tf.summary.scalar(name='task_loss', data=task_loss,
                               step=step)
             return task_loss
+
+
+    # Define the optimizer, losses, and weights.
+    optimizer_gen = Adam()
+    optimizer_discrim = Adam()
+    optimizer_task = Adam()
+    optimizer_list = [optimizer_gen, optimizer_discrim, optimizer_task]
+    loss_list = [calc_generator_loss, calc_discriminator_loss, calc_task_loss]
+    loss_weights = [a.gen_weight, a.dsc_weight, a.task_weight]
 
     # Train the model.
     batches_seen = tf.Variable(0, dtype=tf.int64)
