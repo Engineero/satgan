@@ -27,7 +27,7 @@ from tensorflow.keras.losses import (mean_squared_error, mean_absolute_error,
 from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint
 from tensorflow.keras.utils import plot_model
 from tensorflow.keras.optimizers import Adam, SGD
-from tesnorflow.keras.metrics import Mean
+from tensorflow.keras.metrics import Mean
 
 
 # Define globals.
