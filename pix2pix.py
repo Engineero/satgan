@@ -488,7 +488,7 @@ def main(a):
                         loss_list.append(weight * loss_function(model_inputs,
                                                                 model_outputs,
                                                                 step))
-                gradients = tape.gradient(tf.concat(loss_list, axis=0),
+                gradients = tape.gradient(tf.stack(loss_list, axis=0),
                                           model.trainable_variables)
                 optimizer.apply_gradients(zip(gradients,
                                               model.trainable_variables))
@@ -499,7 +499,7 @@ def main(a):
                         loss_list.append(loss_function(model_inputs,
                                                        model_outputs,
                                                        step))
-                gradients = tape.gradient(tf.concat(loss_list, axis=0),
+                gradients = tape.gradient(tf.stack(loss_list, axis=0),
                                           model.trainable_variables)
                 optimizer.apply_gradients(zip(gradients,
                                               model.trainable_variables))
