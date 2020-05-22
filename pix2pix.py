@@ -485,7 +485,7 @@ def main(a):
                                                             loss_function_list,
                                                             loss_weight_list):
                     with tf.GradientTape() as tape:
-                        loss_list.extend(weight * loss_function(model_inputs,
+                        loss_list.append(weight * loss_function(model_inputs,
                                                                 model_outputs,
                                                                 step))
                 gradients = tape.gradient(loss_list,
@@ -496,7 +496,7 @@ def main(a):
                 for optimizer, loss_function in zip(optimizer_list,
                                                     loss_function_list):
                     with tf.GradientTape() as tape:
-                        loss_list.extend(loss_function(model_inputs,
+                        loss_list.append(loss_function(model_inputs,
                                                        model_outputs,
                                                        step))
                 gradients = tape.gradient(loss_list,
