@@ -549,18 +549,19 @@ def main(a):
             fake_img = model_outputs[0]
             discrim_outputs = model_outputs[1]
             targets = model_inputs[1]
-            gen_loss_GAN = tf.reduce_mean(
-                -tf.math.log(discrim_outputs[1] + EPS)
-            )
+            # gen_loss_GAN = tf.reduce_mean(
+            #     -tf.math.log(discrim_outputs[1] + EPS)
+            # )
             gen_loss_L1 = tf.reduce_mean(mean_absolute_error(targets,
                                                              fake_img))
-            gen_loss = a.gan_weight * gen_loss_GAN + a.l1_weight * gen_loss_L1
+            # gen_loss = a.gan_weight * gen_loss_GAN + a.l1_weight * gen_loss_L1
+            gen_loss = a.l1_weight * gen_loss_L1
 
             # Write summaries.
             tf.summary.scalar(name='gen_L1_loss', data=gen_loss_L1,
                               step=step)
-            tf.summary.scalar(name='gen_GAN_loss', data=gen_loss_GAN,
-                              step=step)
+            # tf.summary.scalar(name='gen_GAN_loss', data=gen_loss_GAN,
+            #                   step=step)
             tf.summary.scalar(name='gen_total_loss', data=gen_loss,
                               step=step)
             return gen_loss
