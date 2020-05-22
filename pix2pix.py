@@ -473,7 +473,6 @@ def main(a):
             fake_img, discrim_outputs, task_outputs = model([inputs, targets])
             model_inputs = (inputs, targets, task_targets)
             model_outputs = (fake_img, discrim_outputs, task_outputs)
-            loss_list = []
             if not isinstance(optimizer_list, list):
                 optimizer_list = [optimizer_list]
             if not isinstance(loss_function_list, list):
@@ -485,24 +484,22 @@ def main(a):
                                                             loss_function_list,
                                                             loss_weight_list):
                     with tf.GradientTape() as tape:
-                        loss_list.append(weight * loss_function(model_inputs,
-                                                                model_outputs,
-                                                                step))
-                gradients = tape.gradient(loss_list,
-                                          model.trainable_variables)
-                optimizer.apply_gradients(zip(gradients,
-                                              model.trainable_variables))
+                        loss = weight * loss_function(model_inputs,
+                                                      model_outputs,
+                                                      step)
+                    gradients = tape.gradient(loss, tape.watched_variables())
+                    optimizer.apply_gradients(zip(gradients,
+                                                  tape.watched_variables()))
             else:
                 for optimizer, loss_function in zip(optimizer_list,
                                                     loss_function_list):
                     with tf.GradientTape() as tape:
-                        loss_list.append(loss_function(model_inputs,
-                                                       model_outputs,
-                                                       step))
-                gradients = tape.gradient(loss_list,
-                                          model.trainable_variables)
-                optimizer.apply_gradients(zip(gradients,
-                                              model.trainable_variables))
+                        loss = loss_function(model_inputs,
+                                             model_outputs,
+                                             step)
+                    gradients = tape.gradient(loss, tape.watched_variables())
+                    optimizer.apply_gradients(zip(gradients,
+                                                  tape.watched_variables()))
 
     with tf.name_scope("discriminator_loss"):
         @tf.function
