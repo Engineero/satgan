@@ -34,16 +34,16 @@ def conv(x, filters, kernel_size=(1, 1), strides=(1, 1), padding='valid',
         conv_op = SeparableConv2D
     else:
         conv_op = Conv2D
+    conv_op = conv_op(filters,
+                      kernel_size=kernel_size,
+                      strides=strides,
+                      use_bias=use_bias,
+                      padding=padding)
     if sn:
         conv_op = SpectralNormalization(conv_op)
 
     with tf.name_scope(scope):
-        x = conv_op(filters,
-                    kernel_size=kernel_size,
-                    strides=strides,
-                    use_bias=use_bias,
-                    padding=padding)(x)
-        return x
+        return conv_op()(x)
 
 
 def deconv(x, filters, kernel_size=(4, 4), strides=(2, 2), padding='same',
