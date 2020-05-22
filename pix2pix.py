@@ -27,6 +27,7 @@ from tensorflow.keras.losses import (mean_squared_error, mean_absolute_error,
 from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint
 from tensorflow.keras.utils import plot_model
 from tensorflow.keras.optimizers import Adam, SGD
+from tesnorflow.keras.metrics import Mean
 
 
 # Define globals.
@@ -519,6 +520,12 @@ def main(a):
     # Train the model.
     batches_seen = tf.Variable(0, dtype=tf.int64)
     with writer.as_default():
+        # Create metrics for accumulating validation, test losses.
+        mean_total = Mean()
+        mean_discrim = Mean()
+        mean_gen = Mean()
+        mean_task = Mean()
+        mean_list = [mean_total, mean_discrim, mean_gen, mean_task]
         for epoch in range(a.max_epochs):
             print(f'Training epoch {epoch+1} of {a.max_epochs}...')
             epoch_start = time.time()
@@ -617,30 +624,50 @@ def main(a):
         epoch_time = time.time() - epoch_start
         print(f'Epoch {epoch+1} completed in {epoch_time}.\n')
 
+        for m in mean_list:
+            m.reset_states()
         # Eval on validation data, save best model, early stopping...
-        total_loss, discrim_loss, gen_loss, task_loss = \
-            compute_loss(model, val_data, batches_seen)
-        print(f'Epoch {epoch+1} performance\ntotal loss: {total_loss:.4f}\t',
-              f'discriminator loss: {discrim_loss:.4f}\t',
-              f'generator loss: {gen_loss:.4f}\t',
-              f'task loss: {task_loss:.4f}\t')
-        if epoch == 0:
-            min_loss = total_loss
-        if total_loss <= min_loss and a.output_dir is not None:
-            print(f'Saving model with total loss {total_loss:.4f} ',
+        for batch in val_data:
+            total_loss, discrim_loss, gen_loss, task_loss = \
+                compute_loss(model, batch, batches_seen)
+            if epoch == 0:
+                min_loss = total_loss
+            for m, loss in zip(mean_list, [total_loss,
+                                           discrim_loss,
+                                           gen_loss,
+                                           task_loss]):
+                m.update_states([loss])
+        if mean_list[0].result().numpy() <= min_loss \
+            and a.output_dir is not None:
+            min_loss = mean_list[0].result().numpy()
+            print(f'Saving model with total loss {min_loss:.4f} ',
                   f'to {a.output_dir}.')
             model.save(a.output_dir) 
+        print(f'Epoch {epoch+1} performance\n',
+              f'total loss: {mean_list[0].result().numpy():.4f}\t',
+              f'discriminator loss: {mean_list[1].result().numpy():.4f}\t',
+              f'generator loss: {mean_list[2].result().numpy():.4f}\t',
+              f'task loss: {mean_list[3].result().numpy():.4f}\t')
         # TODO (NLT): add in early stopping.
 
     # Test the best saved model or current model if not saving.
     if a.output_dir is not None:
         model = load_model(a.output_dir)
-    total_loss, discrim_loss, gen_loss, task_loss = \
-        compute_loss(model, test_data, batches_seen)
-    print(f'Test performance\ntotal loss: {total_loss:.4f}\t',
-          f'discriminator loss: {discrim_loss:.4f}\t',
-          f'generator loss: {gen_loss:.4f}\t',
-          f'task loss: {task_loss:.4f}\t')
+    for m in mean_list:
+        m.reset_states()
+    for batch in test_data:
+        total_loss, discrim_loss, gen_loss, task_loss = \
+            compute_loss(model, batch, batches_seen)
+        for m, loss in zip(mean_list, [total_loss,
+                                       discrim_loss,
+                                       gen_loss,
+                                       task_loss]):
+            m.update_states([loss])
+    print(f'Test performance\n',
+          f'total loss: {mean_list[0].result().numpy():.4f}\t',
+          f'discriminator loss: {mean_list[1].result().numpy():.4f}\t',
+          f'generator loss: {mean_list[2].result().numpy():.4f}\t',
+          f'task loss: {mean_list[3].result().numpy():.4f}\t')
 
 
 if __name__ == '__main__':
