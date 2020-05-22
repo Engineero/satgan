@@ -621,53 +621,62 @@ def main(a):
                 batches_seen.assign_add(1)
                 writer.flush()
 
-        epoch_time = time.time() - epoch_start
-        print(f'Epoch {epoch+1} completed in {epoch_time}.\n')
+            epoch_time = time.time() - epoch_start
+            print(f'Epoch {epoch+1} completed in {epoch_time}.\n')
 
+            # Eval on validation data, save best model, early stopping...
+            for m in mean_list:
+                m.reset_states()
+            for batch in val_data:
+                total_loss, discrim_loss, gen_loss, task_loss = \
+                    compute_loss(model, batch, batches_seen)
+                if epoch == 0:
+                    min_loss = total_loss
+                    epochs_without_improvement = 0
+                for m, loss in zip(mean_list, [total_loss,
+                                               discrim_loss,
+                                               gen_loss,
+                                               task_loss]):
+                    m.update_states([loss])
+            if mean_list[0].result().numpy() <= min_loss \
+                and a.output_dir is not None:
+                min_loss = mean_list[0].result().numpy()
+                print(f'Saving model with total loss {min_loss:.4f} ',
+                      f'to {a.output_dir}.')
+                model.save(a.output_dir) 
+                epochs_without_improvement = 0
+            else:
+                epochs_without_improvement += 1
+            print(f'Epoch {epoch+1} performance\n',
+                  f'total loss: {mean_list[0].result().numpy():.4f}\t',
+                  f'discriminator loss: {mean_list[1].result().numpy():.4f}\t',
+                  f'generator loss: {mean_list[2].result().numpy():.4f}\t',
+                  f'task loss: {mean_list[3].result().numpy():.4f}\t')
+
+            # Check for early stopping.
+            if epochs_without_improvement >= a.early_stop_patience:
+                print(f'{a.early_stop_patience} epochs passed without ',
+                      'improvement. Stopping training.')
+                break
+
+        # Test the best saved model or current model if not saving.
+        if a.output_dir is not None:
+            model = load_model(a.output_dir)
         for m in mean_list:
             m.reset_states()
-        # Eval on validation data, save best model, early stopping...
-        for batch in val_data:
+        for batch in test_data:
             total_loss, discrim_loss, gen_loss, task_loss = \
                 compute_loss(model, batch, batches_seen)
-            if epoch == 0:
-                min_loss = total_loss
             for m, loss in zip(mean_list, [total_loss,
                                            discrim_loss,
                                            gen_loss,
                                            task_loss]):
                 m.update_states([loss])
-        if mean_list[0].result().numpy() <= min_loss \
-            and a.output_dir is not None:
-            min_loss = mean_list[0].result().numpy()
-            print(f'Saving model with total loss {min_loss:.4f} ',
-                  f'to {a.output_dir}.')
-            model.save(a.output_dir) 
-        print(f'Epoch {epoch+1} performance\n',
+        print(f'Test performance\n',
               f'total loss: {mean_list[0].result().numpy():.4f}\t',
               f'discriminator loss: {mean_list[1].result().numpy():.4f}\t',
               f'generator loss: {mean_list[2].result().numpy():.4f}\t',
               f'task loss: {mean_list[3].result().numpy():.4f}\t')
-        # TODO (NLT): add in early stopping.
-
-    # Test the best saved model or current model if not saving.
-    if a.output_dir is not None:
-        model = load_model(a.output_dir)
-    for m in mean_list:
-        m.reset_states()
-    for batch in test_data:
-        total_loss, discrim_loss, gen_loss, task_loss = \
-            compute_loss(model, batch, batches_seen)
-        for m, loss in zip(mean_list, [total_loss,
-                                       discrim_loss,
-                                       gen_loss,
-                                       task_loss]):
-            m.update_states([loss])
-    print(f'Test performance\n',
-          f'total loss: {mean_list[0].result().numpy():.4f}\t',
-          f'discriminator loss: {mean_list[1].result().numpy():.4f}\t',
-          f'generator loss: {mean_list[2].result().numpy():.4f}\t',
-          f'task loss: {mean_list[3].result().numpy():.4f}\t')
 
 
 if __name__ == '__main__':
@@ -779,6 +788,8 @@ if __name__ == '__main__':
                         help='Relative weight of discriminator loss.')
     parser.add_argument('--task_weight', default=1., type=float,
                         help='Relative weight of task loss.')
+    parser.add_argument('--early_stop_patience', default=10, type=int,
+                        help='Early stopping patience, epochs. Default 10.')
 
     # export options
     parser.add_argument("--output_filetype", default="png",
