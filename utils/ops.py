@@ -43,7 +43,7 @@ def conv(x, filters, kernel_size=(1, 1), strides=(1, 1), padding='valid',
         conv_op = SpectralNormalization(conv_op)
 
     with tf.name_scope(scope):
-        return conv_op()(x)
+        return conv_op(x)
 
 
 def deconv(x, filters, kernel_size=(4, 4), strides=(2, 2), padding='same',
