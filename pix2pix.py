@@ -488,10 +488,10 @@ def main(a):
                         loss_list.append(weight * loss_function(model_inputs,
                                                                 model_outputs,
                                                                 step))
-                    gradients = tape.gradient(tf.concat(loss_list, axis=0),
-                                              model.trainable_variables)
-                    optimizer.apply_gradients(zip(gradients,
-                                                  model.trainable_variables))
+                gradients = tape.gradient(tf.concat(loss_list, axis=0),
+                                          model.trainable_variables)
+                optimizer.apply_gradients(zip(gradients,
+                                              model.trainable_variables))
             else:
                 for optimizer, loss_function in zip(optimizer_list,
                                                     loss_function_list):
@@ -499,10 +499,10 @@ def main(a):
                         loss_list.append(loss_function(model_inputs,
                                                        model_outputs,
                                                        step))
-                    gradients = tape.gradient(tf.concat(loss_list, axis=0),
-                                              model.trainable_variables)
-                    optimizer.apply_gradients(zip(gradients,
-                                                  model.trainable_variables))
+                gradients = tape.gradient(tf.concat(loss_list, axis=0),
+                                          model.trainable_variables)
+                optimizer.apply_gradients(zip(gradients,
+                                              model.trainable_variables))
 
     with tf.name_scope("discriminator_loss"):
         @tf.function
