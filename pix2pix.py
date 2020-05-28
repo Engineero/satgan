@@ -299,9 +299,12 @@ def create_discriminator(a, input_shape, target_shape):
         x = BatchNormalization()(x)
 
     # layer_5: [batch, 31, 31, ndf * 8] => [batch, 30, 30, 1]
-    x = ops.down_resblock(x, filters=1, to_down=False, sn=a.spec_norm,
+    # x = ops.down_resblock(x, filters=1, to_down=False, sn=a.spec_norm,
+    #                       scope=f'layer_{n_layers + 1}')
+    # x = tf.nn.sigmoid(x, name='discriminator')
+    x = ops.down_resblock(x, filters=2, to_down=False, sn=a.spec_norm,
                           scope=f'layer_{n_layers + 1}')
-    x = tf.nn.sigmoid(x, name='discriminator')
+    x = tf.nn.softmax(x, name='discriminator')
 
     return Model(inputs=[x_in, y_in], outputs=x, name='discriminator')
 
@@ -401,8 +404,8 @@ def create_model(a, train_data):
         # TODO (NLT): figure out discriminator loss, interaction with Keras changes.
         discriminator = create_discriminator(a, input_shape, target_shape)
         print(f'Discriminator model summary\n:{discriminator.summary()}')
-        predict_real = discriminator([inputs, targets])
-        predict_fake = discriminator([inputs, fake_img])
+        predict_real = discriminator([inputs, targets])  # should -> [0, 1]
+        predict_fake = discriminator([inputs, fake_img])  # should -> [1, 0]
         discrim_outputs = tf.stack([predict_real, predict_fake], axis=0,
                                    name='discriminator')
 
@@ -520,14 +523,26 @@ def main(a):
         @tf.function
         def calc_discriminator_loss(model_inputs, model_outputs, step):
             # minimizing -tf.log will try to get inputs to 1
-            # discrim_outputs[0] = predict_real => 1
-            # discrim_outputs[1] = predict_fake => 0
+            # discrim_outputs[0] = predict_real => [0, 1]
+            # discrim_outputs[1] = predict_fake => [1, 0]
             discrim_outputs = model_outputs[1]
-            real_loss = tf.reduce_mean(
-                -tf.math.log(discrim_outputs[0] + EPS)
+            predict_real = discrim_outputs[0]
+            predict_fake = discrim_outputs[1]
+            targets_real = tf.ones(shape=predict_real.shape[:-1])
+            targets_fake = tf.zeros(shape=predict_fake.shape[:-1])
+            # real_loss = tf.reduce_mean(
+            #     -tf.math.log(predict_real + EPS)
+            # )
+            # fake_loss = tf.reduce_mean(
+            #     -tf.math.log(1 - predict_fake + EPS)
+            # )
+            real_loss = tf.keras.losses.sparse_categorical_crossentropy(
+                targets_real,
+                predict_real,
             )
-            fake_loss = tf.reduce_mean(
-                -tf.math.log(1 - discrim_outputs[1] + EPS)
+            fake_loss = tf.keras.losses.sparse_categorical_crossentropy(
+                targets_fake,
+                predict_fake,
             )
             discrim_loss = real_loss + fake_loss
 
@@ -547,10 +562,10 @@ def main(a):
             # predict_fake => 1
             # abs(targets - outputs) => 0
             fake_img = model_outputs[0]
-            discrim_outputs = model_outputs[1]
+            discrim_fake = model_outputs[1][1]
             targets = model_inputs[1]
             gen_loss_GAN = tf.reduce_mean(
-                -tf.math.log(discrim_outputs[1] + EPS)
+                -tf.math.log(discrim_fake + EPS)
             )
             gen_loss_L1 = tf.reduce_mean(mean_absolute_error(targets,
                                                              fake_img))
