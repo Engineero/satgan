@@ -105,12 +105,12 @@ def _parse_example(serialized_example, a):
     print(f'objects shape: {objects.shape}')
     # Need to pad objects to max inferences (not all images will have same
     # number of objects).
-    paddings = tf.constant([[0, 0], [0, 0], [0, a.max_inferences]])
+    paddings = tf.constant([[0, 0], [0, a.max_inferences], [0, 0]])
     print(f'paddings shape: {paddings.shape}')
-    paddings = paddings - (tf.constant([[0, 0], [0, 0], [0, 1]]) * objects.shape[-1])
+    paddings = paddings - (tf.constant([[0, 0], [0, 1], [0, 0]]) * objects.shape[-1])
     objects = tf.pad(tensor=objects, paddings=paddings, constant_values=-1.0)
     print(f'padded objects shape: {objects.shape}')
-    objects = tf.tile(objects, [1, 1, a.num_pred_layers])
+    objects = tf.tile(objects, [1, a.num_pred_layers, 1])
     print(f'tiled objects shape: {objects.shape}')
 
     # TODO (NLT): either mask these bboxes to 64x64 images or figure out how to
