@@ -102,12 +102,16 @@ def _parse_example(serialized_example, a):
 
     # Package things up for output.
     objects = tf.stack([xcenter, ycenter], axis=-1)
+    print(f'objects shape: {objects.shape}')
     # Need to pad objects to max inferences (not all images will have same
     # number of objects).
     paddings = tf.constant([[0, 0], [0, 0], [0, a.max_inferences]])
-    paddings = paddings - (tf.constant([[0, 0], [0, 0], [0, 1]]) * tf.shape(objects)[-1])
+    print(f'paddings shape: {paddings.shape}')
+    paddings = paddings - (tf.constant([[0, 0], [0, 0], [0, 1]]) * objects.shape[-1])
     objects = tf.pad(tensor=objects, paddings=paddings, constant_values=-1.0)
+    print(f'padded objects shape: {objects.shape}')
     objects = tf.tile(objects, [1, 1, a.num_pred_layers])
+    print(f'tiled objects shape: {objects.shape}')
 
     # TODO (NLT): either mask these bboxes to 64x64 images or figure out how to
     # get 100 bboxes per task net output...
@@ -371,6 +375,8 @@ def create_model(a, train_data):
         print(f'Task Net model summary:\n{task_net.summary()}')
         pred_xy = task_net(targets)
         pred_xy_fake = task_net(fake_img)
+        print(f'pred_xy shape: {pred_xy.shape}')
+        print(f'pred_xy_fake shape: {pred_xy_fake.shape}')
         task_outputs = tf.stack([pred_xy, pred_xy_fake], axis=0,
                                 name='task_net')
 
@@ -508,12 +514,6 @@ def main(a):
             predict_fake = tf.reshape(predict_fake, [predict_fake.shape[0], -1, 2])
             targets_real = tf.ones(shape=predict_real.shape[:-1])
             targets_fake = tf.zeros(shape=predict_fake.shape[:-1])
-            # real_loss = tf.reduce_mean(
-            #     -tf.math.log(predict_real + EPS)
-            # )
-            # fake_loss = tf.reduce_mean(
-            #     -tf.math.log(1 - predict_fake + EPS)
-            # )
             real_loss = tf.math.reduce_mean(
                 tf.keras.losses.sparse_categorical_crossentropy(
                     targets_real,
