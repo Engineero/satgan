@@ -582,9 +582,7 @@ def main(a):
             print(f'task target shape: {task_targets.shape}')
             print(f'task outputs shape: {task_outputs.shape}')
             target_sum = tf.math.reduce_sum(tf.math.abs(task_targets + 1.), axis=-1)
-            print(f'target sum shape: {target_sum.shape}')
             bool_mask = (target_sum != 0)
-            print(f'boolean mask shape: {bool_mask.shape}')
             xy_loss = tf.reduce_sum(tf.where(
                 bool_mask,
                 tf.math.reduce_mean(
