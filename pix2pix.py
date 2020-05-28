@@ -370,13 +370,7 @@ def create_model(a, train_data):
         task_net = create_task_net(a, input_shape)
         print(f'Task Net model summary:\n{task_net.summary()}')
         pred_xy = task_net(targets)
-        pred_xy = tf.reshape(pred_xy, [a.batch_size, -1, pred_xy.shape[-1]],
-                             name='pred_xy')
         pred_xy_fake = task_net(fake_img)
-        pred_xy_fake = tf.reshape(pred_xy_fake, [a.batch_size,
-                                                 -1,
-                                                 pred_xy_fake.shape[-1]],
-                                  name='pred_xy_fake')
         task_outputs = tf.stack([pred_xy, pred_xy_fake], axis=0,
                                 name='task_net')
 
