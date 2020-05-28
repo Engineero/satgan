@@ -569,9 +569,18 @@ def main(a):
             # abs(targets - outputs) => 0
             fake_img = model_outputs[0]
             discrim_fake = model_outputs[1][1]
+            discrim_fake = tf.reshape(discrim_fake,
+                                      [discrim_fake.shape[0], -1, 2])
+            targets_fake = tf.ones(shape=discrim_fake.shape[:-1])
             targets = model_inputs[1]
+            # gen_loss_GAN = tf.reduce_mean(
+            #     -tf.math.log(discrim_fake + EPS)
+            # )
             gen_loss_GAN = tf.reduce_mean(
-                -tf.math.log(discrim_fake + EPS)
+                tf.keras.losses.sparse_categorical_crossentropy(
+                    targets_fake,
+                    discrim_fake,
+                )
             )
             gen_loss_L1 = tf.reduce_mean(mean_absolute_error(targets,
                                                              fake_img))
