@@ -673,12 +673,14 @@ def main(a):
                     )
                     tf.summary.image(
                         name='predict_real',
-                        data=discrim_outputs[0][..., 1],
+                        data=tf.expand_dims(discrim_outputs[0][..., 1],
+                                            axis=-1),
                         step=batches_seen,
                     )
                     tf.summary.image(
                         name='predict_fake',
-                        data=discrim_outputs[1][..., 0],
+                        data=tf.expand_dims(discrim_outputs[1][..., 0],
+                                            axis=-1),
                         step=batches_seen,
                     )
 
