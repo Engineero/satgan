@@ -340,7 +340,7 @@ def create_task_net(a, input_shape):
         print(f'pred_xy conv2D shape: {pred_xy.shape}')
         pred_xy = GlobalAveragePooling2D()(pred_xy)
         print(f'pred_xy global pooling shape: {pred_xy.shape}')
-        pred_xy = tf.reshape(pred_xy, (..., a.max_inferences, 2))
+        pred_xy = tf.reshape(pred_xy, (-1, a.max_inferences, 2))
         print(f'pred_xy reshaped shape: {pred_xy.shape}')
         xy_list.append(pred_xy)
 
