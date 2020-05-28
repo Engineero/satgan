@@ -285,23 +285,24 @@ def create_discriminator(a, input_shape, target_shape):
     y_in = Input(shape=target_shape)
     input_concat = Concatenate(axis=-1)([x_in, y_in])
 
-    # layer_1: [batch, 256, 256, in_channels * 2] => [batch, 128, 128, ndf]
+    # layer_1: [batch, h, w, in_channels * 2] => [batch, h//2, w//2, ndf]
     x = ops.down_resblock(input_concat, filters=a.ndf,
                           sn=a.spec_norm, scope='layer_1')
 
-    # layer_2: [batch, 128, 128, ndf] => [batch, 64, 64, ndf * 2]
-    # layer_3: [batch, 64, 64, ndf * 2] => [batch, 32, 32, ndf * 4]
-    # layer_4: [batch, 32, 32, ndf * 4] => [batch, 31, 31, ndf * 8]
+    # layer_2: [batch, h//2, w//2, ndf] => [batch, h//4, w//4, ndf * 2]
+    # layer_3: [batch, h//4, w//4, ndf * 2] => [batch, h//8, w//8, ndf * 4]
+    # layer_4: [batch, h//8, w//8, ndf * 4] => [batch, h//16, w//16, ndf * 8]
     for i in range(n_layers):
         out_channels = a.ndf * min(2**(i+1), 8)
         x = ops.down_resblock(x, filters=out_channels, sn=a.spec_norm,
                               scope=f'layer_{i+1}')
         x = BatchNormalization()(x)
 
-    # layer_5: [batch, 31, 31, ndf * 8] => [batch, 30, 30, 1]
-    # x = ops.down_resblock(x, filters=1, to_down=False, sn=a.spec_norm,
-    #                       scope=f'layer_{n_layers + 1}')
-    # x = tf.nn.sigmoid(x, name='discriminator')
+    # Add self attention layer before final down resblock.
+    x = google_attention(x, out_channels, sn=a.spec_norm,
+                         scope='discrim_attention')
+
+    # layer_5: [batch, h//16, w//16, ndf * 8] => [batch, h//16-1, w//16-1, 2]
     x = ops.down_resblock(x, filters=2, to_down=False, sn=a.spec_norm,
                           scope=f'layer_{n_layers + 1}')
     x = tf.nn.softmax(x, name='discriminator')
