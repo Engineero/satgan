@@ -538,13 +538,17 @@ def main(a):
             # fake_loss = tf.reduce_mean(
             #     -tf.math.log(1 - predict_fake + EPS)
             # )
-            real_loss = tf.keras.losses.sparse_categorical_crossentropy(
-                targets_real,
-                predict_real,
+            real_loss = tf.math.reduce_mean(
+                tf.keras.losses.sparse_categorical_crossentropy(
+                    targets_real,
+                    predict_real,
+                )
             )
-            fake_loss = tf.keras.losses.sparse_categorical_crossentropy(
-                targets_fake,
-                predict_fake,
+            fake_loss = tf.math.reduce_mean(
+                tf.keras.losses.sparse_categorical_crossentropy(
+                    targets_fake,
+                    predict_fake,
+                )
             )
             discrim_loss = real_loss + fake_loss
 
