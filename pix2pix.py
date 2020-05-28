@@ -575,7 +575,7 @@ def main(a):
             task_outputs = model_outputs[2]
             target_sum = tf.math.reduce_sum(tf.math.abs(task_targets + 1.), axis=-1)
             bool_mask = (target_sum != 0)
-            indices = tf.where(bool_mask)
+            num_indices = tf.cast(len(tf.where(bool_mask)), dtype=tf.float32)
             xy_loss = tf.reduce_sum(tf.where(
                 bool_mask,
                 tf.math.reduce_mean(
@@ -584,7 +584,7 @@ def main(a):
                 ),
                 tf.zeros_like(bool_mask, dtype=tf.float32)
             ))
-            xy_loss = xy_loss / tf.math.maximum(1, len(indices))
+            xy_loss = xy_loss / tf.math.maximum(1, num_indices)
             xy_loss_fake = tf.reduce_sum(tf.where(
                 bool_mask,
                 tf.math.reduce_mean(
@@ -593,7 +593,7 @@ def main(a):
                 ),
                 tf.zeros_like(bool_mask, dtype=tf.float32)
             ))
-            xy_loss_fake = xy_loss_fake / tf.math.maximum(1, len(indices))
+            xy_loss_fake = xy_loss_fake / tf.math.maximum(1, num_indices)
             task_loss = xy_loss + xy_loss_fake
 
             # Write summaries.
