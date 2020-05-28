@@ -528,10 +528,10 @@ def main(a):
             discrim_outputs = model_outputs[1]
             predict_real = discrim_outputs[0]
             predict_fake = discrim_outputs[1]
-            predict_real = tf.reshape(predict_real, [predict_real.shape[0], -1])
-            predict_fake = tf.reshape(predict_fake, [predict_fake.shape[0], -1])
-            targets_real = tf.ones_like(predict_real)
-            targets_fake = tf.zeros_like(predict_fake)
+            predict_real = tf.reshape(predict_real, [predict_real.shape[0], -1, 2])
+            predict_fake = tf.reshape(predict_fake, [predict_fake.shape[0], -1, 2])
+            targets_real = tf.ones(shape=predict_real.shape[:-1])
+            targets_fake = tf.zeros(shape=predict_fake.shape[:-1])
             # real_loss = tf.reduce_mean(
             #     -tf.math.log(predict_real + EPS)
             # )
