@@ -337,13 +337,18 @@ def create_task_net(a, input_shape):
             bias_regularizer=l1_l2(a.l1_reg_bias,
                                    a.l2_reg_bias)
         )(output)
+        print(f'pred_xy conv2D shape: {pred_xy.shape}')
         pred_xy = GlobalAveragePooling2D()(pred_xy)
+        print(f'pred_xy global pooling shape: {pred_xy.shape}')
         pred_xy = tf.reshape(pred_xy, (-1, a.max_inferences, 2))
+        print(f'pred_xy reshaped shape: {pred_xy.shape}')
         xy_list.append(pred_xy)
 
     # Combine outputs together.
     if a.num_pred_layers > 1 and len(model.outputs) > 1:
+        # pred_xy = tf.stack(xy_list, axis=-1, name='stack_xy')
         pred_xy = tf.concat(xy_list, axis=1, name='concat_xy')
+        print(f'pred_xy shape: {pred_xy.shape}')
     else:
         pred_xy = tf.expand_dims(xy_list[0], axis=-1)
     return Model(inputs=model.input, outputs=pred_xy, name='task_net')
@@ -372,6 +377,8 @@ def create_model(a, train_data):
         print(f'Task Net model summary:\n{task_net.summary()}')
         pred_xy = task_net(targets)
         pred_xy_fake = task_net(fake_img)
+        print(f'pred_xy shape: {pred_xy.shape}')
+        print(f'pred_xy_fake shape: {pred_xy_fake.shape}')
         task_outputs = tf.stack([pred_xy, pred_xy_fake], axis=0,
                                 name='task_net')
 
@@ -572,6 +579,8 @@ def main(a):
             # task_targets are [xcenter, ycenter]
             task_targets = model_inputs[2]
             task_outputs = model_outputs[2]
+            print(f'task target shape: {task_targets.shape}')
+            print(f'task outputs shape: {task_outputs.shape}')
             target_sum = tf.math.reduce_sum(tf.math.abs(task_targets + 1.), axis=-1)
             print(f'target sum shape: {target_sum.shape}')
             bool_mask = (target_sum != 0)
