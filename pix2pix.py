@@ -101,7 +101,7 @@ def _parse_example(serialized_example, a):
     b_image = preprocess(b_image, add_noise=False)
 
     # Package things up for output.
-    objects = tf.stack([xcenter, ycenter], axis=1)
+    objects = tf.stack([xcenter, ycenter], axis=-1)
     # Need to pad objects to max inferences (not all images will have same
     # number of objects).
     paddings = tf.constant([[0, 0], [0, 0], [0, a.max_inferences]])
@@ -320,15 +320,14 @@ def create_task_net(a, input_shape):
         Task network (detection) model.
     """
 
-    x_list = []
-    y_list = []
+    xy_list = []
     # Feature pyramid network or darknet or something with res blocks.
     model = build_darknet_model(input_shape)
     # Predictor heads for object centroid, width, height.
     for _, output in zip(range(a.num_pred_layers), model.outputs):
-        pred_x = Conv2D(
+        pred_xy = Conv2D(
             filters=a.max_inferences,
-            kernel_size=1,
+            kernel_size=2,
             strides=1,
             padding='same',
             kernel_initializer='he_normal',
@@ -338,31 +337,15 @@ def create_task_net(a, input_shape):
             bias_regularizer=l1_l2(a.l1_reg_bias,
                                    a.l2_reg_bias)
         )(output)
-        pred_x = GlobalAveragePooling2D()(pred_x)
-        x_list.append(pred_x)
-        pred_y = Conv2D(
-            filters=a.max_inferences,
-            kernel_size=1,
-            strides=1,
-            padding='same',
-            kernel_initializer='he_normal',
-            activation='sigmoid',
-            kernel_regularizer=l1_l2(a.l1_reg_kernel,
-                                     a.l2_reg_kernel),
-            bias_regularizer=l1_l2(a.l1_reg_bias,
-                                   a.l2_reg_bias)
-        )(output)
-        pred_y = GlobalAveragePooling2D()(pred_y)
-        y_list.append(pred_y)
+        pred_xy = GlobalAveragePooling2D()(pred_xy)
+        xy_list.append(pred_xy)
 
     # Combine outputs together.
     if a.num_pred_layers > 1 and len(model.outputs) > 1:
-        pred_x = tf.stack(x_list, axis=-1, name='stack_x')
-        pred_y = tf.stack(y_list, axis=-1, name='stack_y')
+        pred_xy = tf.stack(xy_list, axis=-1, name='stack_xy')
     else:
-        pred_x = tf.expand_dims(x_list[0], axis=-1)
-        pred_y = tf.expand_dims(y_list[0], axis=-1)
-    return Model(inputs=model.input, outputs=[pred_x, pred_y], name='task_net')
+        pred_xy = tf.expand_dims(xy_list[0], axis=-1)
+    return Model(inputs=model.input, outputs=pred_xy, name='task_net')
 
 
 def create_model(a, train_data):
@@ -386,15 +369,13 @@ def create_model(a, train_data):
     with tf.name_scope('task_net'):
         task_net = create_task_net(a, input_shape)
         print(f'Task Net model summary:\n{task_net.summary()}')
-        pred_x, pred_y = task_net(targets)
-        pred_xy = tf.stack([pred_x, pred_y], axis=1)
-        pred_xy = tf.reshape(pred_xy, [a.batch_size, pred_xy.shape[1], -1],
+        pred_xy = task_net(targets)
+        pred_xy = tf.reshape(pred_xy, [a.batch_size, -1, pred_xy.shape[-1]],
                              name='pred_xy')
-        pred_x_fake, pred_y_fake = task_net(fake_img)
-        pred_xy_fake = tf.stack([pred_x_fake, pred_y_fake], axis=1)
+        pred_xy_fake = task_net(fake_img)
         pred_xy_fake = tf.reshape(pred_xy_fake, [a.batch_size,
-                                                 pred_xy_fake.shape[1],
-                                                 -1],
+                                                 -1,
+                                                 pred_xy_fake.shape[-1]],
                                   name='pred_xy_fake')
         task_outputs = tf.stack([pred_xy, pred_xy_fake], axis=0,
                                 name='task_net')
@@ -602,13 +583,15 @@ def main(a):
             # task_targets are [xcenter, ycenter]
             task_targets = model_inputs[2]
             task_outputs = model_outputs[2]
-            target_sum = tf.math.reduce_sum(tf.math.abs(task_targets + 1.), axis=1)
+            print(f'task target shape: {task_targets.shape}')
+            print(f'task outputs shape: {task_outputs.shape}')
+            target_sum = tf.math.reduce_sum(tf.math.abs(task_targets + 1.), axis=-1)
             bool_mask = (target_sum != 0)
             xy_loss = tf.reduce_sum(tf.where(
                 bool_mask,
                 tf.math.reduce_mean(
                     tf.math.square(task_targets - task_outputs[0]),
-                    axis=1
+                    axis=-1
                 ),
                 tf.zeros_like(bool_mask, dtype=tf.float32)
             ))
@@ -616,7 +599,7 @@ def main(a):
                 bool_mask,
                 tf.math.reduce_mean(
                     tf.math.square(task_targets - task_outputs[1]),
-                    axis=1
+                    axis=-1
                 ),
                 tf.zeros_like(bool_mask, dtype=tf.float32)
             ))
