@@ -86,11 +86,11 @@ EPS = 1e-12
 
 Examples = collections.namedtuple(
     "Examples",
-    "paths, inputs, targets, count, steps_per_epoch"
+    "paths, inputs, objects, targets, count, steps_per_epoch"
 )
 Model = collections.namedtuple(
     "Model",
-    "outputs, predict_real, predict_fake, discrim_loss, discrim_grads_and_vars, gen_loss_GAN, gen_loss_L1, gen_grads_and_vars, train"
+    "outputs, combined_outputs, predict_real, predict_fake, discrim_loss, discrim_grads_and_vars, gen_loss_GAN, gen_loss_L1, gen_grads_and_vars, train"
 )
 
 
@@ -100,8 +100,8 @@ def preprocess(image, add_noise=False):
         # return image * 2 - 1
         if add_noise:
             noise = tf.random_normal(shape=tf.shape(image), mean=0.0,
-                                     stddev=0.5, dtype=tf.float32)
-            return tf.image.per_image_standardization(image) + noise
+                                     stddev=1., dtype=tf.float32)
+            return (tf.image.per_image_standardization(image), noise)
         else:
             return tf.image.per_image_standardization(image)
 
@@ -371,12 +371,12 @@ def load_examples():
         else:
             # break apart image pair and move to range [-1, 1]
             width = tf.shape(raw_input)[1] # [height, width, channels]
-            a_images = preprocess(raw_input[:, :width//2, :], add_noise=True)
+            a_images, gen_inputs = preprocess(raw_input[:, :width//2, :], add_noise=True)
             b_images = preprocess(raw_input[:, width//2:, :])
     if a.which_direction == "AtoB":
-        inputs, targets = [a_images, b_images]
+        inputs, objects, targets = [gen_inputs, a_images, b_images]
     elif a.which_direction == "BtoA":
-        inputs, targets = [b_images, a_images]
+        inputs, objects, targets = [gen_inputs, b_images, a_images]
     else:
         raise Exception("invalid direction")
 
@@ -409,16 +409,19 @@ def load_examples():
 
     with tf.name_scope("input_images"):
         input_images = transform(inputs)
+    with tf.name_scope('object_images'):
+        object_images = transform(objects)
     with tf.name_scope("target_images"):
         target_images = transform(targets)
-    paths_batch, inputs_batch, targets_batch = tf.train.batch(
-        [paths, input_images, target_images],
+    paths_batch, inputs_batch, objects_batch, targets_batch = tf.train.batch(
+        [paths, input_images, object_images, target_images],
         batch_size=a.batch_size
     )
     steps_per_epoch = int(math.ceil(len(input_paths) / a.batch_size))
     return Examples(
         paths=paths_batch,
         inputs=inputs_batch,
+        objects=objects_batch,
         targets=targets_batch,
         count=len(input_paths),
         steps_per_epoch=steps_per_epoch,
@@ -528,7 +531,7 @@ def create_generator(generator_inputs, generator_outputs_channels):
     return layers[-1]
 
 
-def create_model(inputs, targets):
+def create_model(inputs, objects, targets):
     def create_discriminator(discrim_inputs, discrim_targets):
         n_layers = 3
         layers = []
@@ -571,12 +574,12 @@ def create_model(inputs, targets):
     with tf.name_scope("real_discriminator"):
         with tf.variable_scope("discriminator"):
             # 2x [batch, height, width, channels] => [batch, 30, 30, 1]
-            predict_real = create_discriminator(inputs, targets)
+            predict_real = create_discriminator(objects, targets)
 
     with tf.name_scope("fake_discriminator"):
         with tf.variable_scope("discriminator", reuse=True):
             # 2x [batch, height, width, channels] => [batch, 30, 30, 1]
-            predict_fake = create_discriminator(inputs, outputs)
+            predict_fake = create_discriminator(objects, outputs + objects)
 
     with tf.name_scope("discriminator_loss"):
         # minimizing -tf.log will try to get inputs to 1
@@ -588,7 +591,7 @@ def create_model(inputs, targets):
         # predict_fake => 1
         # abs(targets - outputs) => 0
         gen_loss_GAN = tf.reduce_mean(-tf.log(predict_fake + EPS))
-        gen_loss_L1 = tf.reduce_mean(tf.abs(targets - outputs))
+        gen_loss_L1 = tf.reduce_mean(tf.abs(outputs + objects - targets))
         gen_loss = gen_loss_GAN * a.gan_weight + gen_loss_L1 * a.l1_weight
 
     with tf.name_scope("discriminator_train"):
@@ -619,6 +622,7 @@ def create_model(inputs, targets):
         gen_loss_L1=ema.average(gen_loss_L1),
         gen_grads_and_vars=gen_grads_and_vars,
         outputs=outputs,
+        combined_outputs=outputs+objects,
         train=tf.group(update_losses, incr_global_step, gen_train),
     )
 
@@ -631,7 +635,7 @@ def save_images(fetches, step=None):
     for i, in_path in enumerate(fetches["paths"]):
         name, _ = os.path.splitext(os.path.basename(in_path.decode("utf8")))
         fileset = {"name": name, "step": step}
-        for kind in ["inputs", "outputs", "targets"]:
+        for kind in ["inputs", "objects", "outputs", "targets"]:
             filename = name + "-" + kind + ".png"
             if step is not None:
                 filename = "%08d-%s" % (step, filename)
@@ -757,7 +761,7 @@ def main():
     examples = load_examples()
     print("examples count = %d" % examples.count)
     # inputs and targets are [batch_size, height, width, channels]
-    model = create_model(examples.inputs, examples.targets)
+    model = create_model(examples.inputs, examples.objects, examples.targets)
     # undo colorization splitting on images that we use for display/output
     if a.lab_colorization:
         if a.which_direction == "AtoB":
@@ -779,8 +783,10 @@ def main():
             raise Exception("invalid direction")
     else:
         inputs = deprocess(examples.inputs)
+        objects = deprocess(examples.objects)
         targets = deprocess(examples.targets)
         outputs = deprocess(model.outputs)
+        combined_outputs = deprocess(model.combined_outputs)
 
     def convert(image):
         if a.aspect_ratio != 1.0:
@@ -797,19 +803,28 @@ def main():
     # reverse any processing on images so they can be written to disk or displayed to user
     with tf.name_scope("convert_inputs"):
         converted_inputs = convert(inputs)
+    with tf.name_scope("convert_objects"):
+        converted_objects = convert(objects)
     with tf.name_scope("convert_targets"):
         converted_targets = convert(targets)
     with tf.name_scope("convert_outputs"):
         converted_outputs = convert(outputs)
+    with tf.name_scope("convert_combined_outputs"):
+        converted_combined_outputs = convert(combined_outputs)
     with tf.name_scope("encode_images"):
         display_fetches = {
             "paths": examples.paths,
             "inputs": tf.map_fn(tf.image.encode_png, converted_inputs,
                                 dtype=tf.string, name="input_pngs"),
+            "objects": tf.map_fn(tf.image.encode_png, converted_objects,
+                                 dtype=tf.string, name="input_pngs"),
             "targets": tf.map_fn(tf.image.encode_png, converted_targets,
                                  dtype=tf.string, name="target_pngs"),
             "outputs": tf.map_fn(tf.image.encode_png, converted_outputs,
                                  dtype=tf.string, name="output_pngs"),
+            "combined_outputs": tf.map_fn(tf.image.encode_png,
+                                          converted_combined_outputs,
+                                          dtype=tf.string, name="output_pngs"),
         }
 
     # summaries
@@ -818,6 +833,11 @@ def main():
         #                                              dtype=tf.float32)
         #tf.summary.image("inputs", summary_inputs)
         tf.summary.image("inputs", inputs)
+    with tf.name_scope("objects_summary"):
+        #summary_inputs = tf.image.convert_image_dtype(converted_inputs,
+        #                                              dtype=tf.float32)
+        #tf.summary.image("inputs", summary_inputs)
+        tf.summary.image("objects", objects)
     with tf.name_scope("targets_summary"):
         #summary_targets = tf.image.convert_image_dtype(converted_targets,
         #                                               dtype=tf.float32)
@@ -828,6 +848,11 @@ def main():
         #                                               dtype=tf.float32)
         #tf.summary.image("outputs", summary_outputs)
         tf.summary.image("outputs", outputs)
+    with tf.name_scope("combined_outputs_summary"):
+        #summary_outputs = tf.image.convert_image_dtype(converted_outputs,
+        #                                               dtype=tf.float32)
+        #tf.summary.image("outputs", summary_outputs)
+        tf.summary.image("combined_outputs", combined_outputs)
     with tf.name_scope("predict_real_summary"):
         tf.summary.image("predict_real",
                          tf.image.convert_image_dtype(model.predict_real,
