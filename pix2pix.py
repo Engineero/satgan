@@ -723,6 +723,7 @@ def main():
         output_image = tf.image.convert_image_dtype(batch_output, dtype=tf.float32)[0]
         output_image = output_image + input_norm
         if a.output_filetype == "png":
+            output_image = tf.image.convert_image_dtype(output_image, dtype=tf.uint16)
             output_data = tf.image.encode_png(output_image)
         elif a.output_filetype == "jpeg":
             output_data = tf.image.encode_jpeg(output_image, quality=80)
