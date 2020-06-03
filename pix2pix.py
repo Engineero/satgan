@@ -699,8 +699,8 @@ def main():
         # export the generator to a meta graph that can be imported later for standalone generation
         if a.lab_colorization:
             raise Exception("export not supported for lab_colorization")
-        input = tf.placeholder(tf.string, shape=[1])
-        input_data = tf.decode_base64(input[0])
+        input_str = tf.placeholder(tf.string, shape=[1])
+        input_data = tf.decode_base64(input_str[0])
         input_image = tf.image.decode_png(input_data)
         # remove alpha channel if present
         input_image = tf.cond(tf.equal(tf.shape(input_image)[2], 4),
@@ -733,7 +733,7 @@ def main():
         key = tf.placeholder(tf.string, shape=[1])
         inputs = {
             "key": key.name,
-            "input": input.name
+            "input": input_str.name
         }
         tf.add_to_collection("inputs", json.dumps(inputs))
         outputs = {
@@ -756,6 +756,7 @@ def main():
             )
             export_saver.save(sess, os.path.join(a.output_dir, "export"),
                               write_meta_graph=False)
+        return
 
     examples = load_examples()
     print("examples count = %d" % examples.count)
