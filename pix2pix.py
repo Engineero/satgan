@@ -756,7 +756,6 @@ def main():
             )
             export_saver.save(sess, os.path.join(a.output_dir, "export"),
                               write_meta_graph=False)
-        return  # if a.mode == 'export'
 
     examples = load_examples()
     print("examples count = %d" % examples.count)
@@ -829,29 +828,14 @@ def main():
 
     # summaries
     with tf.name_scope("inputs_summary"):
-        #summary_inputs = tf.image.convert_image_dtype(converted_inputs,
-        #                                              dtype=tf.float32)
-        #tf.summary.image("inputs", summary_inputs)
         tf.summary.image("inputs", inputs)
     with tf.name_scope("objects_summary"):
-        #summary_inputs = tf.image.convert_image_dtype(converted_inputs,
-        #                                              dtype=tf.float32)
-        #tf.summary.image("inputs", summary_inputs)
         tf.summary.image("objects", objects)
     with tf.name_scope("targets_summary"):
-        #summary_targets = tf.image.convert_image_dtype(converted_targets,
-        #                                               dtype=tf.float32)
-        #tf.summary.image("targets", summary_targets)
         tf.summary.image("targets", targets)
     with tf.name_scope("outputs_summary"):
-        #summary_outputs = tf.image.convert_image_dtype(converted_outputs,
-        #                                               dtype=tf.float32)
-        #tf.summary.image("outputs", summary_outputs)
         tf.summary.image("outputs", outputs)
     with tf.name_scope("combined_outputs_summary"):
-        #summary_outputs = tf.image.convert_image_dtype(converted_outputs,
-        #                                               dtype=tf.float32)
-        #tf.summary.image("outputs", summary_outputs)
         tf.summary.image("combined_outputs", combined_outputs)
     with tf.name_scope("predict_real_summary"):
         tf.summary.image("predict_real",
