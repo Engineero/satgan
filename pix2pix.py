@@ -721,7 +721,7 @@ def main():
                 create_generator(gen_input, a.n_channels)
             )
         output_image = tf.image.convert_image_dtype(batch_output, dtype=tf.float32)[0]
-        output_image = output_image + input_norm
+        output_image = output_image + input_norm[0]
         if a.output_filetype == "png":
             output_image = tf.image.convert_image_dtype(output_image, dtype=tf.uint16)
             output_data = tf.image.encode_png(output_image)
