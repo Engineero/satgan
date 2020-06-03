@@ -714,15 +714,14 @@ def main():
         input_image = tf.image.convert_image_dtype(input_image, dtype=tf.float32)
         input_image.set_shape([a.crop_size, a.crop_size, a.n_channels])
         batch_input = tf.expand_dims(input_image, axis=0)
+        input_norm, gen_input = preprocess(batch_input, add_noise=True)
 
         with tf.variable_scope("generator"):
             batch_output = deprocess(
-                create_generator(
-                    preprocess(batch_input, add_noise=True),
-                    a.n_channels
-                )
+                create_generator(gen_input, a.n_channels)
             )
         output_image = tf.image.convert_image_dtype(batch_output, dtype=tf.float32)[0]
+        output_image = output_image + input_norm
         if a.output_filetype == "png":
             output_data = tf.image.encode_png(output_image)
         elif a.output_filetype == "jpeg":
