@@ -565,7 +565,7 @@ def create_model(inputs, objects, targets):
 
         return layers[-1]
 
-    with tf.variable_scope("generator"):
+    with tf.variable_scope("generator", reuse=tf.AUTO_REUSE):
         out_channels = int(targets.get_shape()[-1])
         outputs = create_generator(inputs, out_channels)
 
@@ -716,7 +716,7 @@ def main():
         batch_input = tf.expand_dims(input_image, axis=0)
         input_norm, gen_input = preprocess(batch_input, add_noise=True)
 
-        with tf.variable_scope("generator"):
+        with tf.variable_scope("generator", reuse=tf.AUTO_REUSE):
             batch_output = deprocess(
                 create_generator(gen_input, a.n_channels)
             )
