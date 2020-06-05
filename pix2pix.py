@@ -616,7 +616,7 @@ def main(a):
         loss_list = [calc_generator_loss, calc_discriminator_loss, calc_task_loss]
         loss_weights = [a.gen_weight, a.dsc_weight, a.task_weight]
     else:
-        optimizer_list = [Adam(learning_rate=1e-4), amsgrad=a.ams_grad]
+        optimizer_list = [Adam(learning_rate=1e-4, amsgrad=a.ams_grad)]
         loss_list = [compute_total_loss]
         loss_weights = None
 
