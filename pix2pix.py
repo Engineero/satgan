@@ -545,15 +545,14 @@ def main(a):
             discrim_fake = model_outputs[1][1]
             discrim_fake = tf.reshape(discrim_fake,
                                       [discrim_fake.shape[0], -1, 2])
-            targets_fake = tf.ones(shape=discrim_fake.shape[:-1])
+            targets_ones = tf.ones(shape=discrim_fake.shape[:-1])
+            targets_zeros = tf.zeros(shape=discrim_fake.shape[:-1])
             targets = model_inputs[1]
-            # gen_loss_GAN = tf.reduce_mean(
-            #     -tf.math.log(discrim_fake + EPS)
-            # )
             gen_loss_GAN = tf.reduce_mean(
-                tf.keras.losses.sparse_categorical_crossentropy(
-                    targets_fake,
+                tf.keras.losses.categorical_crossentropy(
+                    tf.stack([targets_zeros, targets_ones], axis=-1),
                     discrim_fake,
+                    label_smoothing=0.1,
                 )
             )
             gen_loss_L1 = tf.reduce_mean(mean_absolute_error(targets,
