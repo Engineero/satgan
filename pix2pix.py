@@ -508,18 +508,20 @@ def main(a):
             predict_fake = discrim_outputs[1]
             predict_real = tf.reshape(predict_real, [predict_real.shape[0], -1, 2])
             predict_fake = tf.reshape(predict_fake, [predict_fake.shape[0], -1, 2])
-            targets_real = tf.ones(shape=predict_real.shape[:-1])
-            targets_fake = tf.zeros(shape=predict_fake.shape[:-1])
+            targets_one = tf.ones(shape=predict_real.shape[:-1])
+            targets_zero = tf.zeros(shape=predict_fake.shape[:-1])
             real_loss = tf.math.reduce_mean(
-                tf.keras.losses.sparse_categorical_crossentropy(
-                    targets_real,
+                tf.keras.losses.categorical_crossentropy(
+                    tf.stack([targets_zero, targets_one], axis=-1),
                     predict_real,
+                    label_smoothing=0.1,
                 )
             )
             fake_loss = tf.math.reduce_mean(
-                tf.keras.losses.sparse_categorical_crossentropy(
-                    targets_fake,
+                tf.keras.losses.categorical_crossentropy(
+                    tf.stack([targets_one, targets_zero], axis=-1),
                     predict_fake,
+                    label_smoothing=0.1,
                 )
             )
             discrim_loss = real_loss + fake_loss
