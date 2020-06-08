@@ -53,8 +53,8 @@ def preprocess(image, add_noise=False):
         result = tf.image.per_image_standardization(image)
         if add_noise:
             noise = tf.random.normal(shape=tf.shape(image), mean=0.0,
-                                     stddev=0.5, dtype=tf.float32)
-            result += noise
+                                     stddev=1.0, dtype=tf.float32)
+            return (result, noise)
         return result
 
 
@@ -94,11 +94,9 @@ def _parse_example(serialized_example, a):
     a_image = tf.sparse.to_dense(example['a_raw'], default_value='')
     a_image = tf.io.decode_raw(a_image, tf.uint16)
     a_image = tf.reshape(a_image, [-1, height[0], width[0], 1])
-    a_image = preprocess(a_image, add_noise=True)
     b_image = tf.sparse.to_dense(example['b_raw'], default_value='')
     b_image = tf.io.decode_raw(b_image, tf.uint16)
     b_image = tf.reshape(b_image, [-1, height[0], width[0], 1])
-    b_image = preprocess(b_image, add_noise=False)
 
     # Package things up for output.
     objects = tf.stack([xcenter, ycenter], axis=-1)
@@ -109,14 +107,15 @@ def _parse_example(serialized_example, a):
     objects = tf.pad(tensor=objects, paddings=paddings, constant_values=-1.0)
     objects = tf.tile(objects, [1, a.num_pred_layers, 1])
 
-    # TODO (NLT): either mask these bboxes to 64x64 images or figure out how to
-    # get 100 bboxes per task net output...
-
     # task_targets = (objects, width, height)
     if a.which_direction == 'AtoB':
-        return ((a_image, b_image), (b_image, 0, objects))
+        a_image, gen_input = preprocess(a_image, add_noise=True)
+        b_image = preprocess(b_image, add_noise=False)
+        return ((a_image, gen_input, b_image), (b_image, 0, objects))
     else:
-        return ((b_image, a_image), (a_image, 0, objects))
+        b_image, gen_input = preprocess(b_image, add_noise=True)
+        a_image = preprocess(a_image, add_noise=False)
+        return ((b_image, gen_input, a_image), (a_image, 0, objects))
 
 
 def load_examples(a):
@@ -351,18 +350,23 @@ def create_task_net(a, input_shape):
 
 
 def create_model(a, train_data):
-    (inputs, targets), (_, _, task_targets) = next(iter(train_data))
+    (inputs, noise, targets), (_, _, task_targets) = next(iter(train_data))
     input_shape = inputs.shape.as_list()[1:]  # don't give Input the batch dim
+    noise_shape = noise.shape.as_list()[1:]
     target_shape = targets.shape.as_list()[1:]
     task_targets_shape = task_targets.shape.as_list()[1:]
     inputs = Input(input_shape)
+    noise = Input(noise_shape)
     targets = Input(target_shape)
     task_targets = Input(task_targets_shape)
     with tf.name_scope("generator"):
         out_channels = target_shape[-1]
         generator = create_generator(a, input_shape, out_channels)
         print(f'Generator model summary:\n{generator.summary()}')
-        fake_img = generator(inputs)
+        gen_noise = generator(noise)
+        fake_img = gen_noise + inputs
+        gen_outputs = tf.stack([fake_img, gen_noise], axis=0,
+                               name='generator')
 
     # Create two copies of the task network, one for real images (targets
     # input to this method) and one for generated images (outputs from
@@ -387,8 +391,8 @@ def create_model(a, train_data):
         discrim_outputs = tf.stack([predict_real, predict_fake], axis=0,
                                    name='discriminator')
 
-    model = Model(inputs=[inputs, targets],
-                  outputs=[fake_img, discrim_outputs, task_outputs])
+    model = Model(inputs=[inputs, noise, targets],
+                  outputs=[gen_outputs, discrim_outputs, task_outputs])
 
     # Plot the sub-models and overall model.
     if a.plot_models:
@@ -467,11 +471,11 @@ def main(a):
                                                             loss_function_list,
                                                             loss_weight_list):
                     with tf.GradientTape() as tape:
-                        (inputs, targets), (_, _, task_targets) = data
-                        fake_img, discrim_outputs, task_outputs = \
-                            model([inputs, targets])
-                        model_inputs = (inputs, targets, task_targets)
-                        model_outputs = (fake_img,
+                        (inputs, noise, targets), (_, _, task_targets) = data
+                        gen_outputs, discrim_outputs, task_outputs = \
+                            model([inputs, noise, targets])
+                        model_inputs = (inputs, targets, task_targets, noise)
+                        model_outputs = (gen_outputs,
                                          discrim_outputs,
                                          task_outputs)
                         loss = weight * loss_function(model_inputs,
@@ -483,11 +487,11 @@ def main(a):
                 for optimizer, loss_function in zip(optimizer_list,
                                                     loss_function_list):
                     with tf.GradientTape() as tape:
-                        (inputs, targets), (_, _, task_targets) = data
-                        fake_img, discrim_outputs, task_outputs = \
-                            model([inputs, targets])
-                        model_inputs = (inputs, targets, task_targets)
-                        model_outputs = (fake_img,
+                        (inputs, noise, targets), (_, _, task_targets) = data
+                        gen_outputs, discrim_outputs, task_outputs = \
+                            model([inputs, noise, targets])
+                        model_inputs = (inputs, targets, task_targets, noise)
+                        model_outputs = (gen_outputs,
                                          discrim_outputs,
                                          task_outputs)
                         loss = loss_function(model_inputs,
@@ -541,7 +545,7 @@ def main(a):
         def calc_generator_loss(model_inputs, model_outputs, step):
             # predict_fake => 1
             # abs(targets - outputs) => 0
-            fake_img = model_outputs[0]
+            fake_img = model_outputs[0][0]
             discrim_fake = model_outputs[1][1]
             discrim_fake = tf.reshape(discrim_fake,
                                       [discrim_fake.shape[0], -1, 2])
@@ -637,23 +641,33 @@ def main(a):
                 # Save summary images, statistics.
                 if batch_num % a.summary_freq == 0:
                     print(f'Writing outputs for batch {batch_num}.')
-                    (inputs, targets), (_, _, task_targets) = batch
-                    fake_img, discrim_outputs, task_outputs = model([inputs, targets])
-                    model_inputs = (inputs, targets, task_targets)
-                    model_outputs = (fake_img, discrim_outputs, task_outputs)
+                    (inputs, noise, targets), (_, _, task_targets) = batch
+                    gen_outputs, discrim_outputs, task_outputs = model([inputs, noise, targets])
+                    model_inputs = (inputs, targets, task_targets, noise)
+                    model_outputs = (gen_outputs, discrim_outputs, task_outputs)
                     tf.summary.image(
                         name='fake_image',
-                        data=fake_img,
+                        data=gen_outputs[0],
+                        step=batches_seen,
+                    )
+                    tf.summary.image(
+                        name='generated_noise',
+                        data=gen_outputs[1],
                         step=batches_seen,
                     )
                     tf.summary.image(
                         name='blank_image',
-                        data=batch[0][0],
+                        data=inputs,
+                        step=batches_seen,
+                    )
+                    tf.summary.image(
+                        name='input_noise',
+                        data=noise,
                         step=batches_seen,
                     )
                     tf.summary.image(
                         name='target_image',
-                        data=batch[0][1],
+                        data=targets,
                         step=batches_seen,
                     )
                     tf.summary.image(
@@ -695,7 +709,7 @@ def main(a):
                         colors=np.array([[1., 0., 0.]])
                     )
                     generated_bboxes = tf.image.draw_bounding_boxes(
-                        images=tf.image.grayscale_to_rgb(fake_img),
+                        images=tf.image.grayscale_to_rgb(gen_outputs[0]),
                         boxes=bboxes_fake,
                         colors=np.array([[0., 1., 0.]])
                     )
@@ -746,11 +760,11 @@ def main(a):
             for m in mean_list:
                 m.reset_states()
             for batch in val_data:
-                (inputs, targets), (_, _, task_targets) = batch
-                fake_img, discrim_outputs, task_outputs = model([inputs,
-                                                                 targets])
+                (inputs, noise, targets), (_, _, task_targets) = batch
+                gen_outputs, discrim_outputs, task_outputs = model([inputs,
+                                                                    targets])
                 model_inputs = (inputs, targets, task_targets)
-                model_outputs = (fake_img, discrim_outputs, task_outputs)
+                model_outputs = (gen_outputs, discrim_outputs, task_outputs)
 
                 total_loss, discrim_loss, gen_loss, task_loss = \
                     compute_total_loss(model_inputs,
@@ -792,11 +806,11 @@ def main(a):
         for m in mean_list:
             m.reset_states()
         for batch in test_data:
-            (inputs, targets), (_, _, task_targets) = batch
-            fake_img, discrim_outputs, task_outputs = model([inputs,
-                                                             targets])
+            (inputs, noise, targets), (_, _, task_targets) = batch
+            gen_outputs, discrim_outputs, task_outputs = model([inputs,
+                                                                targets])
             model_inputs = (inputs, targets, task_targets)
-            model_outputs = (fake_img, discrim_outputs, task_outputs)
+            model_outputs = (gen_outputs, discrim_outputs, task_outputs)
 
             total_loss, discrim_loss, gen_loss, task_loss = \
                 compute_total_loss(model_inputs,
