@@ -88,7 +88,7 @@ def _parse_example(serialized_example, a):
     ycenter = tf.cast(tf.sparse.to_dense(example['ycenter']), tf.float32)
     # ymin = tf.cast(tf.sparse.to_dense(example['ymin']), tf.float32)
     # ymax = tf.cast(tf.sparse.to_dense(example['ymax']), tf.float32)
-    # classes = tf.cast(tf.sparse.to_dense(example['classes']), tf.float32)
+    classes = tf.cast(tf.sparse.to_dense(example['classes']), tf.float32)
 
     # Parse images and preprocess.
     a_image = tf.sparse.to_dense(example['a_raw'], default_value='')
@@ -99,12 +99,12 @@ def _parse_example(serialized_example, a):
     b_image = tf.reshape(b_image, [-1, height[0], width[0], 1])
 
     # Package things up for output.
-    objects = tf.stack([xcenter, ycenter], axis=-1)
+    objects = tf.stack([xcenter, ycenter, classes], axis=-1)
     # Need to pad objects to max inferences (not all images will have same
     # number of objects).
     paddings = tf.constant([[0, 0], [0, a.max_inferences], [0, 0]])
     paddings = paddings - (tf.constant([[0, 0], [0, 1], [0, 0]]) * tf.shape(objects)[1])
-    objects = tf.pad(tensor=objects, paddings=paddings, constant_values=-1.0)
+    objects = tf.pad(tensor=objects, paddings=paddings, constant_values=0.)
     objects = tf.tile(objects, [1, a.num_pred_layers, 1])
 
     # task_targets = (objects, width, height)
@@ -575,25 +575,26 @@ def main(a):
     with tf.name_scope('task_loss'):
         @tf.function
         def calc_task_loss(model_inputs, model_outputs, step):
-            # task_targets are [xcenter, ycenter]
+            # task_targets are [xcenter, ycenter, class]
             task_targets = model_inputs[2]
             task_outputs = model_outputs[2]
-            target_sum = tf.math.reduce_sum(tf.math.abs(task_targets + 1.), axis=-1)
-            bool_mask = (target_sum != 0)
+            # target_sum = tf.math.reduce_sum(tf.math.abs(task_targets + 1.), axis=-1)
+            # bool_mask = (target_sum != 0)
+            bool_mask = (task_targets[..., -1] != 0)
             num_indices = tf.cast(len(tf.where(bool_mask)), dtype=tf.float32)
             xy_loss = tf.reduce_sum(tf.where(
                 bool_mask,
                 tf.math.reduce_mean(
-                    tf.math.square(task_targets - task_outputs[0]),
+                    tf.math.square(task_targets[..., :-1] - task_outputs[0]),
                     axis=-1
                 ),
                 tf.zeros_like(bool_mask, dtype=tf.float32)
             ))
-            xy_loss = xy_loss / tf.math.maximum(1., num_indices)
+            xy_loss = xy_loss / tf.math.maximum(1., num_indices)  # average
             xy_loss_fake = tf.reduce_sum(tf.where(
                 bool_mask,
                 tf.math.reduce_mean(
-                    tf.math.square(task_targets - task_outputs[1]),
+                    tf.math.square(task_targets[..., :-1] - task_outputs[1]),
                     axis=-1
                 ),
                 tf.zeros_like(bool_mask, dtype=tf.float32)
