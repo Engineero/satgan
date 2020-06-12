@@ -357,7 +357,7 @@ def create_task_net(a, input_shape):
         pred_class = tf.reshape(pred_class, (-1, a.max_inferences,
                                              a.num_classes))
         pred_class = tf.nn.softmax(pred_class)
-        prediction = tf.stack([pred_xy, pred_class], axis=-1)
+        prediction = tf.concat([pred_xy, pred_class], axis=-1)
         pred_list.append(prediction)
 
     # Combine outputs together.
@@ -607,7 +607,7 @@ def main(a):
                 bool_mask,
                 tf.math.reduce_mean(
                     tf.math.square(
-                        task_targets[..., :-1] - task_outputs[0, ..., 0]
+                        task_targets[..., :-1] - task_outputs[0, ..., 0:2]
                     ),
                     axis=-1
                 ),
@@ -615,7 +615,7 @@ def main(a):
             ))
             obj_loss = tf.math.reduce_mean(
                 categorical_crossentropy(target_classes,
-                                         task_outputs[0, ..., -1])
+                                         task_outputs[0, ..., 2:])
             )
             xy_loss = xy_loss / tf.math.maximum(1., num_indices)  # average
             obj_loss = obj_loss / tf.math.maximum(1., num_indices)
@@ -623,7 +623,7 @@ def main(a):
                 bool_mask,
                 tf.math.reduce_mean(
                     tf.math.square(
-                        task_targets[..., :-1] - task_outputs[1, ..., 0]
+                        task_targets[..., :-1] - task_outputs[1, ..., 0:2]
                     ),
                     axis=-1
                 ),
@@ -631,7 +631,7 @@ def main(a):
             ))
             obj_loss_fake = tf.math.reduce_mean(
                 categorical_crossentropy(target_classes,
-                                         task_outputs[1, ..., -1])
+                                         task_outputs[1, ..., 2:])
             )
             xy_loss_fake = xy_loss_fake / tf.math.maximum(1., num_indices)
             obj_loss_fake = obj_loss_fake / tf.math.maximum(1., num_indices)
