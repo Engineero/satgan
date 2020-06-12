@@ -723,6 +723,7 @@ def main(a):
                     # Create object bboxes and summarize task outputs, targets
                     real_detects = task_outputs[0]
                     fake_detects = task_outputs[1]
+                    true_mask = tf.where(task_targets[..., -1] != 0)
                     true_bboxes = tf.stack([task_targets[..., 1] - 0.02,
                                             task_targets[..., 0] - 0.02,
                                             task_targets[..., 1] + 0.02,
@@ -737,22 +738,22 @@ def main(a):
                                             fake_detects[..., 0] + 0.02], axis=-1)
                     target_bboxes = tf.image.draw_bounding_boxes(
                         images=tf.image.grayscale_to_rgb(targets),
-                        boxes=bboxes_real,
+                        boxes=bboxes_real[true_mask],
                         colors=np.array([[0., 1., 0.]])
                     )
                     target_bboxes = tf.image.draw_bounding_boxes(
                         images=target_bboxes,
-                        boxes=true_bboxes,
+                        boxes=true_bboxes[true_mask],
                         colors=np.array([[1., 0., 0.]])
                     )
                     generated_bboxes = tf.image.draw_bounding_boxes(
                         images=tf.image.grayscale_to_rgb(gen_outputs[0]),
-                        boxes=bboxes_fake,
+                        boxes=bboxes_fake[true_mask],
                         colors=np.array([[0., 1., 0.]])
                     )
                     generated_bboxes = tf.image.draw_bounding_boxes(
                         images=generated_bboxes,
-                        boxes=true_bboxes,
+                        boxes=true_bboxes[true_mask],
                         colors=np.array([[1., 0., 0.]])
                     )
 
