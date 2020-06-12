@@ -614,10 +614,10 @@ def main(a):
             ))
             obj_loss = tf.math.reduce_mean(
                 categorical_crossentropy(target_classes,
-                                         task_outputs[0, ..., 2:])
+                                         task_outputs[0, ..., 2:],
+                                         label_smoothing=0.1)
             )
-            xy_loss = xy_loss / tf.math.maximum(1., num_indices)  # average
-            obj_loss = obj_loss / tf.math.maximum(1., num_indices)
+            # xy_loss = xy_loss / tf.math.maximum(1., num_indices)  # average
             xy_loss_fake = tf.reduce_sum(tf.where(
                 bool_mask,
                 tf.math.reduce_mean(
@@ -630,10 +630,10 @@ def main(a):
             ))
             obj_loss_fake = tf.math.reduce_mean(
                 categorical_crossentropy(target_classes,
-                                         task_outputs[1, ..., 2:])
+                                         task_outputs[1, ..., 2:],
+                                         label_smoothing=0.1)
             )
-            xy_loss_fake = xy_loss_fake / tf.math.maximum(1., num_indices)
-            obj_loss_fake = obj_loss_fake / tf.math.maximum(1., num_indices)
+            # xy_loss_fake = xy_loss_fake / tf.math.maximum(1., num_indices)
             task_loss = xy_loss + xy_loss_fake + obj_loss + obj_loss_fake
 
             # Write summaries.
