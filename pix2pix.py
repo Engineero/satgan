@@ -23,7 +23,7 @@ from tensorflow.keras.activations import tanh
 from tensorflow.keras.models import Model, load_model
 from tensorflow.keras.regularizers import l1_l2
 from tensorflow.keras.losses import (mean_squared_error, mean_absolute_error,
-                                     binary_crossentropy)
+                                     categorical_crossentropy)
 from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint
 from tensorflow.keras.utils import plot_model
 from tensorflow.keras.optimizers import Adam, SGD
@@ -319,11 +319,12 @@ def create_task_net(a, input_shape):
         Task network (detection) model.
     """
 
-    xy_list = []
+    pred_list = []
     # Feature pyramid network or darknet or something with res blocks.
     model = build_darknet_model(input_shape)
     # Predictor heads for object centroid, width, height.
     for _, output in zip(range(a.num_pred_layers), model.outputs):
+        # Predict the object centroid.
         pred_xy = Conv2D(
             filters=2*a.max_inferences,
             kernel_size=1,
@@ -338,15 +339,34 @@ def create_task_net(a, input_shape):
         )(output)
         pred_xy = GlobalAveragePooling2D()(pred_xy)
         pred_xy = tf.reshape(pred_xy, (-1, a.max_inferences, 2))
-        xy_list.append(pred_xy)
+
+        # Predict the class of the object. 0 is no object.
+        pred_class = Conv2D(
+            filters=a.num_classes*a.max_inferences,
+            kernel_size=1,
+            strides=1,
+            padding='same',
+            kernel_initializer='he_normal',
+            activation='sigmoid',
+            kernel_regularizer=l1_l2(a.l1_reg_kernel,
+                                     a.l2_reg_kernel),
+            bias_regularizer=l1_l2(a.l1_reg_bias,
+                                   a.l2_reg_bias)
+        )(output)
+        pred_class = GlobalAveragePooling2D()(pred_class)
+        pred_class = tf.reshape(pred_class, (-1, a.max_inferences,
+                                             a.num_classes))
+        pred_class = tf.nn.softmax(pred_class)
+        prediction = tf.stack([pred_xy, pred_class], axis=-1)
+        pred_list.append(prediction)
 
     # Combine outputs together.
     if a.num_pred_layers > 1 and len(model.outputs) > 1:
         # pred_xy = tf.stack(xy_list, axis=-1, name='stack_xy')
-        pred_xy = tf.concat(xy_list, axis=1, name='concat_xy')
+        predict = tf.concat(pred_list, axis=1, name='concat_xy')
     else:
-        pred_xy = tf.expand_dims(xy_list[0], axis=-1)
-    return Model(inputs=model.input, outputs=pred_xy, name='task_net')
+        predict = tf.expand_dims(pred_list[0], axis=-1)
+    return Model(inputs=model.input, outputs=predict, name='task_net')
 
 
 def create_model(a, train_data):
@@ -515,14 +535,14 @@ def main(a):
             targets_one = tf.ones(shape=predict_real.shape[:-1])
             targets_zero = tf.zeros(shape=predict_fake.shape[:-1])
             real_loss = tf.math.reduce_mean(
-                tf.keras.losses.categorical_crossentropy(
+                categorical_crossentropy(
                     tf.stack([targets_zero, targets_one], axis=-1),
                     predict_real,
                     label_smoothing=0.1,
                 )
             )
             fake_loss = tf.math.reduce_mean(
-                tf.keras.losses.categorical_crossentropy(
+                categorical_crossentropy(
                     tf.stack([targets_one, targets_zero], axis=-1),
                     predict_fake,
                     label_smoothing=0.1,
@@ -553,7 +573,7 @@ def main(a):
             targets_zeros = tf.zeros(shape=discrim_fake.shape[:-1])
             targets = model_inputs[1]
             gen_loss_GAN = tf.reduce_mean(
-                tf.keras.losses.categorical_crossentropy(
+                categorical_crossentropy(
                     tf.stack([targets_zeros, targets_ones], axis=-1),
                     discrim_fake,
                     label_smoothing=0.1,
@@ -578,6 +598,7 @@ def main(a):
             # task_targets are [xcenter, ycenter, class]
             task_targets = model_inputs[2]
             task_outputs = model_outputs[2]
+            target_classes = tf.one_hot(task_targets[..., -1], a.num_classes)
             # target_sum = tf.math.reduce_sum(tf.math.abs(task_targets + 1.), axis=-1)
             # bool_mask = (target_sum != 0)
             bool_mask = (task_targets[..., -1] != 0)
@@ -585,22 +606,42 @@ def main(a):
             xy_loss = tf.reduce_sum(tf.where(
                 bool_mask,
                 tf.math.reduce_mean(
-                    tf.math.square(task_targets[..., :-1] - task_outputs[0]),
+                    tf.math.square(
+                        task_targets[..., :-1] - task_outputs[0, ..., 0]
+                    ),
                     axis=-1
                 ),
                 tf.zeros_like(bool_mask, dtype=tf.float32)
             ))
+            obj_loss = tf.reduce_sum(tf.where(
+                bool_mask,
+                tf.math.reduce_mean(
+                    categorical_crossentropy(target_classes,
+                                             task_outputs[0, ..., -1])
+                )
+            ))
             xy_loss = xy_loss / tf.math.maximum(1., num_indices)  # average
+            obj_loss = obj_loss / tf.math.maximum(1., num_indices)
             xy_loss_fake = tf.reduce_sum(tf.where(
                 bool_mask,
                 tf.math.reduce_mean(
-                    tf.math.square(task_targets[..., :-1] - task_outputs[1]),
+                    tf.math.square(
+                        task_targets[..., :-1] - task_outputs[1, ..., 0]
+                    ),
                     axis=-1
                 ),
                 tf.zeros_like(bool_mask, dtype=tf.float32)
             ))
+            obj_loss_fake = tf.reduce_sum(tf.where(
+                bool_mask,
+                tf.math.reduce_mean(
+                    categorical_crossentropy(target_classes,
+                                             task_outputs[1, ..., -1])
+                )
+            ))
             xy_loss_fake = xy_loss_fake / tf.math.maximum(1., num_indices)
-            task_loss = xy_loss + xy_loss_fake
+            obj_loss_fake = obj_loss_fake / tf.math.maximum(1., num_indices)
+            task_loss = xy_loss + xy_loss_fake + obj_loss + obj_loss_fake
 
             # Write summaries.
             tf.summary.scalar(name='task_real_loss', data=xy_loss,
