@@ -601,12 +601,12 @@ def main(a):
             target_classes = tf.one_hot(tf.cast(task_targets[..., -1], tf.int32),
                                         a.num_classes)
             bool_mask = (task_targets[..., -1] != 0)
-            num_indices = tf.cast(len(tf.where(bool_mask)), dtype=tf.float32)
+            # num_indices = tf.cast(len(tf.where(bool_mask)), dtype=tf.float32)
             xy_loss = tf.reduce_sum(tf.where(
                 bool_mask,
                 tf.math.reduce_mean(
                     tf.math.square(
-                        task_targets[..., :-1] - task_outputs[0, ..., 0:2]
+                        task_targets[..., :-1] - task_outputs[0, ..., :2]
                     ),
                     axis=-1
                 ),
@@ -622,7 +622,7 @@ def main(a):
                 bool_mask,
                 tf.math.reduce_mean(
                     tf.math.square(
-                        task_targets[..., :-1] - task_outputs[1, ..., 0:2]
+                        task_targets[..., :-1] - task_outputs[1, ..., :2]
                     ),
                     axis=-1
                 ),
