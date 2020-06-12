@@ -637,9 +637,13 @@ def main(a):
             task_loss = xy_loss + xy_loss_fake + obj_loss + obj_loss_fake
 
             # Write summaries.
-            tf.summary.scalar(name='task_real_loss', data=xy_loss,
+            tf.summary.scalar(name='task_real_xy_loss', data=xy_loss,
                               step=step)
-            tf.summary.scalar(name='task_fake_loss', data=xy_loss_fake,
+            tf.summary.scalar(name='task_fake_xy_loss', data=xy_loss_fake,
+                              step=step)
+            tf.summary.scalar(name='task_real_class_loss', data=obj_loss,
+                              step=step)
+            tf.summary.scalar(name='task_fake_class_loss', data=obj_loss_fake,
                               step=step)
             tf.summary.scalar(name='task_loss', data=task_loss,
                               step=step)
