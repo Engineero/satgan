@@ -600,8 +600,6 @@ def main(a):
             task_outputs = model_outputs[2]
             target_classes = tf.one_hot(tf.cast(task_targets[..., -1], tf.int32),
                                         a.num_classes)
-            # target_sum = tf.math.reduce_sum(tf.math.abs(task_targets + 1.), axis=-1)
-            # bool_mask = (target_sum != 0)
             bool_mask = (task_targets[..., -1] != 0)
             num_indices = tf.cast(len(tf.where(bool_mask)), dtype=tf.float32)
             xy_loss = tf.reduce_sum(tf.where(
@@ -723,11 +721,13 @@ def main(a):
                     # Create object bboxes and summarize task outputs, targets
                     real_detects = task_outputs[0]
                     fake_detects = task_outputs[1]
-                    num_true = len(tf.where(task_targets[..., -1] != 0))
-                    real_detects = real_detects[..., :num_true, :]
-                    fake_detects = fake_detects[..., :num_true, :]
-                    true_detects = task_targets[..., :num_true, :]
-                    print(f'shape of real detects: {real_detects.shape}')
+                    true_detects = task_targets
+                    real_detects = tf.where(real_detects[..., -1] > a.obj_threshold,
+                                            real_detects,
+                                            tf.zeros_like(real_detects))
+                    fake_detects = tf.where(fake_detects[..., -1] > a.obj_threshold,
+                                            fake_detects,
+                                            tf.zeros_like(fake_detects))
                     true_bboxes = tf.stack([true_detects[..., 1] - 0.02,
                                             true_detects[..., 0] - 0.02,
                                             true_detects[..., 1] + 0.02,
@@ -980,6 +980,8 @@ if __name__ == '__main__':
                         help='Whether to use separate optimizers for each loss.')
     parser.add_argument('--ams_grad', default=False, action='store_true',
                         help='Whether to use AMS Grad variant of Adam optimizer.')
+    parser.add_argument('--obj_threshold', type=float, default=0.5,
+                        help='Objectness threshold, under which a detection is ignored.')
 
     # export options
     parser.add_argument("--output_filetype", default="png",
