@@ -723,10 +723,11 @@ def main(a):
                     # Create object bboxes and summarize task outputs, targets
                     real_detects = task_outputs[0]
                     fake_detects = task_outputs[1]
-                    true_mask = tf.where(task_targets[..., -1] != 0)
-                    real_detects = tf.boolean_mask(real_detects, true_mask)
-                    fake_detects = tf.boolean_mask(fake_detects, true_mask)
-                    true_detects = tf.boolean_mask(task_targets, true_mask)
+                    num_true = len(tf.where(task_targets[..., -1] != 0))
+                    real_detects = real_detects[..., :num_true, :]
+                    fake_detects = fake_detects[..., :num_true, :]
+                    true_detects = task_targets[..., :num_true, :]
+                    print(f'shape of real detects: {real_detects.shape}')
                     true_bboxes = tf.stack([true_detects[..., 1] - 0.02,
                                             true_detects[..., 0] - 0.02,
                                             true_detects[..., 1] + 0.02,
