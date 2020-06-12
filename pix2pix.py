@@ -724,10 +724,13 @@ def main(a):
                     real_detects = task_outputs[0]
                     fake_detects = task_outputs[1]
                     true_mask = tf.where(task_targets[..., -1] != 0)
-                    true_bboxes = tf.stack([task_targets[..., 1] - 0.02,
-                                            task_targets[..., 0] - 0.02,
-                                            task_targets[..., 1] + 0.02,
-                                            task_targets[..., 0] + 0.02], axis=-1)
+                    real_detects = tf.boolean_mask(real_detects, true_mask)
+                    fake_detects = tf.boolean_mask(fake_detects, true_mask)
+                    true_detects = tf.boolean_mask(task_targets, true_mask)
+                    true_bboxes = tf.stack([true_detects[..., 1] - 0.02,
+                                            true_detects[..., 0] - 0.02,
+                                            true_detects[..., 1] + 0.02,
+                                            true_detects[..., 0] + 0.02], axis=-1)
                     bboxes_real = tf.stack([real_detects[..., 1] - 0.02,
                                             real_detects[..., 0] - 0.02,
                                             real_detects[..., 1] + 0.02,
@@ -738,22 +741,22 @@ def main(a):
                                             fake_detects[..., 0] + 0.02], axis=-1)
                     target_bboxes = tf.image.draw_bounding_boxes(
                         images=tf.image.grayscale_to_rgb(targets),
-                        boxes=tf.boolean_mask(bboxes_real, true_mask),
+                        boxes=bboxes_real,
                         colors=np.array([[0., 1., 0.]])
                     )
                     target_bboxes = tf.image.draw_bounding_boxes(
                         images=target_bboxes,
-                        boxes=tf.boolean_mask(true_bboxes, true_mask),
+                        boxes=true_bboxes,
                         colors=np.array([[1., 0., 0.]])
                     )
                     generated_bboxes = tf.image.draw_bounding_boxes(
                         images=tf.image.grayscale_to_rgb(gen_outputs[0]),
-                        boxes=tf.boolean_mask(bboxes_fake, true_mask),
+                        boxes=bboxes_fake,
                         colors=np.array([[0., 1., 0.]])
                     )
                     generated_bboxes = tf.image.draw_bounding_boxes(
                         images=generated_bboxes,
-                        boxes=tf.boolean_mask(true_bboxes, true_mask),
+                        boxes=true_bboxes,
                         colors=np.array([[1., 0., 0.]])
                     )
 
