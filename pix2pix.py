@@ -598,7 +598,8 @@ def main(a):
             # task_targets are [xcenter, ycenter, class]
             task_targets = model_inputs[2]
             task_outputs = model_outputs[2]
-            target_classes = tf.one_hot(task_targets[..., -1], a.num_classes)
+            target_classes = tf.one_hot(tf.cast(task_targets[..., -1], tf.int32),
+                                        a.num_classes)
             # target_sum = tf.math.reduce_sum(tf.math.abs(task_targets + 1.), axis=-1)
             # bool_mask = (target_sum != 0)
             bool_mask = (task_targets[..., -1] != 0)
