@@ -722,10 +722,20 @@ def main(a):
                     real_detects = task_outputs[0]
                     fake_detects = task_outputs[1]
                     true_detects = task_targets
-                    real_detects = tf.where(real_detects[..., -1] > a.obj_threshold,
+                    real_mask = tf.tile(
+                        tf.expand_dims(real_detects[..., -1] > a.obj_threshold,
+                                       axis=-1),
+                        [1, 1, 2+a.num_classes]
+                    )
+                    fake_mask = tf.tile(
+                        tf.expand_dims(fake_detects[..., -1] > a.obj_threshold,
+                                       axis=-1),
+                        [1, 1, 2+a.num_classes]
+                    )
+                    real_detects = tf.where(real_mask,
                                             real_detects,
                                             tf.zeros_like(real_detects))
-                    fake_detects = tf.where(fake_detects[..., -1] > a.obj_threshold,
+                    fake_detects = tf.where(fake_mask,
                                             fake_detects,
                                             tf.zeros_like(fake_detects))
                     true_bboxes = tf.stack([true_detects[..., 1] - 0.02,
