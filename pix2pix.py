@@ -235,14 +235,13 @@ def create_generator(a, input_shape, generator_outputs_channels):
     """
 
     x_in = Input(shape=input_shape)
-    num_blocks = 8
     num_filters = a.ngf
     # encoder_1: [batch, 256, 256, in_channels] => [batch, 128, 128, ngf]
     with tf.name_scope("generator"):
         skip_layers = []
         x = ops.down_resblock(x_in, filters=num_filters, sn=a.spec_norm,
                               scope='front_down_resblock_0')
-        for i in range(num_blocks // 2):
+        for i in range(a.n_blocks_gen // 2):
             x = ops.down_resblock(x, filters=num_filters // 2, sn=a.spec_norm,
                                   scope=f'mid_down_resblock_{i}')
             num_filters = num_filters // 2
@@ -251,7 +250,7 @@ def create_generator(a, input_shape, generator_outputs_channels):
         x = google_attention(x, filters=num_filters, scope='self_attention')
 
         # Build the back end of the generator with skip connections.
-        for i in range(num_blocks // 2, num_blocks):
+        for i in range(a.n_blocks_gen // 2, a.n_blocks_gen):
             x = ops.up_resblock(Concatenate()([x, skip_layers.pop()]),
                                 filters=num_filters,
                                 sn=a.spec_norm,
@@ -277,7 +276,6 @@ def create_discriminator(a, input_shape, target_shape):
     Returns:
         Discriminator network model.
     """
-    n_layers = 3
 
     # 2x [batch, height, width, in_channels] => [batch, height, width, in_channels * 2]
     x_in = Input(shape=input_shape)
@@ -291,7 +289,7 @@ def create_discriminator(a, input_shape, target_shape):
     # layer_2: [batch, h//2, w//2, ndf] => [batch, h//4, w//4, ndf * 2]
     # layer_3: [batch, h//4, w//4, ndf * 2] => [batch, h//8, w//8, ndf * 4]
     # layer_4: [batch, h//8, w//8, ndf * 4] => [batch, h//16, w//16, ndf * 8]
-    for i in range(n_layers):
+    for i in range(a.n_layer_dsc):
         out_channels = a.ndf * min(2**(i+1), 8)
         x = ops.down_resblock(x, filters=out_channels, sn=a.spec_norm,
                               scope=f'layer_{i+1}')
@@ -303,7 +301,7 @@ def create_discriminator(a, input_shape, target_shape):
 
     # layer_5: [batch, h//16, w//16, ndf * 8] => [batch, h//16-1, w//16-1, 2]
     x = ops.down_resblock(x, filters=2, to_down=False, sn=a.spec_norm,
-                          scope=f'layer_{n_layers + 1}')
+                          scope=f'layer_{a.n_layer_dsc + 1}')
     x = tf.nn.softmax(x, name='discriminator')
 
     return Model(inputs=[x_in, y_in], outputs=x, name='discriminator')
@@ -929,6 +927,10 @@ if __name__ == '__main__':
                         help="number of images in batch")
     parser.add_argument("--which_direction", type=str, default="AtoB",
                         choices=["AtoB", "BtoA"])
+    parser.add_argument("--n_blocks_gen", type=int, default=8,
+                        help="Number of ResNet blocks in generator. Must be even.")
+    parser.add_argument("--n_layer_dsc", type=int, default=3,
+                        help="Number of layers in discriminator.")
     parser.add_argument("--ngf", type=int, default=64,
                         help="number of generator filters in first conv layer")
     parser.add_argument("--ndf", type=int, default=64,
