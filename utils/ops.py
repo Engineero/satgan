@@ -188,7 +188,8 @@ def down_resblock(x_init, filters, to_down=True, use_bias=True, sn=False,
     with tf.name_scope(scope):
         init_channel = x_init.shape.as_list()[-1]
         with tf.name_scope('res1'):
-            x = LeakyReLU()(x_init)
+            x = BatchNormalization()(x_init)
+            x = LeakyReLU()(x)
             x = conv(x,
                      filters,
                      kernel_size=(3, 3),
@@ -199,6 +200,7 @@ def down_resblock(x_init, filters, to_down=True, use_bias=True, sn=False,
                      separable=separable)
 
         with tf.name_scope('res2'):
+            x = BatchNormalization()(x)
             x = LeakyReLU()(x)
             x = conv(x,
                      filters,
