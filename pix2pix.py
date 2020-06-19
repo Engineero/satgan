@@ -293,7 +293,6 @@ def create_discriminator(a, input_shape, target_shape):
         out_channels = a.ndf * min(2**(i+1), 8)
         x = ops.down_resblock(x, filters=out_channels, sn=a.spec_norm,
                               scope=f'layer_{i+1}')
-        x = BatchNormalization()(x)
 
     # Add self attention layer before final down resblock.
     x = google_attention(x, out_channels, sn=a.spec_norm,
