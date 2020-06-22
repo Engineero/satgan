@@ -28,6 +28,7 @@ from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint
 from tensorflow.keras.utils import plot_model
 from tensorflow.keras.optimizers import Adam, SGD
 from tensorflow.keras.metrics import Mean
+from yolo_v3 import build_yolo_model, load_yolo_model_weights
 
 
 # Define globals.
@@ -390,10 +391,25 @@ def create_model(a, train_data):
     # generator). The task targets (detected objects) should be the same for
     # both.
     with tf.name_scope('task_net'):
-        task_net = create_task_net(a, input_shape)
+        if a.use_yolo:
+            task_net, task_loss, encoder = build_yolo_model(
+                base_model_name=a.base_model_name,
+                is_recurrent=a.is_recurrent,
+                num_predictor_heads=a.num_predictor_heads,
+                max_inferences_per_image=a.max_inferences_per_image,
+                max_bbox_overlap=a.max_bbox_overlap,
+                confidence_threshold=a.confidence_threshold,
+            )
+            task_net = load_yolo_model_weights(task_net,
+                                               a.checkpoint_load_path)
+            # TODO (NLT): batch task_net inputs using miss data generator, encoder?
+            pred_xy = task_net.predict(targets)
+            pred_xy_fake = task_net.predict(fake_img)
+        else:
+            task_net = create_task_net(a, input_shape)
+            pred_xy = task_net(targets)
+            pred_xy_fake = task_net(fake_img)
         print(f'Task Net model summary:\n{task_net.summary()}')
-        pred_xy = task_net(targets)
-        pred_xy_fake = task_net(fake_img)
         task_outputs = tf.stack([pred_xy, pred_xy_fake], axis=0,
                                 name='task_net')
 
@@ -420,7 +436,10 @@ def create_model(a, train_data):
 
     # Return the model. We'll define losses and a training loop back in the
     # main function.
-    return model
+    if a.use_yolo:
+        return model, task_loss
+    else:
+        return model
 
 
 def main(a):
@@ -433,7 +452,10 @@ def main(a):
     train_data, val_data, test_data = load_examples(a)
 
     # Build the model.
-    model = create_model(a, train_data)
+    if a.use_yolo:
+        model, task_loss_obj = create_model(a, train_data)
+    else:
+        model = create_model(a, train_data)
     print(f'Overall model summary:\n{model.summary()}')
 
     # Define model losses and helpers for computing and applying gradients.
@@ -595,53 +617,59 @@ def main(a):
             # task_targets are [xcenter, ycenter, class]
             task_targets = model_inputs[2]
             task_outputs = model_outputs[2]
-            target_classes = tf.one_hot(tf.cast(task_targets[..., -1], tf.int32),
-                                        a.num_classes)
-            bool_mask = (task_targets[..., -1] != 0)
-            # num_indices = tf.cast(len(tf.where(bool_mask)), dtype=tf.float32)
-            xy_loss = tf.reduce_sum(tf.where(
-                bool_mask,
-                tf.math.reduce_mean(
-                    tf.math.square(
-                        task_targets[..., :-1] - task_outputs[0, ..., :2]
-                    ),
-                    axis=-1
-                ),
-                tf.zeros_like(bool_mask, dtype=tf.float32)
-            ))
-            obj_loss = tf.math.reduce_mean(
-                categorical_crossentropy(target_classes,
-                                         task_outputs[0, ..., 2:],
-                                         label_smoothing=0.1)
-            )
-            # xy_loss = xy_loss / tf.math.maximum(1., num_indices)  # average
-            xy_loss_fake = tf.reduce_sum(tf.where(
-                bool_mask,
-                tf.math.reduce_mean(
-                    tf.math.square(
-                        task_targets[..., :-1] - task_outputs[1, ..., :2]
-                    ),
-                    axis=-1
-                ),
-                tf.zeros_like(bool_mask, dtype=tf.float32)
-            ))
-            obj_loss_fake = tf.math.reduce_mean(
-                categorical_crossentropy(target_classes,
-                                         task_outputs[1, ..., 2:],
-                                         label_smoothing=0.1)
-            )
-            # xy_loss_fake = xy_loss_fake / tf.math.maximum(1., num_indices)
-            task_loss = xy_loss + xy_loss_fake + obj_loss + obj_loss_fake
+            if a.use_yolo:
+                task_loss = task_loss_obj.compute_loss(task_targets,
+                                                       task_outputs)
+            else:
+                target_classes = tf.one_hot(tf.cast(task_targets[..., -1],
+                                                    tf.int32),
+                                            a.num_classes)
+                bool_mask = (task_targets[..., -1] != 0)
 
-            # Write summaries.
-            tf.summary.scalar(name='task_real_xy_loss', data=xy_loss,
-                              step=step)
-            tf.summary.scalar(name='task_fake_xy_loss', data=xy_loss_fake,
-                              step=step)
-            tf.summary.scalar(name='task_real_class_loss', data=obj_loss,
-                              step=step)
-            tf.summary.scalar(name='task_fake_class_loss', data=obj_loss_fake,
-                              step=step)
+                xy_loss = tf.reduce_sum(tf.where(
+                    bool_mask,
+                    tf.math.reduce_mean(
+                        tf.math.square(
+                            task_targets[..., :-1] - task_outputs[0, ..., :2]
+                        ),
+                        axis=-1
+                    ),
+                    tf.zeros_like(bool_mask, dtype=tf.float32)
+                ))
+                obj_loss = tf.math.reduce_mean(
+                    categorical_crossentropy(target_classes,
+                                             task_outputs[0, ..., 2:],
+                                             label_smoothing=0.1)
+                )
+
+                xy_loss_fake = tf.reduce_sum(tf.where(
+                    bool_mask,
+                    tf.math.reduce_mean(
+                        tf.math.square(
+                            task_targets[..., :-1] - task_outputs[1, ..., :2]
+                        ),
+                        axis=-1
+                    ),
+                    tf.zeros_like(bool_mask, dtype=tf.float32)
+                ))
+                obj_loss_fake = tf.math.reduce_mean(
+                    categorical_crossentropy(target_classes,
+                                             task_outputs[1, ..., 2:],
+                                             label_smoothing=0.1)
+                )
+
+                task_loss = xy_loss + xy_loss_fake + obj_loss + obj_loss_fake
+
+                # Write summaries.
+                tf.summary.scalar(name='task_real_xy_loss', data=xy_loss,
+                                  step=step)
+                tf.summary.scalar(name='task_fake_xy_loss', data=xy_loss_fake,
+                                  step=step)
+                tf.summary.scalar(name='task_real_class_loss', data=obj_loss,
+                                  step=step)
+                tf.summary.scalar(name='task_fake_class_loss',
+                                  data=obj_loss_fake,
+                                  step=step)
             tf.summary.scalar(name='task_loss', data=task_loss,
                               step=step)
             return task_loss
@@ -997,6 +1025,30 @@ if __name__ == '__main__':
                         help='Whether to use AMS Grad variant of Adam optimizer.')
     parser.add_argument('--obj_threshold', type=float, default=0.5,
                         help='Objectness threshold, under which a detection is ignored.')
+    parser.add_argument('--use_yolo', default=False, action='store_true',
+                        help='Whether to use existing YOLO SatNet for task network.')
+    parser.add_argument('--checkpoint_load_path', type=str,
+                        default=None,
+                        help='Path to the model checkpoint to load.')
+    parser.add_argument('--base_model_name', type=str,
+                        default="DarkNet",
+                        help='The name of the base network to be used.')
+    parser.add_argument('--num_predictor_heads', type=int,
+                        default=1,
+                        help='The number of predictor heads in the network.')
+    parser.add_argument('--max_inferences_per_image', type=int,
+                        default=20,
+                        help='Maximum number of bounding boxes to infer.')
+    parser.add_argument('--max_bbox_overlap', type=float,
+                        default=1.0,
+                        help='Maximum amount two inferred boxes can overlap.')
+    parser.add_argument('--confidence_threshold', type=float,
+                        default=0.0,
+                        help='Minimum confidence required to infer a box.')
+    parser.add_argument('--is_recurrent', action='store_true',
+                        default=False,
+                        help='Should we use a recurrent (Convolutional LSTM) '
+                             'variant of the model')
 
     # export options
     parser.add_argument("--output_filetype", default="png",
