@@ -396,7 +396,7 @@ def create_model(a, train_data):
                 base_model_name=a.base_model_name,
                 is_recurrent=a.is_recurrent,
                 num_predictor_heads=a.num_predictor_heads,
-                max_inferences_per_image=a.max_inferences_per_image,
+                max_inferences_per_image=a.max_inferences,
                 max_bbox_overlap=a.max_bbox_overlap,
                 confidence_threshold=a.confidence_threshold,
             )
@@ -1007,7 +1007,7 @@ if __name__ == '__main__':
                         help='Whether to perform spectral normalization.')
     parser.add_argument('--plot_models', default=False, action='store_true',
                         help='Whether to plot model architectures.')
-    parser.add_argument('--max_inferences', default=100, type=int,
+    parser.add_argument('--max_inferences', default=20, type=int,
                         help='Max inferences per image. Default 100.')
     parser.add_argument('--num_pred_layers', default=1, type=int,
                         help='Number of predictor layers to use in network.')
@@ -1036,9 +1036,6 @@ if __name__ == '__main__':
     parser.add_argument('--num_predictor_heads', type=int,
                         default=1,
                         help='The number of predictor heads in the network.')
-    parser.add_argument('--max_inferences_per_image', type=int,
-                        default=20,
-                        help='Maximum number of bounding boxes to infer.')
     parser.add_argument('--max_bbox_overlap', type=float,
                         default=1.0,
                         help='Maximum amount two inferred boxes can overlap.')
