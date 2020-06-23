@@ -664,8 +664,10 @@ def main(a):
             task_targets = model_inputs[2]
             task_outputs = model_outputs[2]
             if a.use_yolo:
-                task_loss = task_loss_obj.compute_loss(task_targets,
-                                                       task_outputs)
+                real_loss = task_loss_obj.compute_loss(task_targets,
+                                                       task_outputs[0])
+                fake_loss = task_loss_obj.compute_loss(task_targets,
+                                                       task_outputs[1])
             else:
                 target_classes = tf.one_hot(tf.cast(task_targets[..., -1],
                                                     tf.int32),
@@ -746,7 +748,6 @@ def main(a):
                 )
                 fake_loss = (xy_loss_fake + iou_loss_fake + obj_loss_fake +
                              class_loss_fake)
-                task_loss = real_loss + fake_loss
 
                 # Write summaries.
                 tf.summary.scalar(name='task_real_xy_loss', data=xy_loss,
@@ -766,12 +767,14 @@ def main(a):
                 tf.summary.scalar(name='task_fake_class_loss',
                                   data=class_loss_fake,
                                   step=step)
-                tf.summary.scalar(name='task_real_loss',
-                                  data=real_loss,
-                                  step=step)
-                tf.summary.scalar(name='task_fake_loss',
-                                  data=fake_loss,
-                                  step=step)
+            
+            task_loss = real_loss + fake_loss
+            tf.summary.scalar(name='task_real_loss',
+                              data=real_loss,
+                              step=step)
+            tf.summary.scalar(name='task_fake_loss',
+                              data=fake_loss,
+                              step=step)
             tf.summary.scalar(name='task_loss', data=task_loss,
                               step=step)
             return task_loss
