@@ -449,8 +449,9 @@ def create_model(a, train_data):
             task_net = load_yolo_model_weights(task_net,
                                                a.checkpoint_load_path)
             # TODO (NLT): batch task_net inputs using miss data generator, encoder?
-            pred_task = task_net.predict(targets)
-            pred_task_fake = task_net.predict(fake_img)
+            pred_task = task_net.predict(targets, batch_size=a.batch_size)
+            pred_task_fake = task_net.predict(fake_img,
+                                              batch_size=a.batch_size)
         else:
             task_net = create_task_net(a, input_shape)
             pred_task = task_net(targets)
