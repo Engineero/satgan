@@ -668,8 +668,18 @@ def main(a):
                 target_classes = tf.one_hot(tf.cast(task_targets[..., -1],
                                                     tf.int32),
                                             a.num_classes)
+                target_objects = tf.one_hot(tf.cast(task_targets[..., -2],
+                                                    tf.int32),
+                                            2)
                 bool_mask = (task_targets[..., -1] != 0)
 
+                # TODO (NLT): Calculate intersection and union.
+                # intersection = 
+                # union = 
+                # intersection_fake = 
+                # union_fake = 
+
+                # Calculate loss on real images.
                 xy_loss = tf.reduce_sum(tf.where(
                     bool_mask,
                     tf.math.reduce_mean(
@@ -681,12 +691,19 @@ def main(a):
                     tf.zeros_like(bool_mask, dtype=tf.float32)
                 ))
                 # TODO (NLT): calc IoU and use for loss...
+                obj_loss = tf.math.reduce_mean(
+                    categorical_crossentropy(target_objects,
+                                             task_outputs[0, ..., 4:6],
+                                             label_smoothing=0.1)
+                )
                 class_loss = tf.math.reduce_mean(
                     categorical_crossentropy(target_classes,
                                              task_outputs[0, ..., 6:],
                                              label_smoothing=0.1)
                 )
+                real_loss = xy_loss + obj_loss + class_loss
 
+                # Calculate loss on fake images.
                 xy_loss_fake = tf.reduce_sum(tf.where(
                     bool_mask,
                     tf.math.reduce_mean(
@@ -697,23 +714,38 @@ def main(a):
                     ),
                     tf.zeros_like(bool_mask, dtype=tf.float32)
                 ))
+                obj_loss_fake = tf.math.reduce_mean(
+                    categorical_crossentropy(target_objects,
+                                             task_outputs[1, ..., 4:6],
+                                             label_smoothing=0.1)
+                )
                 class_loss_fake = tf.math.reduce_mean(
                     categorical_crossentropy(target_classes,
                                              task_outputs[1, ..., 6:],
                                              label_smoothing=0.1)
                 )
-
-                task_loss = xy_loss + xy_loss_fake + class_loss + class_loss_fake
+                fake_loss = xy_loss_fake + obj_loss_fake + class_loss_fake
+                task_loss = real_loss + fake_loss
 
                 # Write summaries.
                 tf.summary.scalar(name='task_real_xy_loss', data=xy_loss,
                                   step=step)
                 tf.summary.scalar(name='task_fake_xy_loss', data=xy_loss_fake,
                                   step=step)
+                tf.summary.scalar(name='task_real_obj_loss', data=obj_loss,
+                                  step=step)
+                tf.summary.scalar(name='task_fake_obj_loss', data=obj_loss_fake,
+                                  step=step)
                 tf.summary.scalar(name='task_real_class_loss', data=class_loss,
                                   step=step)
                 tf.summary.scalar(name='task_fake_class_loss',
                                   data=class_loss_fake,
+                                  step=step)
+                tf.summary.scalar(name='task_real_loss',
+                                  data=real_loss,
+                                  step=step)
+                tf.summary.scalar(name='task_fake_loss',
+                                  data=fake_loss,
                                   step=step)
             tf.summary.scalar(name='task_loss', data=task_loss,
                               step=step)
