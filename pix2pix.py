@@ -691,7 +691,7 @@ def main(a):
                     output_area = (outputs[..., 2] + 1) * (outputs[..., 3] + 1)
                     iou = intersection / (target_area + output_area - 
                                           intersection)
-                    return iou
+                    return 1. - iou
 
                 # Calculate loss on real images.
                 xy_loss = tf.reduce_sum(tf.where(
