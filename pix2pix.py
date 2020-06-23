@@ -854,14 +854,14 @@ def main(a):
                     fake_detects = task_outputs[1]
                     true_detects = task_targets
                     real_mask = tf.tile(
-                        tf.expand_dims(real_detects[..., -1] > a.obj_threshold,
+                        tf.expand_dims(real_detects[..., 5] > a.obj_threshold,
                                        axis=-1),
-                        [1, 1, 6+a.num_classes]
+                        [1, 1, real_detects.shape[-1]]
                     )
                     fake_mask = tf.tile(
-                        tf.expand_dims(fake_detects[..., -1] > a.obj_threshold,
+                        tf.expand_dims(fake_detects[..., 5] > a.obj_threshold,
                                        axis=-1),
-                        [1, 1, 6+a.num_classes]
+                        [1, 1, real_detects.shape[-1]]
                     )
                     real_detects = tf.where(real_mask,
                                             real_detects,
