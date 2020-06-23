@@ -676,10 +676,38 @@ def main(a):
                 bool_mask = (task_targets[..., -1] != 0)
 
                 # TODO (NLT): Calculate intersection and union.
-                # intersection = 
-                # union = 
-                # intersection_fake = 
-                # union_fake = 
+                def calc_intersection_union(targets, outputs):
+                    intersection_xmin = tf.where(
+                        targets[..., 0] >= outputs[..., 0],
+                        targets[..., 0],
+                        outputs[..., 0]
+                    )
+                    intersection_ymin = tf.where(
+                        targets[..., 1] >= outputs[..., 1],
+                        targets[..., 1],
+                        outputs[..., 1]
+                    )
+                    target_xmax = targets[..., 0] + targets[..., 2]
+                    target_ymax = targets[..., 1] + targets[..., 3]
+                    output_xmax = outputs[..., 0] + outputs[..., 2]
+                    output_ymax = outputs[..., 1] + outputs[..., 3]
+                    intersection_xmax = tf.where(target_xmax <= output_xmax,
+                                                 target_xmax, output_xmax)
+                    intersection_ymax = tf.where(target_ymax <= output_ymax,
+                                                 target_ymax, output_ymax)
+                    intersection = (intersection_xmax - intersection_xmin) * \
+                                   (intersection_ymax - intersection_ymin)
+
+                    area_targets = targets[..., 2] * targets[..., 3]
+                    area_outputs = outputs[..., 2] * outputs[..., 3]
+                    union = area_targets + area_outputs - intersection
+                    return intersection, union
+                intersection, union = calc_intersection_union(task_targets,
+                                                              task_outputs[0])
+                intersection_fake, union_fake = calc_intersection_union(
+                    task_targets,
+                    task_outputs[1]
+                )
 
                 # Calculate loss on real images.
                 xy_loss = tf.reduce_sum(tf.where(
@@ -692,6 +720,7 @@ def main(a):
                     ),
                     tf.zeros_like(bool_mask, dtype=tf.float32)
                 ))
+                iou_loss = tf.math.reduce_mean(intersection / union)
                 # TODO (NLT): calc IoU and use for loss...
                 obj_loss = tf.math.reduce_mean(
                     categorical_crossentropy(target_objects,
@@ -703,7 +732,7 @@ def main(a):
                                              task_outputs[0, ..., 6:],
                                              label_smoothing=0.1)
                 )
-                real_loss = xy_loss + obj_loss + class_loss
+                real_loss = xy_loss + iou_loss + obj_loss + class_loss
 
                 # Calculate loss on fake images.
                 xy_loss_fake = tf.reduce_sum(tf.where(
@@ -716,6 +745,9 @@ def main(a):
                     ),
                     tf.zeros_like(bool_mask, dtype=tf.float32)
                 ))
+                iou_loss_fake = tf.math.reduce_mean(
+                    intersection_fake / union_fake
+                )
                 obj_loss_fake = tf.math.reduce_mean(
                     categorical_crossentropy(target_objects,
                                              task_outputs[1, ..., 4:6],
@@ -726,13 +758,18 @@ def main(a):
                                              task_outputs[1, ..., 6:],
                                              label_smoothing=0.1)
                 )
-                fake_loss = xy_loss_fake + obj_loss_fake + class_loss_fake
+                fake_loss = (xy_loss_fake + iou_loss_fake + obj_loss_fake +
+                             class_loss_fake)
                 task_loss = real_loss + fake_loss
 
                 # Write summaries.
                 tf.summary.scalar(name='task_real_xy_loss', data=xy_loss,
                                   step=step)
                 tf.summary.scalar(name='task_fake_xy_loss', data=xy_loss_fake,
+                                  step=step)
+                tf.summary.scalar(name='task_real_iou_loss', data=iou_loss,
+                                  step=step)
+                tf.summary.scalar(name='task_fake_iou_loss', data=iou_loss_fake,
                                   step=step)
                 tf.summary.scalar(name='task_real_obj_loss', data=obj_loss,
                                   step=step)
