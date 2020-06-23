@@ -83,13 +83,18 @@ def _parse_example(serialized_example, a):
     # Cast parsed objects into usable types.
     width = tf.cast(example['width'], tf.int32)
     height = tf.cast(example['height'], tf.int32)
-    xcenter = tf.cast(tf.sparse.to_dense(example['xcenter']), tf.float32)
-    # xmin = tf.cast(tf.sparse.to_dense(example['xmin']), tf.float32)
-    # xmax = tf.cast(tf.sparse.to_dense(example['xmax']), tf.float32)
-    ycenter = tf.cast(tf.sparse.to_dense(example['ycenter']), tf.float32)
-    # ymin = tf.cast(tf.sparse.to_dense(example['ymin']), tf.float32)
-    # ymax = tf.cast(tf.sparse.to_dense(example['ymax']), tf.float32)
+    # xcenter = tf.cast(tf.sparse.to_dense(example['xcenter']), tf.float32)
+    xmin = tf.cast(tf.sparse.to_dense(example['xmin']), tf.float32)
+    xmax = tf.cast(tf.sparse.to_dense(example['xmax']), tf.float32)
+    # ycenter = tf.cast(tf.sparse.to_dense(example['ycenter']), tf.float32)
+    ymin = tf.cast(tf.sparse.to_dense(example['ymin']), tf.float32)
+    ymax = tf.cast(tf.sparse.to_dense(example['ymax']), tf.float32)
     classes = tf.cast(tf.sparse.to_dense(example['classes']), tf.float32)
+    confidence = tf.ones_like(classes)
+
+    # Calculate bbox widths and heights.
+    box_w = xmax - xmin
+    box_h = ymax - ymin
 
     # Parse images and preprocess.
     a_image = tf.sparse.to_dense(example['a_raw'], default_value='')
@@ -100,7 +105,7 @@ def _parse_example(serialized_example, a):
     b_image = tf.reshape(b_image, [-1, height[0], width[0], 1])
 
     # Package things up for output.
-    objects = tf.stack([xcenter, ycenter, classes], axis=-1)
+    objects = tf.stack([xmin, ymin, box_w, box_h, confidence, classes], axis=-1)
     # Need to pad objects to max inferences (not all images will have same
     # number of objects).
     paddings = tf.constant([[0, 0], [0, a.max_inferences], [0, 0]])
@@ -338,6 +343,39 @@ def create_task_net(a, input_shape):
         pred_xy = GlobalAveragePooling2D()(pred_xy)
         pred_xy = tf.reshape(pred_xy, (-1, a.max_inferences, 2))
 
+        # Predict bounding box width and height.
+        pred_wh = Conv2D(
+            filters=2*a.max_inferences,
+            kernel_size=1,
+            strides=1,
+            padding='same',
+            kernel_initializer='he_normal',
+            activation='sigmoid',
+            kernel_regularizer=l1_l2(a.l1_reg_kernel,
+                                     a.l2_reg_kernel),
+            bias_regularizer=l1_l2(a.l1_reg_bias,
+                                   a.l2_reg_bias)
+        )(output)
+        pred_wh = GlobalAveragePooling2D()(pred_wh)
+        pred_wh = tf.reshape(pred_wh, (-1, a.max_inferences, 2))
+
+        # Predict object confidence.
+        pred_conf = Conv2D(
+            filters=2*a.max_inferences,
+            kernel_size=1,
+            strides=1,
+            padding='same',
+            kernel_initializer='he_normal',
+            activation='sigmoid',
+            kernel_regularizer=l1_l2(a.l1_reg_kernel,
+                                     a.l2_reg_kernel),
+            bias_regularizer=l1_l2(a.l1_reg_bias,
+                                   a.l2_reg_bias)
+        )(output)
+        pred_conf = GlobalAveragePooling2D()(pred_conf)
+        pred_conf = tf.reshape(pred_conf, (-1, a.max_inferences, 2))
+        pred_conf = tf.nn.softmax(pred_conf)
+
         # Predict the class of the object. 0 is no object.
         pred_class = Conv2D(
             filters=a.num_classes*a.max_inferences,
@@ -355,7 +393,13 @@ def create_task_net(a, input_shape):
         pred_class = tf.reshape(pred_class, (-1, a.max_inferences,
                                              a.num_classes))
         pred_class = tf.nn.softmax(pred_class)
-        prediction = tf.concat([pred_xy, pred_class], axis=-1)
+
+        # Shift predicted xy by half width and height.
+        pred_xy = pred_xy - pred_wh / 2
+
+        # Build prediction.
+        prediction = tf.concat([pred_xy, pred_wh, pred_conf, pred_class],
+                               axis=-1)
         pred_list.append(prediction)
 
     # Combine outputs together.
@@ -403,14 +447,14 @@ def create_model(a, train_data):
             task_net = load_yolo_model_weights(task_net,
                                                a.checkpoint_load_path)
             # TODO (NLT): batch task_net inputs using miss data generator, encoder?
-            pred_xy = task_net.predict(targets)
-            pred_xy_fake = task_net.predict(fake_img)
+            pred_task = task_net.predict(targets)
+            pred_task_fake = task_net.predict(fake_img)
         else:
             task_net = create_task_net(a, input_shape)
-            pred_xy = task_net(targets)
-            pred_xy_fake = task_net(fake_img)
+            pred_task = task_net(targets)
+            pred_task_fake = task_net(fake_img)
         print(f'Task Net model summary:\n{task_net.summary()}')
-        task_outputs = tf.stack([pred_xy, pred_xy_fake], axis=0,
+        task_outputs = tf.stack([pred_task, pred_task_fake], axis=0,
                                 name='task_net')
 
     # Create two copies of discriminator, one for real pairs and one for fake
@@ -630,15 +674,16 @@ def main(a):
                     bool_mask,
                     tf.math.reduce_mean(
                         tf.math.square(
-                            task_targets[..., :-1] - task_outputs[0, ..., :2]
+                            task_targets[..., :2] - task_outputs[0, ..., :2]
                         ),
                         axis=-1
                     ),
                     tf.zeros_like(bool_mask, dtype=tf.float32)
                 ))
-                obj_loss = tf.math.reduce_mean(
+                # TODO (NLT): calc IoU and use for loss...
+                class_loss = tf.math.reduce_mean(
                     categorical_crossentropy(target_classes,
-                                             task_outputs[0, ..., 2:],
+                                             task_outputs[0, ..., 5:],
                                              label_smoothing=0.1)
                 )
 
@@ -646,29 +691,29 @@ def main(a):
                     bool_mask,
                     tf.math.reduce_mean(
                         tf.math.square(
-                            task_targets[..., :-1] - task_outputs[1, ..., :2]
+                            task_targets[..., :2] - task_outputs[1, ..., :2]
                         ),
                         axis=-1
                     ),
                     tf.zeros_like(bool_mask, dtype=tf.float32)
                 ))
-                obj_loss_fake = tf.math.reduce_mean(
+                class_loss_fake = tf.math.reduce_mean(
                     categorical_crossentropy(target_classes,
-                                             task_outputs[1, ..., 2:],
+                                             task_outputs[1, ..., 5:],
                                              label_smoothing=0.1)
                 )
 
-                task_loss = xy_loss + xy_loss_fake + obj_loss + obj_loss_fake
+                task_loss = xy_loss + xy_loss_fake + class_loss + class_loss_fake
 
                 # Write summaries.
                 tf.summary.scalar(name='task_real_xy_loss', data=xy_loss,
                                   step=step)
                 tf.summary.scalar(name='task_fake_xy_loss', data=xy_loss_fake,
                                   step=step)
-                tf.summary.scalar(name='task_real_class_loss', data=obj_loss,
+                tf.summary.scalar(name='task_real_class_loss', data=class_loss,
                                   step=step)
                 tf.summary.scalar(name='task_fake_class_loss',
-                                  data=obj_loss_fake,
+                                  data=class_loss_fake,
                                   step=step)
             tf.summary.scalar(name='task_loss', data=task_loss,
                               step=step)
@@ -704,7 +749,7 @@ def main(a):
             for batch_num, batch in enumerate(train_data):
                 # Save summary images, statistics.
                 if batch_num % a.summary_freq == 0:
-                    print(f'Writing outputs for batch {batch_num}.')
+                    print(f'Writing outputs for epoch {epoch+1}, batch {batch_num}.')
                     (inputs, noise, targets), (_, _, task_targets) = batch
                     gen_outputs, discrim_outputs, task_outputs = model([inputs, noise, targets])
                     model_inputs = (inputs, targets, task_targets, noise)
@@ -747,7 +792,7 @@ def main(a):
                         step=batches_seen,
                     )
 
-                    # Create object bboxes and summarize task outputs, targets
+                    # Create object bboxes and summarize task outputs, targets.
                     real_detects = task_outputs[0]
                     fake_detects = task_outputs[1]
                     true_detects = task_targets
@@ -767,18 +812,31 @@ def main(a):
                     fake_detects = tf.where(fake_mask,
                                             fake_detects,
                                             tf.zeros_like(fake_detects))
-                    true_bboxes = tf.stack([true_detects[..., 1] - 0.02,
-                                            true_detects[..., 0] - 0.02,
-                                            true_detects[..., 1] + 0.02,
-                                            true_detects[..., 0] + 0.02], axis=-1)
-                    bboxes_real = tf.stack([real_detects[..., 1] - 0.02,
-                                            real_detects[..., 0] - 0.02,
-                                            real_detects[..., 1] + 0.02,
-                                            real_detects[..., 0] + 0.02], axis=-1)
-                    bboxes_fake = tf.stack([fake_detects[..., 1] - 0.02,
-                                            fake_detects[..., 0] - 0.02,
-                                            fake_detects[..., 1] + 0.02,
-                                            fake_detects[..., 0] + 0.02], axis=-1)
+
+                    # Bounding boxes are [ymin, xmin, ymax, xmax].
+                    true_bboxes = tf.stack(
+                        [true_detects[..., 1],
+                         true_detects[..., 0],
+                         true_detects[..., 1] + true_detects[..., 3],
+                         true_detects[..., 0] + true_detects[..., 2]],
+                        axis=-1
+                    )
+                    bboxes_real = tf.stack(
+                        [real_detects[..., 1],
+                         real_detects[..., 0],
+                         real_detects[..., 1] + real_detects[..., 3],
+                         real_detects[..., 0] + real_detects[..., 2]],
+                        axis=-1
+                    )
+                    bboxes_fake = tf.stack(
+                        [fake_detects[..., 1],
+                         fake_detects[..., 0],
+                         fake_detects[..., 1] + fake_detects[..., 3],
+                         fake_detects[..., 0] + fake_detects[..., 2]],
+                        axis=-1
+                    )
+
+                    # Add bounding boxes to sample images.
                     target_bboxes = tf.image.draw_bounding_boxes(
                         images=tf.image.grayscale_to_rgb(targets),
                         boxes=bboxes_real,
