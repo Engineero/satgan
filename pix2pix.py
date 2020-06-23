@@ -720,7 +720,7 @@ def main(a):
                     ),
                     tf.zeros_like(bool_mask, dtype=tf.float32)
                 ))
-                iou_loss = 1 - tf.math.reduce_mean(intersection / union)
+                iou_loss = tf.math.reduce_mean(1. - intersection / union)
                 # TODO (NLT): calc IoU and use for loss...
                 obj_loss = tf.math.reduce_mean(
                     categorical_crossentropy(target_objects,
@@ -745,8 +745,8 @@ def main(a):
                     ),
                     tf.zeros_like(bool_mask, dtype=tf.float32)
                 ))
-                iou_loss_fake = 1 - tf.math.reduce_mean(
-                    intersection_fake / union_fake
+                iou_loss_fake = tf.math.reduce_mean(
+                    1. - intersection_fake / union_fake
                 )
                 obj_loss_fake = tf.math.reduce_mean(
                     categorical_crossentropy(target_objects,
