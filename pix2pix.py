@@ -668,18 +668,18 @@ def main(a):
                 # where *object is a one-hot encoded score of objectness, and
                 # *class is a one-hot encoded score for each class in the
                 # dataset.
-                print(f'model_outputs[0] shape: {model_outputs[0].shape}')
+                print(f'model_outputs[0] shape: {task_outputs[0].shape}')
                 yolo_outputs = tf.concat(
-                    [model_outputs[0][..., :4],
-                     model_outputs[0][..., 6],
-                     model_outputs[0][..., -1]],
+                    [task_outputs[0][..., :4],
+                     task_outputs[0][..., 6],
+                     task_outputs[0][..., -1]],
                     axis=-1
                 )
                 print(f'yolo_outputs shape: {yolo_outputs.shape}')
                 yolo_outputs_fake = tf.concat(
-                    [model_outputs[1][..., :4],
-                     model_outputs[1][..., 6],
-                     model_outputs[1][..., -1]],
+                    [task_outputs[1][..., :4],
+                     task_outputs[1][..., 6],
+                     task_outputs[1][..., -1]],
                     axis=-1
                 )
                 print(f'yolo_outputs_fake shape: {yolo_outputs_fake.shape}')
