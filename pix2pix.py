@@ -663,30 +663,18 @@ def main(a):
             # task_targets are [xcenter, ycenter, class]
             task_targets = model_inputs[2]
             task_outputs = model_outputs[2]
+
+            # Outputs are [xmin, ymin, width, height, *object, *class] where
+            # *object is a one-hot encoded score of objectness, and *class is a
+            # one-hot encoded score for each class in the dataset for custom
+            # detector. For YOLO model, *object is just a scalar objectness
+            # score and *class is just a scalar class score.
+
             if a.use_yolo:
-                # Outputs are [xmin, ymin, width, height, *object, *class]
-                # where *object is a one-hot encoded score of objectness, and
-                # *class is a one-hot encoded score for each class in the
-                # dataset.
-                print(f'model_outputs[0] shape: {task_outputs[0].shape}')
-                yolo_outputs = tf.concat(
-                    [task_outputs[0][..., :4],
-                     task_outputs[0][..., 6],
-                     task_outputs[0][..., -1]],
-                    axis=-1
-                )
-                print(f'yolo_outputs shape: {yolo_outputs.shape}')
-                yolo_outputs_fake = tf.concat(
-                    [task_outputs[1][..., :4],
-                     task_outputs[1][..., 6],
-                     task_outputs[1][..., -1]],
-                    axis=-1
-                )
-                print(f'yolo_outputs_fake shape: {yolo_outputs_fake.shape}')
                 real_loss = task_loss_obj.compute_loss(task_targets,
-                                                       yolo_outputs)
+                                                       task_outputs[0])
                 fake_loss = task_loss_obj.compute_loss(task_targets,
-                                                       yolo_outputs_fake)
+                                                       task_outputs[1])
             else:
                 target_classes = tf.one_hot(tf.cast(task_targets[..., -1],
                                                     tf.int32),
