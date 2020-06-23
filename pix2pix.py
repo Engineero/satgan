@@ -683,7 +683,7 @@ def main(a):
                 # TODO (NLT): calc IoU and use for loss...
                 class_loss = tf.math.reduce_mean(
                     categorical_crossentropy(target_classes,
-                                             task_outputs[0, ..., 5:],
+                                             task_outputs[0, ..., 6:],
                                              label_smoothing=0.1)
                 )
 
@@ -699,7 +699,7 @@ def main(a):
                 ))
                 class_loss_fake = tf.math.reduce_mean(
                     categorical_crossentropy(target_classes,
-                                             task_outputs[1, ..., 5:],
+                                             task_outputs[1, ..., 6:],
                                              label_smoothing=0.1)
                 )
 
@@ -799,12 +799,12 @@ def main(a):
                     real_mask = tf.tile(
                         tf.expand_dims(real_detects[..., -1] > a.obj_threshold,
                                        axis=-1),
-                        [1, 1, 2+a.num_classes]
+                        [1, 1, 6+a.num_classes]
                     )
                     fake_mask = tf.tile(
                         tf.expand_dims(fake_detects[..., -1] > a.obj_threshold,
                                        axis=-1),
-                        [1, 1, 2+a.num_classes]
+                        [1, 1, 6+a.num_classes]
                     )
                     real_detects = tf.where(real_mask,
                                             real_detects,
