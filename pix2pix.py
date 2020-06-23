@@ -342,7 +342,7 @@ def create_task_net(a, input_shape):
         )(output)
         pred_xy = GlobalAveragePooling2D()(pred_xy)
         pred_xy = tf.reshape(pred_xy, (-1, a.max_inferences, 2))
-        pred_xy = tf.tanh(pred_xy)
+        pred_xy = tf.sigmoid(pred_xy)
 
         # Predict bounding box width and height.
         pred_wh = Conv2D(
@@ -359,7 +359,7 @@ def create_task_net(a, input_shape):
         )(output)
         pred_wh = GlobalAveragePooling2D()(pred_wh)
         pred_wh = tf.reshape(pred_wh, (-1, a.max_inferences, 2))
-        pred_wh = tf.tanh(pred_wh)
+        pred_wh = tf.sigmoid(pred_wh)
 
         # Predict object confidence.
         pred_conf = Conv2D(
