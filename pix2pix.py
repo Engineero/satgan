@@ -676,38 +676,22 @@ def main(a):
                 bool_mask = (task_targets[..., -1] != 0)
 
                 # TODO (NLT): Calculate intersection and union.
-                def calc_intersection_union(targets, outputs):
-                    intersection_xmin = tf.where(
-                        targets[..., 0] >= outputs[..., 0],
-                        targets[..., 0],
-                        outputs[..., 0]
-                    )
-                    intersection_ymin = tf.where(
-                        targets[..., 1] >= outputs[..., 1],
-                        targets[..., 1],
-                        outputs[..., 1]
-                    )
+                def calc_iou(targets, outputs):
                     target_xmax = targets[..., 0] + targets[..., 2]
                     target_ymax = targets[..., 1] + targets[..., 3]
                     output_xmax = outputs[..., 0] + outputs[..., 2]
                     output_ymax = outputs[..., 1] + outputs[..., 3]
-                    intersection_xmax = tf.where(target_xmax <= output_xmax,
-                                                 target_xmax, output_xmax)
-                    intersection_ymax = tf.where(target_ymax <= output_ymax,
-                                                 target_ymax, output_ymax)
-                    intersection = (intersection_xmax - intersection_xmin) * \
-                                   (intersection_ymax - intersection_ymin)
-
-                    area_targets = targets[..., 2] * targets[..., 3]
-                    area_outputs = outputs[..., 2] * outputs[..., 3]
-                    union = area_targets + area_outputs - intersection
-                    return intersection, union
-                intersection, union = calc_intersection_union(task_targets,
-                                                              task_outputs[0])
-                intersection_fake, union_fake = calc_intersection_union(
-                    task_targets,
-                    task_outputs[1]
-                )
+                    x_a = tf.maximum(targets[..., 0], outputs[..., 0])
+                    y_a = tf.maximum(targets[..., 1], outputs[..., 1])
+                    x_b = tf.minimum(target_xmax, output_xmax)
+                    y_b = tf.minimum(target_ymax, output_ymax)
+                    intersection = tf.maximum(x_b - x_a + 1, 0) * \
+                                   tf.maximum(y_b - y_a + 1, 0)
+                    target_area = (targets[..., 2] + 1) * (targets[..., 3] + 1)
+                    output_area = (outputs[..., 2] + 1) * (outputs[..., 3] + 1)
+                    iou = intersection / (target_area + output_area - 
+                                          intersection)
+                    return iou
 
                 # Calculate loss on real images.
                 xy_loss = tf.reduce_sum(tf.where(
@@ -720,7 +704,9 @@ def main(a):
                     ),
                     tf.zeros_like(bool_mask, dtype=tf.float32)
                 ))
-                iou_loss = tf.math.reduce_mean(1. - intersection / union)
+                iou_loss = tf.math.reduce_mean(
+                    calc_iou(task_targets, task_outputs[0])
+                )
                 # TODO (NLT): calc IoU and use for loss...
                 obj_loss = tf.math.reduce_mean(
                     categorical_crossentropy(target_objects,
@@ -746,7 +732,7 @@ def main(a):
                     tf.zeros_like(bool_mask, dtype=tf.float32)
                 ))
                 iou_loss_fake = tf.math.reduce_mean(
-                    1. - intersection_fake / union_fake
+                    calc_iou(task_targets, task_outputs[1])
                 )
                 obj_loss_fake = tf.math.reduce_mean(
                     categorical_crossentropy(target_objects,
