@@ -668,19 +668,18 @@ def main(a):
                 # where *object is a one-hot encoded score of objectness, and
                 # *class is a one-hot encoded score for each class in the
                 # dataset.
-                print(f'model_outputs shape: {model_outputs.shape}')
                 print(f'model_outputs[0] shape: {model_outputs[0].shape}')
                 yolo_outputs = tf.concat(
-                    [model_outputs[0, ..., :4],
-                     model_outputs[0, ..., 6],
-                     model_outputs[0, ..., -1]],
+                    [model_outputs[0][..., :4],
+                     model_outputs[0][..., 6],
+                     model_outputs[0][..., -1]],
                     axis=-1
                 )
                 print(f'yolo_outputs shape: {yolo_outputs.shape}')
                 yolo_outputs_fake = tf.concat(
-                    [model_outputs[1, ..., :4],
-                     model_outputs[1, ..., 6],
-                     model_outputs[1, ..., -1]],
+                    [model_outputs[1][..., :4],
+                     model_outputs[1][..., 6],
+                     model_outputs[1][..., -1]],
                     axis=-1
                 )
                 print(f'yolo_outputs_fake shape: {yolo_outputs_fake.shape}')
@@ -720,7 +719,7 @@ def main(a):
                     bool_mask,
                     tf.math.reduce_mean(
                         tf.math.square(
-                            task_targets[..., :2] - task_outputs[0, ..., :2]
+                            task_targets[..., :2] - task_outputs[0][..., :2]
                         ),
                         axis=-1
                     ),
@@ -732,12 +731,12 @@ def main(a):
                 # TODO (NLT): calc IoU and use for loss...
                 obj_loss = tf.math.reduce_mean(
                     categorical_crossentropy(target_objects,
-                                             task_outputs[0, ..., 4:6],
+                                             task_outputs[0][..., 4:6],
                                              label_smoothing=0.1)
                 )
                 class_loss = tf.math.reduce_mean(
                     categorical_crossentropy(target_classes,
-                                             task_outputs[0, ..., 6:],
+                                             task_outputs[0][..., 6:],
                                              label_smoothing=0.1)
                 )
                 real_loss = xy_loss + iou_loss + obj_loss + class_loss
@@ -747,7 +746,7 @@ def main(a):
                     bool_mask,
                     tf.math.reduce_mean(
                         tf.math.square(
-                            task_targets[..., :2] - task_outputs[1, ..., :2]
+                            task_targets[..., :2] - task_outputs[1][..., :2]
                         ),
                         axis=-1
                     ),
@@ -758,12 +757,12 @@ def main(a):
                 )
                 obj_loss_fake = tf.math.reduce_mean(
                     categorical_crossentropy(target_objects,
-                                             task_outputs[1, ..., 4:6],
+                                             task_outputs[1][..., 4:6],
                                              label_smoothing=0.1)
                 )
                 class_loss_fake = tf.math.reduce_mean(
                     categorical_crossentropy(target_classes,
-                                             task_outputs[1, ..., 6:],
+                                             task_outputs[1][..., 6:],
                                              label_smoothing=0.1)
                 )
                 fake_loss = (xy_loss_fake + iou_loss_fake + obj_loss_fake +
