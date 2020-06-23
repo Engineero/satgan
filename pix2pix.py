@@ -671,6 +671,9 @@ def main(a):
             # score and *class is just a scalar class score.
 
             if a.use_yolo:
+                print(f'task_targets shape: {task_targets.shape}')
+                print(f'task_outputs[0] shape: {task_outputs[0].shape}')
+                print(f'task_outputs[1] shape: {task_outputs[1].shape}')
                 real_loss = task_loss_obj.compute_loss(task_targets,
                                                        task_outputs[0])
                 fake_loss = task_loss_obj.compute_loss(task_targets,
