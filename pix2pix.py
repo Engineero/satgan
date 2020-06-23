@@ -664,12 +664,6 @@ def main(a):
             task_targets = model_inputs[2]
             task_outputs = model_outputs[2]
             if a.use_yolo:
-                yolo_targets = tf.concat(
-                    [task_targets[..., :4], 
-                     task_targets[..., 6],
-                     task_targets[..., -1]],
-                    axis=-1
-                )
                 yolo_outputs = tf.concat(
                     [model_outputs[0, ..., :4],
                      model_outputs[0, ..., 6],
@@ -682,9 +676,9 @@ def main(a):
                      model_outputs[1, ..., -1]],
                     axis=-1
                 )
-                real_loss = task_loss_obj.compute_loss(yolo_targets,
+                real_loss = task_loss_obj.compute_loss(task_targets,
                                                        yolo_outputs)
-                fake_loss = task_loss_obj.compute_loss(yolo_targets,
+                fake_loss = task_loss_obj.compute_loss(task_targets,
                                                        yolo_outputs_fake)
             else:
                 target_classes = tf.one_hot(tf.cast(task_targets[..., -1],
