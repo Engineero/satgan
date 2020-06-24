@@ -437,7 +437,7 @@ def create_model(a, train_data):
             task_net, task_loss, encoder = build_yolo_model(
                 base_model_name=a.base_model_name,
                 is_recurrent=a.is_recurrent,
-                num_predictor_heads=a.num_predictor_heads,
+                num_predictor_heads=a.num_pred_layers,
                 max_inferences_per_image=a.max_inferences,
                 max_bbox_overlap=a.max_bbox_overlap,
                 confidence_threshold=a.confidence_threshold,
@@ -1138,9 +1138,6 @@ if __name__ == '__main__':
     parser.add_argument('--base_model_name', type=str,
                         default="DarkNet",
                         help='The name of the base network to be used.')
-    parser.add_argument('--num_predictor_heads', type=int,
-                        default=1,
-                        help='The number of predictor heads in the network.')
     parser.add_argument('--max_bbox_overlap', type=float,
                         default=1.0,
                         help='Maximum amount two inferred boxes can overlap.')
