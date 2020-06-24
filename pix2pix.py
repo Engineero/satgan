@@ -816,7 +816,8 @@ def main(a):
                     if a.use_yolo:
                         targets, task_targets = encoder.encode_for_yolo(
                             inputs,
-                            task_targets,
+                            tf.reshape(task_targets,
+                                       [-1, task_targets.shape[-1]]),
                             None
                         )
                         gen_outputs, discrim_outputs, task_outputs = model(
@@ -824,7 +825,8 @@ def main(a):
                         )
                         gen_outputs, task_outputs = encoder.encode_for_yolo(
                             gen_outputs,
-                            task_outputs,
+                            tf.reshape(task_outputs, [-1,
+                                                      task_outputs.shape[-1]]),
                             None
                         )
                     else:
