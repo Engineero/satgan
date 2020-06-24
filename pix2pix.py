@@ -814,14 +814,14 @@ def main(a):
                     print(f'Writing outputs for epoch {epoch+1}, batch {batch_num}.')
                     (inputs, noise, targets), (_, _, task_targets) = batch
                     if a.use_yolo:
-                        targets, task_targets_enc = encoder.encode_for_yolo(
+                        targets_enc, task_targets_enc = encoder.encode_for_yolo(
                             inputs,
                             tf.reshape(task_targets,
                                        [-1, task_targets.shape[-1]]),
                             None
                         )
                         gen_outputs, discrim_outputs, task_outputs = model(
-                            [inputs, noise, targets]
+                            [inputs, noise, targets_enc]
                         )
                         # gen_outputs, task_outputs = encoder.encode_for_yolo(
                         #     gen_outputs,
@@ -829,12 +829,17 @@ def main(a):
                         #                               task_outputs.shape[-1]]),
                         #     None
                         # )
+                        model_inputs = (inputs, targets_enc, task_targets_enc,
+                                        noise)
+                        model_outputs = (gen_outputs, discrim_outputs,
+                                         task_outputs)
                     else:
                         gen_outputs, discrim_outputs, task_outputs = model(
                             [inputs, noise, targets]
                         )
-                    model_inputs = (inputs, targets, task_targets, noise)
-                    model_outputs = (gen_outputs, discrim_outputs, task_outputs)
+                        model_inputs = (inputs, targets, task_targets, noise)
+                        model_outputs = (gen_outputs, discrim_outputs,
+                                         task_outputs)
                     tf.summary.image(
                         name='fake_image',
                         data=gen_outputs[0],
