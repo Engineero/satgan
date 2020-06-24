@@ -405,7 +405,7 @@ def create_task_net(a, input_shape):
         # pred_xy = tf.stack(xy_list, axis=-1, name='stack_xy')
         predict = tf.concat(pred_list, axis=1, name='concat_xy')
     else:
-        predict = tf.expand_dims(pred_list[0], axis=-1)
+        predict = pred_list[0]
     return Model(inputs=model.input, outputs=predict, name='task_net')
 
 
