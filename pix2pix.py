@@ -659,6 +659,9 @@ def main(a):
             # task_targets are [xcenter, ycenter, class]
             task_targets = model_inputs[2]
             task_outputs = model_outputs[2]
+            print(f'length of task targets: {len(task_targets)}')
+            print(f'task targets[0] shape: {task_targets.shape}')
+            print(f'task outputs[0] shape: {task_outputs.shape}')
 
             # Outputs are [xmin, ymin, width, height, *object, *class] where
             # *object is a one-hot encoded score of objectness, and *class is a
@@ -831,15 +834,13 @@ def main(a):
                         # )
                         model_inputs = (inputs, targets_enc, task_targets_enc,
                                         noise)
-                        model_outputs = (gen_outputs, discrim_outputs,
-                                         task_outputs)
                     else:
                         gen_outputs, discrim_outputs, task_outputs = model(
                             [inputs, noise, targets]
                         )
                         model_inputs = (inputs, targets, task_targets, noise)
-                        model_outputs = (gen_outputs, discrim_outputs,
-                                         task_outputs)
+                    model_outputs = (gen_outputs, discrim_outputs,
+                                     task_outputs)
                     tf.summary.image(
                         name='fake_image',
                         data=gen_outputs[0],
