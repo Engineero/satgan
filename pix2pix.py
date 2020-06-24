@@ -100,7 +100,7 @@ def _parse_example(serialized_example, a):
     b_image = tf.reshape(b_image, [-1, height[0], width[0], 1])
 
     # Package things up for output.
-    objects = tf.stack([ymin, xmin, ymax, ymin, classes], axis=-1)
+    objects = tf.stack([ymin, xmin, ymax, xmax, classes], axis=-1)
     # Need to pad objects to max inferences (not all images will have same
     # number of objects).
     paddings = tf.constant([[0, 0], [0, a.max_inferences], [0, 0]])
@@ -860,7 +860,7 @@ def main(a):
                     # Create object bboxes and summarize task outputs, targets.
                     real_detects = task_outputs[0]
                     fake_detects = task_outputs[1]
-                    true_detects = task_targets
+                    # true_detects = task_targets
                     # real_mask = tf.tile(
                     #     tf.expand_dims(real_detects[..., 5] > a.obj_threshold,
                     #                    axis=-1),
@@ -879,15 +879,9 @@ def main(a):
                     #                         tf.zeros_like(fake_detects))
 
                     # Bounding boxes are [ymin, xmin, ymax, xmax].
-                    print(f'true detects shape: {true_detects.shape}')
-                    print(f'real detects shape: {real_detects.shape}')
-                    print(f'fake detects shape: {fake_detects.shape}')
-                    true_bboxes = true_detects[..., :4]
+                    true_bboxes = task_targets[..., :4]
                     bboxes_real = real_detects[..., :4]
                     bboxes_fake = fake_detects[..., :4]
-                    print(f'true bboxes shape: {true_bboxes.shape}')
-                    print(f'real bboxes shape: {bboxes_real.shape}')
-                    print(f'fake bboxes shape: {bboxes_fake.shape}')
 
                     # Add bounding boxes to sample images.
                     target_bboxes = tf.image.draw_bounding_boxes(
