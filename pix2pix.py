@@ -504,12 +504,13 @@ def main(a):
     with tf.name_scope("compute_total_loss"):
         @tf.function
         def compute_total_loss(model_inputs, model_outputs, step,
-                               return_all=False):
+                               return_all=False, encoder=None):
             discrim_loss = calc_discriminator_loss(model_inputs,
                                                    model_outputs,
                                                    step)
             gen_loss = calc_generator_loss(model_inputs, model_outputs, step)
-            task_loss = calc_task_loss(model_inputs, model_outputs, step)
+            task_loss = calc_task_loss(model_inputs, model_outputs, step,
+                                       encoder=encoder)
             total_loss = a.dsc_weight * discrim_loss + \
                 a.gen_weight * gen_loss + a.task_weight * task_loss
             tf.summary.scalar(name='total_loss', data=total_loss,
@@ -523,7 +524,7 @@ def main(a):
         @tf.function
         def compute_apply_gradients(model, data, optimizer_list,
                                     loss_function_list, step,
-                                    loss_weight_list=None):
+                                    loss_weight_list=None, encoder=None):
             """Computes and applies gradients with optional lists of
             optimizers and corresponding loss functions.
 
@@ -561,7 +562,7 @@ def main(a):
                                          task_outputs)
                         loss = weight * loss_function(model_inputs,
                                                       model_outputs,
-                                                      step)
+                                                      step, encoder=encoder)
                     gradients = tape.gradient(loss, model.trainable_variables)
                     optimizer.apply_gradients(zip(gradients, model.trainable_variables))
             else:
@@ -577,14 +578,15 @@ def main(a):
                                          task_outputs)
                         loss = loss_function(model_inputs,
                                              model_outputs,
-                                             step)
+                                             step, encoder=encoder)
                     gradients = tape.gradient(loss, model.trainable_variables)
                     optimizer.apply_gradients(zip(gradients,
                                                   model.trainable_variables))
 
     with tf.name_scope("discriminator_loss"):
         @tf.function
-        def calc_discriminator_loss(model_inputs, model_outputs, step):
+        def calc_discriminator_loss(model_inputs, model_outputs, step,
+                                    **kwargs):
             # minimizing -tf.log will try to get inputs to 1
             # discrim_outputs[0] = predict_real => [0, 1]
             # discrim_outputs[1] = predict_fake => [1, 0]
@@ -623,7 +625,7 @@ def main(a):
 
     with tf.name_scope("generator_loss"):
         @tf.function
-        def calc_generator_loss(model_inputs, model_outputs, step):
+        def calc_generator_loss(model_inputs, model_outputs, step, **kwargs):
             # predict_fake => 1
             # abs(targets - outputs) => 0
             fake_img = model_outputs[0][0]
@@ -655,7 +657,7 @@ def main(a):
 
     with tf.name_scope('task_loss'):
         @tf.function
-        def calc_task_loss(model_inputs, model_outputs, step):
+        def calc_task_loss(model_inputs, model_outputs, step, encoder=None):
             # task_targets are [xcenter, ycenter, class]
             task_targets = model_inputs[2]
             task_outputs = model_outputs[2]
@@ -663,13 +665,13 @@ def main(a):
             print(f'task targets[0] shape: {task_targets[0].shape}')
             print(f'task outputs[0] shape: {task_outputs[0].shape}')
 
-            # Outputs are [xmin, ymin, width, height, *object, *class] where
-            # *object is a one-hot encoded score of objectness, and *class is a
+            # Outputs are [xmin, ymin, width, height, *class] where *class is a
             # one-hot encoded score for each class in the dataset for custom
-            # detector. For YOLO model, *object is just a scalar objectness
-            # score and *class is just a scalar class score.
+            # detector. For YOLO model, *class is just a scalar class score.
 
             if a.use_yolo:
+                if encoder is not None:
+                    pass  # TODO (NLT): encode data for YOLO loss...
                 real_loss = task_loss_obj.compute_loss(task_targets,
                                                        task_outputs[0])
                 fake_loss = task_loss_obj.compute_loss(task_targets,
@@ -752,7 +754,8 @@ def main(a):
                                              task_outputs[1][..., 4:],
                                              label_smoothing=0.1)
                 )
-                fake_loss = xy_loss_fake + iou_loss_fake + class_loss_fake
+                fake_loss = xy_loss_fake + a.iou_weight * iou_loss_fake + \
+                            a.class_weight * class_loss_fake
 
                 # Write summaries.
                 tf.summary.scalar(name='task_real_xy_loss', data=xy_loss,
@@ -1144,6 +1147,10 @@ if __name__ == '__main__':
                         help='Relative weight of discriminator loss.')
     parser.add_argument('--task_weight', default=1., type=float,
                         help='Relative weight of task loss.')
+    parser.add_argument('--iou_weight', default=1., type=float,
+                        help='Relative weight of IoU task loss component.')
+    parser.add_argument('--class_weight', default=1., type=float,
+                        help='Relative weight of class task loss component.')
     parser.add_argument('--early_stop_patience', default=10, type=int,
                         help='Early stopping patience, epochs. Default 10.')
     parser.add_argument('--multi_optim', default=False, action='store_true',
