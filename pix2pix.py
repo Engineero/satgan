@@ -695,8 +695,8 @@ def main(a):
                                    tf.maximum(y_b - y_a + 1, 0)
                     target_area = (targets[..., 2] - targets[..., 0] + 1.) * \
                                   (targets[..., 3] - targets[..., 1] + 1.)
-                    output_area = (outputs[..., 2] - targets[..., 0] + 1.) * \
-                                  (outputs[..., 3] - targets[..., 1] + 1.)
+                    output_area = (outputs[..., 2] - outputs[..., 0] + 1.) * \
+                                  (outputs[..., 3] - outputs[..., 1] + 1.)
                     iou = intersection / (target_area + output_area - 
                                           intersection)
                     return 1. - iou
