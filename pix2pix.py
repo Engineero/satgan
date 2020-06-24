@@ -700,11 +700,13 @@ def main(a):
                     return 1. - iou
 
                 # Calculate loss on real images.
+                task_wh = task_targets[..., 2:4] - task_targets[..., :2]
                 xy_loss = tf.reduce_sum(tf.where(
                     bool_mask,
                     tf.math.reduce_mean(
                         tf.math.square(
-                            task_targets[..., :2] - task_outputs[0][..., :2]
+                            task_targets[..., :2] + task_wh/2 - \
+                                task_outputs[0][..., :2]
                         ),
                         axis=-1
                     ),
@@ -720,7 +722,7 @@ def main(a):
                 # )
                 class_loss = tf.math.reduce_mean(
                     categorical_crossentropy(target_classes,
-                                             task_outputs[0][..., 6:],
+                                             task_outputs[0][..., 4:],
                                              label_smoothing=0.1)
                 )
                 real_loss = xy_loss + iou_loss + class_loss
@@ -730,7 +732,8 @@ def main(a):
                     bool_mask,
                     tf.math.reduce_mean(
                         tf.math.square(
-                            task_targets[..., :2] - task_outputs[1][..., :2]
+                            task_targets[..., :2] + task_wh/2 - \
+                                task_outputs[1][..., :2]
                         ),
                         axis=-1
                     ),
@@ -746,7 +749,7 @@ def main(a):
                 # )
                 class_loss_fake = tf.math.reduce_mean(
                     categorical_crossentropy(target_classes,
-                                             task_outputs[1][..., 6:],
+                                             task_outputs[1][..., 4:],
                                              label_smoothing=0.1)
                 )
                 fake_loss = xy_loss_fake + iou_loss_fake + class_loss_fake
