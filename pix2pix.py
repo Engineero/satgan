@@ -858,22 +858,22 @@ def main(a):
                     real_detects = task_outputs[0]
                     fake_detects = task_outputs[1]
                     true_detects = task_targets
-                    real_mask = tf.tile(
-                        tf.expand_dims(real_detects[..., 5] > a.obj_threshold,
-                                       axis=-1),
-                        [1, 1, real_detects.shape[-1]]
-                    )
-                    fake_mask = tf.tile(
-                        tf.expand_dims(fake_detects[..., 5] > a.obj_threshold,
-                                       axis=-1),
-                        [1, 1, real_detects.shape[-1]]
-                    )
-                    real_detects = tf.where(real_mask,
-                                            real_detects,
-                                            tf.zeros_like(real_detects))
-                    fake_detects = tf.where(fake_mask,
-                                            fake_detects,
-                                            tf.zeros_like(fake_detects))
+                    # real_mask = tf.tile(
+                    #     tf.expand_dims(real_detects[..., 5] > a.obj_threshold,
+                    #                    axis=-1),
+                    #     [1, 1, real_detects.shape[-1]]
+                    # )
+                    # fake_mask = tf.tile(
+                    #     tf.expand_dims(fake_detects[..., 5] > a.obj_threshold,
+                    #                    axis=-1),
+                    #     [1, 1, real_detects.shape[-1]]
+                    # )
+                    # real_detects = tf.where(real_mask,
+                    #                         real_detects,
+                    #                         tf.zeros_like(real_detects))
+                    # fake_detects = tf.where(fake_mask,
+                    #                         fake_detects,
+                    #                         tf.zeros_like(fake_detects))
 
                     # Bounding boxes are [ymin, xmin, ymax, xmax].
                     true_bboxes = tf.stack(true_detects[..., :4], axis=-1)
