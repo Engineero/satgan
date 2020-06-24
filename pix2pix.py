@@ -879,9 +879,9 @@ def main(a):
                     print(f'true detects shape: {true_detects.shape}')
                     print(f'real detects shape: {real_detects.shape}')
                     print(f'fake detects shape: {fake_detects.shape}')
-                    true_bboxes = tf.stack(true_detects[..., :4], axis=-1)
-                    bboxes_real = tf.stack(real_detects[..., :4], axis=-1)
-                    bboxes_fake = tf.stack(fake_detects[..., :4], axis=-1)
+                    true_bboxes = true_detects[..., :4]
+                    bboxes_real = real_detects[..., :4]
+                    bboxes_fake = fake_detects[..., :4]
                     print(f'true bboxes shape: {true_bboxes.shape}')
                     print(f'real bboxes shape: {bboxes_real.shape}')
                     print(f'fake bboxes shape: {bboxes_fake.shape}')
