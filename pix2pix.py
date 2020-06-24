@@ -857,8 +857,6 @@ def main(a):
                     # Create object bboxes and summarize task outputs, targets.
                     real_detects = task_outputs[0]
                     fake_detects = task_outputs[1]
-                    print(f'real detects shape: {real_detects.shape}')
-                    print(f'fake detects shape: {fake_detects.shape}')
                     # true_detects = task_targets
                     # real_mask = tf.tile(
                     #     tf.expand_dims(real_detects[..., 5] > a.obj_threshold,
