@@ -823,12 +823,12 @@ def main(a):
                         gen_outputs, discrim_outputs, task_outputs = model(
                             [inputs, noise, targets]
                         )
-                        gen_outputs, task_outputs = encoder.encode_for_yolo(
-                            gen_outputs,
-                            tf.reshape(task_outputs, [-1,
-                                                      task_outputs.shape[-1]]),
-                            None
-                        )
+                        # gen_outputs, task_outputs = encoder.encode_for_yolo(
+                        #     gen_outputs,
+                        #     tf.reshape(task_outputs, [-1,
+                        #                               task_outputs.shape[-1]]),
+                        #     None
+                        # )
                     else:
                         gen_outputs, discrim_outputs, task_outputs = model(
                             [inputs, noise, targets]
