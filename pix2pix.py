@@ -661,9 +661,6 @@ def main(a):
             # task_targets are [xcenter, ycenter, class]
             task_targets = model_inputs[2]
             task_outputs = model_outputs[2]
-            print(f'length of task targets: {len(task_targets)}')
-            print(f'task targets[0] shape: {task_targets[0].shape}')
-            print(f'task outputs[0] shape: {task_outputs[0].shape}')
 
             # Outputs are [xmin, ymin, width, height, *class] where *class is a
             # one-hot encoded score for each class in the dataset for custom
@@ -671,11 +668,28 @@ def main(a):
 
             if a.use_yolo:
                 if encoder is not None:
-                    pass  # TODO (NLT): encode data for YOLO loss...
-                real_loss = task_loss_obj.compute_loss(task_targets,
-                                                       task_outputs[0])
+                    _, task_targets_enc = encoder.encode_for_yolo(
+                        model_inputs[1],
+                        tf.reshape(task_targets,
+                                   [-1, task_targets.shape[-1]]),
+                        None
+                    )
+                    _, real_task_outputs_enc = encoder.encode_for_yolo(
+                        model_inputs[1],
+                        tf.reshape(task_outputs[0],
+                                   [-1, task_outputs[0].shape[-1]]),
+                        None
+                    )
+                    _, fake_task_outputs_enc = encoder.encode_for_yolo(
+                        model_inputs[1],
+                        tf.reshape(task_outputs[1],
+                                   [-1, task_outputs[1].shape[-1]]),
+                        None
+                    )
+                real_loss = task_loss_obj.compute_loss(task_targets_enc,
+                                                       real_task_outputs_enc)
                 fake_loss = task_loss_obj.compute_loss(task_targets,
-                                                       task_outputs[1])
+                                                       fake_task_outputs_enc)
             else:
                 target_classes = tf.one_hot(tf.cast(task_targets[..., -1],
                                                     tf.int32),
