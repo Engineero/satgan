@@ -876,9 +876,15 @@ def main(a):
                     #                         tf.zeros_like(fake_detects))
 
                     # Bounding boxes are [ymin, xmin, ymax, xmax].
+                    print(f'true detects shape: {true_detects.shape}')
+                    print(f'real detects shape: {real_detects.shape}')
+                    print(f'fake detects shape: {fake_detects.shape}')
                     true_bboxes = tf.stack(true_detects[..., :4], axis=-1)
                     bboxes_real = tf.stack(real_detects[..., :4], axis=-1)
                     bboxes_fake = tf.stack(fake_detects[..., :4], axis=-1)
+                    print(f'true bboxes shape: {true_bboxes.shape}')
+                    print(f'real bboxes shape: {bboxes_real.shape}')
+                    print(f'fake bboxes shape: {bboxes_fake.shape}')
 
                     # Add bounding boxes to sample images.
                     target_bboxes = tf.image.draw_bounding_boxes(
