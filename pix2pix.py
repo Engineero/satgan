@@ -721,7 +721,7 @@ def main(a):
                     bool_mask,
                     tf.math.reduce_mean(
                         tf.math.square(
-                            task_targets[..., :2] + task_wh/2 - \
+                            task_targets[..., :2] + task_wh / 2. - \
                                 task_outputs[0][..., :2]
                         ),
                         axis=-1
@@ -749,7 +749,7 @@ def main(a):
                     bool_mask,
                     tf.math.reduce_mean(
                         tf.math.square(
-                            task_targets[..., :2] + task_wh/2 - \
+                            task_targets[..., :2] + task_wh / 2. - \
                                 task_outputs[1][..., :2]
                         ),
                         axis=-1
