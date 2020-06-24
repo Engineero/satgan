@@ -479,7 +479,7 @@ def create_model(a, train_data):
     # Return the model. We'll define losses and a training loop back in the
     # main function.
     if a.use_yolo:
-        return model, task_loss
+        return model, task_loss, encoder
     else:
         return model
 
@@ -495,7 +495,7 @@ def main(a):
 
     # Build the model.
     if a.use_yolo:
-        model, task_loss_obj = create_model(a, train_data)
+        model, task_loss_obj, encoder = create_model(a, train_data)
     else:
         model = create_model(a, train_data)
     print(f'Overall model summary:\n{model.summary()}')
@@ -667,9 +667,6 @@ def main(a):
             # score and *class is just a scalar class score.
 
             if a.use_yolo:
-                print(f'task_targets shape: {task_targets.shape}')
-                print(f'task_outputs[0] shape: {task_outputs[0].shape}')
-                print(f'task_outputs[1] shape: {task_outputs[1].shape}')
                 real_loss = task_loss_obj.compute_loss(task_targets,
                                                        task_outputs[0])
                 fake_loss = task_loss_obj.compute_loss(task_targets,
@@ -860,6 +857,8 @@ def main(a):
                     # Create object bboxes and summarize task outputs, targets.
                     real_detects = task_outputs[0]
                     fake_detects = task_outputs[1]
+                    print(f'real detects shape: {real_detects.shape}')
+                    print(f'fake detects shape: {fake_detects.shape}')
                     # true_detects = task_targets
                     # real_mask = tf.tile(
                     #     tf.expand_dims(real_detects[..., 5] > a.obj_threshold,
