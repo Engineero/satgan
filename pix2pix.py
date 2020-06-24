@@ -693,10 +693,10 @@ def main(a):
                     x_b = tf.minimum(targets[..., 3], outputs[..., 3])
                     intersection = tf.maximum(x_b - x_a + 1, 0) * \
                                    tf.maximum(y_b - y_a + 1, 0)
-                    target_area = (targets[..., 2] + 1.) * \
-                                  (targets[..., 3] + 1.)
-                    output_area = (outputs[..., 2] + 1.) * \
-                                  (outputs[..., 3] + 1.)
+                    target_area = (targets[..., 2] - targets[..., 0] + 1.) * \
+                                  (targets[..., 3] - targets[..., 1] + 1.)
+                    output_area = (outputs[..., 2] - targets[..., 0] + 1.) * \
+                                  (outputs[..., 3] - targets[..., 1] + 1.)
                     iou = intersection / (target_area + output_area - 
                                           intersection)
                     return 1. - iou
