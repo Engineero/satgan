@@ -814,7 +814,7 @@ def main(a):
                     print(f'Writing outputs for epoch {epoch+1}, batch {batch_num}.')
                     (inputs, noise, targets), (_, _, task_targets) = batch
                     if a.use_yolo:
-                        targets, task_targets = encoder.encode_for_yolo(
+                        targets, task_targets_enc = encoder.encode_for_yolo(
                             inputs,
                             tf.reshape(task_targets,
                                        [-1, task_targets.shape[-1]]),
