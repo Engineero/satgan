@@ -727,7 +727,8 @@ def main(a):
                                              task_outputs[0][..., 4:],
                                              label_smoothing=0.1)
                 )
-                real_loss = xy_loss + iou_loss + class_loss
+                real_loss = xy_loss + a.iou_weight * iou_loss + \
+                            a.class_weight * class_loss
 
                 # Calculate loss on fake images.
                 xy_loss_fake = tf.reduce_sum(tf.where(
