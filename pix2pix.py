@@ -660,8 +660,8 @@ def main(a):
             task_targets = model_inputs[2]
             task_outputs = model_outputs[2]
             print(f'length of task targets: {len(task_targets)}')
-            print(f'task targets[0] shape: {task_targets.shape}')
-            print(f'task outputs[0] shape: {task_outputs.shape}')
+            print(f'task targets[0] shape: {task_targets[0].shape}')
+            print(f'task outputs[0] shape: {task_outputs[0].shape}')
 
             # Outputs are [xmin, ymin, width, height, *object, *class] where
             # *object is a one-hot encoded score of objectness, and *class is a
