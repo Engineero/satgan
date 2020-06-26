@@ -650,16 +650,12 @@ def main(a):
             # score.
             task_targets = model_inputs[2]
             task_outputs = model_outputs[2]
-            print(f'task targets: {task_targets}')
-            print(f'task targets shape: {task_targets.shape}')
-            print(f'task outputs: {task_outputs}')
-            print(f'task outputs shape: {task_outputs.shape}')
 
             if a.use_yolo:
                 _, task_targets_enc = encoder.encode_for_yolo(
                     None,
-                    tf.reshape(task_targets,
-                               [-1, task_targets.shape[-1]]),
+                    tf.reshape(task_targets[0],
+                               [-1, task_targets[0].shape[-1]]),
                     None
                 )
                 _, real_task_outputs_enc = encoder.encode_for_yolo(
