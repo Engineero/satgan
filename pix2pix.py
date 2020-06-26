@@ -672,6 +672,9 @@ def main(a):
                                [-1, task_outputs[1].shape[-1]]),
                     None
                 )
+                print(f'encoded task targets: {task_targets_enc}')
+                print(f'encoded real task outputs: {real_task_outputs_enc}')
+                print(f'encoded fake task outputs: {fake_task_outputs_enc}')
                 real_loss = task_loss_obj.compute_loss(task_targets_enc[0],
                                                        real_task_outputs_enc[0])
                 fake_loss = task_loss_obj.compute_loss(task_targets[0],
