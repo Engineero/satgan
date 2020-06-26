@@ -513,38 +513,7 @@ def main(a):
                                                    model_outputs,
                                                    step)
             gen_loss = calc_generator_loss(model_inputs, model_outputs, step)
-            if a.use_yolo:
-                targets_enc, task_targets_enc = encoder.encode_for_yolo(
-                    model_inputs[1],
-                    tf.reshape(model_inputs[2],
-                               [-1, model_inputs[2].shape[-1]]),
-                    None
-                )
-                _, real_task_outputs_enc = encoder.encode_for_yolo(
-                    model_inputs[1],
-                    tf.reshape(model_outputs[2][0],
-                               [-1, model_outputs[2][0].shape[-1]]),
-                    None
-                )
-                _, fake_task_outputs_enc = encoder.encode_for_yolo(
-                    model_inputs[1],
-                    tf.reshape(model_outputs[2][1],
-                               [-1, model_outputs[2][1].shape[-1]]),
-                    None
-                )
-                enc_inputs = (model_inputs[0],
-                              targets_enc,
-                              task_targets_enc,
-                              model_inputs[-1])
-                enc_outputs = (
-                    model_outputs[0],
-                    model_outputs[1],
-                    tf.stack([real_task_outputs_enc, fake_task_outputs_enc],
-                             axis=0)
-                )
-                task_loss = calc_task_loss(enc_inputs, enc_outputs, step)
-            else:
-                task_loss = calc_task_loss(model_inputs, model_outputs, step)
+            task_loss = calc_task_loss(model_inputs, model_outputs, step)
             total_loss = a.dsc_weight * discrim_loss + \
                 a.gen_weight * gen_loss + a.task_weight * task_loss
             tf.summary.scalar(name='total_loss', data=total_loss,
