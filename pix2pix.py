@@ -372,6 +372,7 @@ def create_task_net(a, input_shape):
         )(output)
         pred_conf = GlobalAveragePooling2D()(pred_conf)
         pred_conf = tf.nn.sigmoid(pred_conf)
+        pred_conf = tf.expand_dims(pred_conf, -1)
 
         # Predict the class of the object. 0 is no object.
         pred_class = Conv2D(
