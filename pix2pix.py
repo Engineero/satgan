@@ -518,8 +518,6 @@ def main(a):
                                [-1, model_inputs[2].shape[-1]]),
                     None
                 )
-                model_inputs[1] = targets_enc
-                model_inputs[2] = task_targets_enc
                 _, real_task_outputs_enc = encoder.encode_for_yolo(
                     model_inputs[1],
                     tf.reshape(model_outputs[2][0],
@@ -532,10 +530,18 @@ def main(a):
                                [-1, model_outputs[2][1].shape[-1]]),
                     None
                 )
-                model_outputs[2] = tf.stack([real_task_outputs_enc,
-                                             fake_task_outputs_enc],
-                                            axis=0)
-            task_loss = calc_task_loss(model_inputs, model_outputs, step)
+                enc_inputs = (model_inputs[0],
+                              targets_enc,
+                              task_targets_enc,
+                              model_inputs[-1])
+                enc_outputs = (
+                    *model_outputs[:2],
+                    tf.stack([real_task_outputs_enc, fake_task_outputs_enc],
+                             axis=0)
+                )
+                task_loss = calc_task_loss(enc_inputs, enc_outputs, step)
+            else:
+                task_loss = calc_task_loss(model_inputs, model_outputs, step)
             total_loss = a.dsc_weight * discrim_loss + \
                 a.gen_weight * gen_loss + a.task_weight * task_loss
             tf.summary.scalar(name='total_loss', data=total_loss,
@@ -584,10 +590,10 @@ def main(a):
                 with tf.GradientTape() as tape:
                     gen_outputs, discrim_outputs, task_outputs = \
                         model([inputs, noise, targets])
-                    model_inputs = [inputs, targets, task_targets, noise]
-                    model_outputs = [gen_outputs,
+                    model_inputs = (inputs, targets, task_targets, noise)
+                    model_outputs = (gen_outputs,
                                      discrim_outputs,
-                                     task_outputs]
+                                     task_outputs)
                     loss = weight * loss_function(model_inputs,
                                                   model_outputs,
                                                   step, encoder=encoder)
@@ -842,9 +848,9 @@ def main(a):
                         gen_outputs, discrim_outputs, task_outputs = model(
                             [inputs, noise, targets]
                         )
-                    model_inputs = [inputs, targets, task_targets, noise]
-                    model_outputs = [gen_outputs, discrim_outputs,
-                                     task_outputs]
+                    model_inputs = (inputs, targets, task_targets, noise)
+                    model_outputs = (gen_outputs, discrim_outputs,
+                                     task_outputs)
 
                     tf.summary.image(
                         name='fake_image',
