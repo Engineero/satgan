@@ -513,7 +513,38 @@ def main(a):
                                                    model_outputs,
                                                    step)
             gen_loss = calc_generator_loss(model_inputs, model_outputs, step)
-            task_loss = calc_task_loss(model_inputs, model_outputs, step)
+            if a.use_yolo:
+                targets_enc, task_targets_enc = encoder.encode_for_yolo(
+                    model_inputs[1],
+                    tf.reshape(model_inputs[2],
+                               [-1, model_inputs[2].shape[-1]]),
+                    None
+                )
+                _, real_task_outputs_enc = encoder.encode_for_yolo(
+                    model_inputs[1],
+                    tf.reshape(model_outputs[2][0],
+                               [-1, model_outputs[2][0].shape[-1]]),
+                    None
+                )
+                _, fake_task_outputs_enc = encoder.encode_for_yolo(
+                    model_inputs[1],
+                    tf.reshape(model_outputs[2][1],
+                               [-1, model_outputs[2][1].shape[-1]]),
+                    None
+                )
+                enc_inputs = (model_inputs[0],
+                              targets_enc,
+                              task_targets_enc,
+                              model_inputs[-1])
+                enc_outputs = (
+                    model_outputs[0],
+                    model_outputs[1],
+                    tf.stack([real_task_outputs_enc, fake_task_outputs_enc],
+                             axis=0)
+                )
+                task_loss = calc_task_loss(enc_inputs, enc_outputs, step)
+            else:
+                task_loss = calc_task_loss(model_inputs, model_outputs, step)
             total_loss = a.dsc_weight * discrim_loss + \
                 a.gen_weight * gen_loss + a.task_weight * task_loss
             tf.summary.scalar(name='total_loss', data=total_loss,
@@ -812,16 +843,27 @@ def main(a):
                                    [-1, task_targets.shape[-1]]),
                         None
                     )
-                    targets = targets[0]
-                    model_inputs = (inputs, targets, task_targets, noise)
+                    # targets = targets[0]
                     batch = ((inputs, noise, targets), (None, None, task_targets))
 
-                # Save images and other metrics.
+                # Save summary images, statistics.
                 if batch_num % a.summary_freq == 0:
                     print(f'Writing outputs for epoch {epoch+1}, batch {batch_num}.')
-                    gen_outputs, discrim_outputs, task_outputs = model(
-                        [inputs, noise, targets]
-                    )
+                    (inputs, noise, targets), (_, _, task_targets) = batch
+                    if a.use_yolo:
+                        targets_enc, _ = encoder.encode_for_yolo(
+                            targets,
+                            tf.reshape(task_targets,
+                                       [-1, task_targets.shape[-1]]),
+                            None
+                        )
+                        gen_outputs, discrim_outputs, task_outputs = model(
+                            [inputs, noise, targets_enc]
+                        )
+                    else:
+                        gen_outputs, discrim_outputs, task_outputs = model(
+                            [inputs, noise, targets]
+                        )
                     model_inputs = (inputs, targets, task_targets, noise)
                     model_outputs = (gen_outputs, discrim_outputs,
                                      task_outputs)
@@ -962,7 +1004,6 @@ def main(a):
                                    [-1, task_targets.shape[-1]]),
                         None
                     )
-                    targets = targets[0]
                 gen_outputs, discrim_outputs, task_outputs = model([inputs,
                                                                     targets])
                 model_inputs = (inputs, targets, task_targets)
@@ -1017,7 +1058,6 @@ def main(a):
                                [-1, task_targets.shape[-1]]),
                     None
                 )
-                targets = targets[0]
             gen_outputs, discrim_outputs, task_outputs = model([inputs,
                                                                 targets])
             model_inputs = (inputs, targets, task_targets)
