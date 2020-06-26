@@ -22,7 +22,7 @@ from tensorflow.keras.layers import (Input, Conv2D, Concatenate,
 from tensorflow.keras.activations import tanh
 from tensorflow.keras.models import Model, load_model
 from tensorflow.keras.regularizers import l1_l2
-from tensorflow.keras.losses import (mean_squared_error, mean_absolute_error,
+from tensorflow.keras.losses import (MSE, mean_absolute_error,
                                      categorical_crossentropy)
 from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint
 from tensorflow.keras.utils import plot_model
@@ -546,42 +546,28 @@ def main(a):
                 optimizer_list = [optimizer_list]
             if not isinstance(loss_function_list, list):
                 loss_function_list = [loss_function_list]
-            if loss_weight_list is not None:
-                if not isinstance(loss_weight_list, list):
-                    loss_weight_list = [loss_weight_list]
-                for optimizer, loss_function, weight in zip(optimizer_list,
-                                                            loss_function_list,
-                                                            loss_weight_list):
-                    with tf.GradientTape() as tape:
-                        (inputs, noise, targets), (_, _, task_targets) = data
-                        gen_outputs, discrim_outputs, task_outputs = \
-                            model([inputs, noise, targets])
-                        model_inputs = (inputs, targets, task_targets, noise)
-                        model_outputs = (gen_outputs,
-                                         discrim_outputs,
-                                         task_outputs)
-                        loss = weight * loss_function(model_inputs,
-                                                      model_outputs,
-                                                      step, encoder=encoder)
-                    gradients = tape.gradient(loss, model.trainable_variables)
-                    optimizer.apply_gradients(zip(gradients, model.trainable_variables))
-            else:
-                for optimizer, loss_function in zip(optimizer_list,
-                                                    loss_function_list):
-                    with tf.GradientTape() as tape:
-                        (inputs, noise, targets), (_, _, task_targets) = data
-                        gen_outputs, discrim_outputs, task_outputs = \
-                            model([inputs, noise, targets])
-                        model_inputs = (inputs, targets, task_targets, noise)
-                        model_outputs = (gen_outputs,
-                                         discrim_outputs,
-                                         task_outputs)
-                        loss = loss_function(model_inputs,
-                                             model_outputs,
-                                             step, encoder=encoder)
-                    gradients = tape.gradient(loss, model.trainable_variables)
-                    optimizer.apply_gradients(zip(gradients,
-                                                  model.trainable_variables))
+            if loss_weight_list is None:
+                loss_weight_list = [1.] * len(optimizer_list)
+            if not isinstance(loss_weight_list, list):
+                loss_weight_list = [loss_weight_list]
+            # Parse out the batch data.
+            (inputs, noise, targets), (_, _, task_targets) = data
+            # Compute and apply gradients.
+            for optimizer, loss_function, weight in zip(optimizer_list,
+                                                        loss_function_list,
+                                                        loss_weight_list):
+                with tf.GradientTape() as tape:
+                    gen_outputs, discrim_outputs, task_outputs = \
+                        model([inputs, noise, targets])
+                    model_inputs = (inputs, targets, task_targets, noise)
+                    model_outputs = (gen_outputs,
+                                     discrim_outputs,
+                                     task_outputs)
+                    loss = weight * loss_function(model_inputs,
+                                                  model_outputs,
+                                                  step, encoder=encoder)
+                gradients = tape.gradient(loss, model.trainable_variables)
+                optimizer.apply_gradients(zip(gradients, model.trainable_variables))
 
     with tf.name_scope("discriminator_loss"):
         @tf.function
@@ -705,27 +691,21 @@ def main(a):
                     x_a = tf.maximum(targets[..., 1], outputs[..., 1])
                     y_b = tf.minimum(targets[..., 2], outputs[..., 2])
                     x_b = tf.minimum(targets[..., 3], outputs[..., 3])
-                    intersection = tf.maximum(x_b - x_a + 1., 0) * \
-                                   tf.maximum(y_b - y_a + 1., 0)
+                    intersection = tf.maximum(x_b - x_a + 1., 0.) * \
+                                   tf.maximum(y_b - y_a + 1., 0.)
                     target_area = (targets[..., 2] - targets[..., 0] + 1.) * \
                                   (targets[..., 3] - targets[..., 1] + 1.)
                     output_area = (outputs[..., 2] - outputs[..., 0] + 1.) * \
                                   (outputs[..., 3] - outputs[..., 1] + 1.)
-                    iou = intersection / (target_area + output_area - 
-                                          intersection)
-                    return 1. - iou
+                    union = target_area + output_area - intersection
+                    return 1. - intersection / union
 
                 # Calculate loss on real images.
                 task_wh = task_targets[..., 2:4] - task_targets[..., :2]
+                task_xy = task_targets[..., :2] + task_wh / 2.
                 xy_loss = tf.reduce_sum(tf.where(
                     bool_mask,
-                    tf.math.reduce_mean(
-                        tf.math.square(
-                            task_targets[..., :2] + task_wh / 2. - \
-                                task_outputs[0][..., :2]
-                        ),
-                        axis=-1
-                    ),
+                    MSE(task_xy, task_outputs[0][..., :2]),
                     tf.zeros_like(bool_mask, dtype=tf.float32)
                 ))
                 iou_loss = tf.math.reduce_mean(
@@ -747,13 +727,7 @@ def main(a):
                 # Calculate loss on fake images.
                 xy_loss_fake = tf.reduce_sum(tf.where(
                     bool_mask,
-                    tf.math.reduce_mean(
-                        tf.math.square(
-                            task_targets[..., :2] + task_wh / 2. - \
-                                task_outputs[1][..., :2]
-                        ),
-                        axis=-1
-                    ),
+                    MSE(task_xy, task_outputs[1][..., :2]),
                     tf.zeros_like(bool_mask, dtype=tf.float32)
                 ))
                 iou_loss_fake = tf.math.reduce_mean(
@@ -901,22 +875,22 @@ def main(a):
                     real_detects = task_outputs[0]
                     fake_detects = task_outputs[1]
                     # true_detects = task_targets
-                    # real_mask = tf.tile(
-                    #     tf.expand_dims(real_detects[..., 5] > a.obj_threshold,
-                    #                    axis=-1),
-                    #     [1, 1, real_detects.shape[-1]]
-                    # )
-                    # fake_mask = tf.tile(
-                    #     tf.expand_dims(fake_detects[..., 5] > a.obj_threshold,
-                    #                    axis=-1),
-                    #     [1, 1, real_detects.shape[-1]]
-                    # )
-                    # real_detects = tf.where(real_mask,
-                    #                         real_detects,
-                    #                         tf.zeros_like(real_detects))
-                    # fake_detects = tf.where(fake_mask,
-                    #                         fake_detects,
-                    #                         tf.zeros_like(fake_detects))
+                    real_mask = tf.tile(
+                        tf.expand_dims(real_detects[..., -1] > a.obj_threshold,
+                                       axis=-1),
+                        [1, 1, real_detects.shape[-1]]
+                    )
+                    fake_mask = tf.tile(
+                        tf.expand_dims(fake_detects[..., -1] > a.obj_threshold,
+                                       axis=-1),
+                        [1, 1, real_detects.shape[-1]]
+                    )
+                    real_detects = tf.where(real_mask,
+                                            real_detects,
+                                            tf.zeros_like(real_detects))
+                    fake_detects = tf.where(fake_mask,
+                                            fake_detects,
+                                            tf.zeros_like(fake_detects))
 
                     # Bounding boxes are [ymin, xmin, ymax, xmax].
                     true_bboxes = task_targets[..., :4]
