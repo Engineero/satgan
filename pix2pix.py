@@ -837,9 +837,9 @@ def main(a):
                         gen_outputs, discrim_outputs, task_outputs = model(
                             [inputs, noise, targets]
                         )
-                    model_inputs = (inputs, targets, task_targets, noise)
-                    model_outputs = (gen_outputs, discrim_outputs,
-                                     task_outputs)
+                    model_inputs = [inputs, targets, task_targets, noise]
+                    model_outputs = [gen_outputs, discrim_outputs,
+                                     task_outputs]
 
                     tf.summary.image(
                         name='fake_image',
