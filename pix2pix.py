@@ -643,13 +643,14 @@ def main(a):
     with tf.name_scope('task_loss'):
         @tf.function
         def calc_task_loss(model_inputs, model_outputs, step):
-            # task_targets are [xcenter, ycenter, class]
+            # task_targets are [ymin, xmin, ymax, xmax, class]
+            # task_outputs are [ymin, xmin, ymax, xmax, *class] where *class
+            # is a one-hot encoded score for each class in the dataset for
+            # custom detector. For YOLO model, *class is just a scalar class
+            # score.
             task_targets = model_inputs[2]
             task_outputs = model_outputs[2]
-
-            # Outputs are [xmin, ymin, width, height, *class] where *class is a
-            # one-hot encoded score for each class in the dataset for custom
-            # detector. For YOLO model, *class is just a scalar class score.
+            print(f'task targets: {task_targets}')
 
             if a.use_yolo:
                 _, task_targets_enc = encoder.encode_for_yolo(
