@@ -583,10 +583,10 @@ def main(a):
                 with tf.GradientTape() as tape:
                     gen_outputs, discrim_outputs, task_outputs = \
                         model([inputs, noise, targets])
-                    model_inputs = (inputs, targets, task_targets, noise)
-                    model_outputs = (gen_outputs,
+                    model_inputs = [inputs, targets, task_targets, noise]
+                    model_outputs = [gen_outputs,
                                      discrim_outputs,
-                                     task_outputs)
+                                     task_outputs]
                     loss = weight * loss_function(model_inputs,
                                                   model_outputs,
                                                   step, encoder=encoder)
