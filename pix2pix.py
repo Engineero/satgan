@@ -511,6 +511,29 @@ def main(a):
                                                    model_outputs,
                                                    step)
             gen_loss = calc_generator_loss(model_inputs, model_outputs, step)
+            if a.use_yolo:
+                targets_enc, task_targets_enc = encoder.encode_for_yolo(
+                    model_inputs[1],
+                    tf.reshape(model_inputs[2],
+                               [-1, model_inputs[2].shape[-1]]),
+                    None
+                )
+                model_inputs[1] = targets_enc
+                model_inputs[2] = task_targets_enc
+                _, real_task_outputs_enc = encoder.encode_for_yolo(
+                    model_inputs[1],
+                    tf.reshape(model_outputs[2][0],
+                               [-1, model_outputs[2][0].shape[-1]]),
+                    None
+                )
+                _, fake_task_outputs_enc = encoder.encode_for_yolo(
+                    model_inputs[1],
+                    tf.reshape(model_outputs[2][1],
+                               [-1, model_outputs[2][1].shape[-1]]),
+                    None
+                )
+                model_outputs[2][0] = real_task_outputs_enc
+                model_outputs[2][1] = fake_task_outputs_enc
             task_loss = calc_task_loss(model_inputs, model_outputs, step)
             total_loss = a.dsc_weight * discrim_loss + \
                 a.gen_weight * gen_loss + a.task_weight * task_loss
@@ -656,31 +679,10 @@ def main(a):
             print(f'task outputs: {task_outputs}')
 
             if a.use_yolo:
-                _, task_targets_enc = encoder.encode_for_yolo(
-                    model_inputs[1],
-                    tf.reshape(task_targets[0],
-                               [-1, task_targets[0].shape[-1]]),
-                    None
-                )
-                _, real_task_outputs_enc = encoder.encode_for_yolo(
-                    model_inputs[1],
-                    tf.reshape(task_outputs[0],
-                               [-1, task_outputs[0].shape[-1]]),
-                    None
-                )
-                _, fake_task_outputs_enc = encoder.encode_for_yolo(
-                    model_inputs[1],
-                    tf.reshape(task_outputs[1],
-                               [-1, task_outputs[1].shape[-1]]),
-                    None
-                )
-                print(f'encoded task targets: {task_targets_enc}')
-                print(f'encoded real task outputs: {real_task_outputs_enc}')
-                print(f'encoded fake task outputs: {fake_task_outputs_enc}')
-                real_loss = task_loss_obj.compute_loss(task_targets_enc[0],
-                                                       real_task_outputs_enc[0])
-                fake_loss = task_loss_obj.compute_loss(task_targets[0],
-                                                       fake_task_outputs_enc[0])
+                real_loss = task_loss_obj.compute_loss(task_targets,
+                                                       task_outputs[0])
+                fake_loss = task_loss_obj.compute_loss(task_targets,
+                                                       task_outputs[1])
             else:
                 target_classes = tf.one_hot(tf.cast(task_targets[..., -1],
                                                     tf.int32),
@@ -822,8 +824,8 @@ def main(a):
                     print(f'Writing outputs for epoch {epoch+1}, batch {batch_num}.')
                     (inputs, noise, targets), (_, _, task_targets) = batch
                     if a.use_yolo:
-                        targets_enc, task_targets_enc = encoder.encode_for_yolo(
-                            inputs,
+                        targets_enc, _ = encoder.encode_for_yolo(
+                            targets,
                             tf.reshape(task_targets,
                                        [-1, task_targets.shape[-1]]),
                             None
@@ -831,21 +833,14 @@ def main(a):
                         gen_outputs, discrim_outputs, task_outputs = model(
                             [inputs, noise, targets_enc]
                         )
-                        # gen_outputs, task_outputs = encoder.encode_for_yolo(
-                        #     gen_outputs,
-                        #     tf.reshape(task_outputs, [-1,
-                        #                               task_outputs.shape[-1]]),
-                        #     None
-                        # )
-                        model_inputs = (inputs, targets_enc, task_targets_enc,
-                                        noise)
                     else:
                         gen_outputs, discrim_outputs, task_outputs = model(
                             [inputs, noise, targets]
                         )
-                        model_inputs = (inputs, targets, task_targets, noise)
+                    model_inputs = (inputs, targets, task_targets, noise)
                     model_outputs = (gen_outputs, discrim_outputs,
                                      task_outputs)
+
                     tf.summary.image(
                         name='fake_image',
                         data=gen_outputs[0],
@@ -887,7 +882,6 @@ def main(a):
                     # Create object bboxes and summarize task outputs, targets.
                     real_detects = task_outputs[0]
                     fake_detects = task_outputs[1]
-                    # true_detects = task_targets
                     real_mask = tf.tile(
                         tf.expand_dims(real_detects[..., -1] > a.obj_threshold,
                                        axis=-1),
