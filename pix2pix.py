@@ -536,7 +536,8 @@ def main(a):
                               task_targets_enc,
                               model_inputs[-1])
                 enc_outputs = (
-                    *model_outputs[:2],
+                    model_outputs[0],
+                    model_outputs[1],
                     tf.stack([real_task_outputs_enc, fake_task_outputs_enc],
                              axis=0)
                 )
