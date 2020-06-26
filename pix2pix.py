@@ -834,6 +834,7 @@ def main(a):
 
             for batch_num, batch in enumerate(train_data):
                 (inputs, noise, targets), (_, _, task_targets) = batch
+                task_targets_copy = tf.identity(task_targets)
 
                 # Encode inputs for YOLO if using YOLO.
                 if a.use_yolo:
@@ -916,7 +917,7 @@ def main(a):
                                             tf.zeros_like(fake_detects))
 
                     # Bounding boxes are [ymin, xmin, ymax, xmax].
-                    true_bboxes = task_targets[..., :4]
+                    true_bboxes = task_targets_copy[..., :4]
                     bboxes_real = real_detects[..., :4]
                     bboxes_fake = fake_detects[..., :4]
 
