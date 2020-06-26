@@ -837,17 +837,13 @@ def main(a):
 
                 # Encode inputs for YOLO if using YOLO.
                 if a.use_yolo:
-                    print(f'non-encoded targets: {targets}')
-                    print(f'non-encoded task targets: {task_targets}')
                     targets, task_targets = encoder.encode_for_yolo(
                         targets,
                         tf.reshape(task_targets,
                                    [-1, task_targets.shape[-1]]),
                         None
                     )
-                    # targets = targets[0]
-                    print(f'encoded targets: {targets}')
-                    print(f'encoded task targets: {task_targets}')
+                    task_targets = task_targets[0]  # encoding somehow makes it a tuple
                     batch = ((inputs, noise, targets), (None, None, task_targets))
 
                 # Save summary images, statistics.
