@@ -504,13 +504,12 @@ def main(a):
     with tf.name_scope("compute_total_loss"):
         @tf.function
         def compute_total_loss(model_inputs, model_outputs, step,
-                               return_all=False, encoder=None):
+                               return_all=False):
             discrim_loss = calc_discriminator_loss(model_inputs,
                                                    model_outputs,
                                                    step)
             gen_loss = calc_generator_loss(model_inputs, model_outputs, step)
-            task_loss = calc_task_loss(model_inputs, model_outputs, step,
-                                       encoder=encoder)
+            task_loss = calc_task_loss(model_inputs, model_outputs, step)
             total_loss = a.dsc_weight * discrim_loss + \
                 a.gen_weight * gen_loss + a.task_weight * task_loss
             tf.summary.scalar(name='total_loss', data=total_loss,
@@ -524,7 +523,7 @@ def main(a):
         @tf.function
         def compute_apply_gradients(model, data, optimizer_list,
                                     loss_function_list, step,
-                                    loss_weight_list=None, encoder=None):
+                                    loss_weight_list=None):
             """Computes and applies gradients with optional lists of
             optimizers and corresponding loss functions.
 
