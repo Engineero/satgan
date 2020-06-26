@@ -652,6 +652,8 @@ def main(a):
             # score.
             task_targets = model_inputs[2]
             task_outputs = model_outputs[2]
+            print(f'task targets: {task_targets}')
+            print(f'task outputs: {task_outputs}')
 
             if a.use_yolo:
                 _, task_targets_enc = encoder.encode_for_yolo(
