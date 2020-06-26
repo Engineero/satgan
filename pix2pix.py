@@ -653,19 +653,19 @@ def main(a):
 
             if a.use_yolo:
                 _, task_targets_enc = encoder.encode_for_yolo(
-                    None,
+                    model_inputs[1],
                     tf.reshape(task_targets[0],
                                [-1, task_targets[0].shape[-1]]),
                     None
                 )
                 _, real_task_outputs_enc = encoder.encode_for_yolo(
-                    None,
+                    model_inputs[1],
                     tf.reshape(task_outputs[0],
                                [-1, task_outputs[0].shape[-1]]),
                     None
                 )
                 _, fake_task_outputs_enc = encoder.encode_for_yolo(
-                    None,
+                    model_inputs[1],
                     tf.reshape(task_outputs[1],
                                [-1, task_outputs[1].shape[-1]]),
                     None
