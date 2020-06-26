@@ -812,6 +812,7 @@ def main(a):
                                    [-1, task_targets.shape[-1]]),
                         None
                     )
+                    targets = targets[0]
                     model_inputs = (inputs, targets, task_targets, noise)
                     batch = ((inputs, noise, targets), (None, None, task_targets))
 
@@ -961,6 +962,7 @@ def main(a):
                                    [-1, task_targets.shape[-1]]),
                         None
                     )
+                    targets = targets[0]
                 gen_outputs, discrim_outputs, task_outputs = model([inputs,
                                                                     targets])
                 model_inputs = (inputs, targets, task_targets)
@@ -1015,6 +1017,7 @@ def main(a):
                                [-1, task_targets.shape[-1]]),
                     None
                 )
+                targets = targets[0]
             gen_outputs, discrim_outputs, task_outputs = model([inputs,
                                                                 targets])
             model_inputs = (inputs, targets, task_targets)
