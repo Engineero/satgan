@@ -532,8 +532,9 @@ def main(a):
                                [-1, model_outputs[2][1].shape[-1]]),
                     None
                 )
-                model_outputs[2][0] = real_task_outputs_enc
-                model_outputs[2][1] = fake_task_outputs_enc
+                model_outputs[2] = tf.stack([real_task_outputs_enc,
+                                             fake_task_outputs_enc],
+                                            axis=0)
             task_loss = calc_task_loss(model_inputs, model_outputs, step)
             total_loss = a.dsc_weight * discrim_loss + \
                 a.gen_weight * gen_loss + a.task_weight * task_loss
