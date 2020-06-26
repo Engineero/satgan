@@ -837,6 +837,8 @@ def main(a):
 
                 # Encode inputs for YOLO if using YOLO.
                 if a.use_yolo:
+                    print(f'non-encoded targets: {targets}')
+                    print(f'non-encoded task targets: {task_targets}')
                     targets, task_targets = encoder.encode_for_yolo(
                         targets,
                         tf.reshape(task_targets,
@@ -844,26 +846,17 @@ def main(a):
                         None
                     )
                     # targets = targets[0]
+                    print(f'encoded targets: {targets}')
+                    print(f'encoded task targets: {task_targets}')
                     batch = ((inputs, noise, targets), (None, None, task_targets))
 
                 # Save summary images, statistics.
                 if batch_num % a.summary_freq == 0:
                     print(f'Writing outputs for epoch {epoch+1}, batch {batch_num}.')
                     (inputs, noise, targets), (_, _, task_targets) = batch
-                    if a.use_yolo:
-                        targets_enc, _ = encoder.encode_for_yolo(
-                            targets,
-                            tf.reshape(task_targets,
-                                       [-1, task_targets.shape[-1]]),
-                            None
-                        )
-                        gen_outputs, discrim_outputs, task_outputs = model(
-                            [inputs, noise, targets_enc]
-                        )
-                    else:
-                        gen_outputs, discrim_outputs, task_outputs = model(
-                            [inputs, noise, targets]
-                        )
+                    gen_outputs, discrim_outputs, task_outputs = model(
+                        [inputs, noise, targets]
+                    )
                     model_inputs = (inputs, targets, task_targets, noise)
                     model_outputs = (gen_outputs, discrim_outputs,
                                      task_outputs)
