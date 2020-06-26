@@ -735,8 +735,8 @@ def main(a):
                 obj_loss = tf.math.reduce_mean(
                     categorical_crossentropy(
                         target_objects,
-                        tf.stack(1. - task_outputs[0][..., 4],
-                                 task_outputs[0][..., 4],
+                        tf.stack([1. - task_outputs[0][..., 4],
+                                  task_outputs[0][..., 4]],
                                  axis=-1),
                         label_smoothing=0.1
                     )
@@ -761,8 +761,8 @@ def main(a):
                 obj_loss_fake = tf.math.reduce_mean(
                     categorical_crossentropy(
                         target_objects,
-                        tf.stack(1. - task_outputs[1][..., 4],
-                                 task_outputs[1][..., 4],
+                        tf.stack([1. - task_outputs[1][..., 4],
+                                  task_outputs[1][..., 4]],
                                  axis=-1),
                         label_smoothing=0.1
                     )
