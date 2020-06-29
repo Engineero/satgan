@@ -790,6 +790,7 @@ def main(a):
         mean_gen = Mean()
         mean_task = Mean()
         mean_list = [mean_total, mean_discrim, mean_gen, mean_task]
+        tf.config.experimental_functions_run_eagerly(True)
         for epoch in range(a.max_epochs):
             print(f'Training epoch {epoch+1} of {a.max_epochs}...')
             epoch_start = time.time()
