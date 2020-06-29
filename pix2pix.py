@@ -835,8 +835,10 @@ def main(a):
                                        [-1, task_outputs[1].shape[-1]]),
                             None
                         )
+                        real_task_out = tf.expand_dims(real_task_out[0], -2)
+                        fake_task_out = tf.expand_dims(fake_task_out[0], -2)
                         task_outputs = tf.stack(
-                            [real_task_out[0], fake_task_out[0]],
+                            [real_task_out, fake_task_out],
                             axis=0
                         )
                     print(f'task outputs shape: {task_outputs.shape}')
