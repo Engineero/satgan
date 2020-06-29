@@ -78,7 +78,9 @@ def _parse_example(serialized_example, a):
     ymin = tf.cast(tf.sparse.to_dense(example['ymin']), tf.float32)
     ymax = tf.cast(tf.sparse.to_dense(example['ymax']), tf.float32)
     classes = tf.cast(tf.sparse.to_dense(example['classes']), tf.float32)
-    objectness = tf.ones_like(classes)
+    objectness = tf.where(classes != 0,
+                          tf.ones_like(classes),
+                          tf.zeros_like(classes))
 
     # Parse images and preprocess.
     a_image = tf.sparse.to_dense(example['a_raw'], default_value='')
@@ -794,8 +796,8 @@ def main(a):
             for batch_num, batch in enumerate(train_data):
                 (inputs, noise, targets), (_, _, task_targets) = batch
                 task_targets_copy = tf.identity(task_targets)
-                print(f'Targets: {targets}')
-                print(f'Task targets: {task_targets}')
+                print(f'Targets shape: {targets.shape}')
+                print(f'Task targets shape: {task_targets.shape}')
 
                 # Encode inputs for YOLO if using YOLO.
                 if a.use_yolo:
@@ -806,7 +808,8 @@ def main(a):
                         None
                     )
                     task_targets = task_targets[0]  # encoding somehow makes it a tuple
-                    print(f'Encoded targets: {targets}')
+                    print(f'Encoded targets shape: {targets.shape}')
+                    print(f'Encoded task targets shape: {task_targets.shape}')
                     print(f'Encoded task targets: {task_targets}')
                     batch = ((inputs, noise, targets), (None, None, task_targets))
 
