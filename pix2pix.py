@@ -497,7 +497,6 @@ def main(a):
 
     # Define model losses and helpers for computing and applying gradients.
     with tf.name_scope("compute_total_loss"):
-        # @tf.function
         def compute_total_loss(model_inputs, model_outputs, step,
                                return_all=False):
             discrim_loss = calc_discriminator_loss(model_inputs,
@@ -515,7 +514,6 @@ def main(a):
                 return total_loss
 
     with tf.name_scope('apply_gradients'):
-        # @tf.function
         def compute_apply_gradients(model, data, optimizer_list,
                                     loss_function_list, step,
                                     loss_weight_list=None):
@@ -564,7 +562,6 @@ def main(a):
                 optimizer.apply_gradients(zip(gradients, model.trainable_variables))
 
     with tf.name_scope("discriminator_loss"):
-        # @tf.function
         def calc_discriminator_loss(model_inputs, model_outputs, step,
                                     **kwargs):
             # minimizing -tf.log will try to get inputs to 1
@@ -604,7 +601,6 @@ def main(a):
             return discrim_loss
 
     with tf.name_scope("generator_loss"):
-        # @tf.function
         def calc_generator_loss(model_inputs, model_outputs, step, **kwargs):
             # predict_fake => 1
             # abs(targets - outputs) => 0
@@ -763,7 +759,6 @@ def main(a):
             tf.summary.scalar(name='task_loss', data=task_loss,
                               step=step)
             return task_loss
-
 
     # Define the optimizer, losses, and weights.
     if a.multi_optim:
