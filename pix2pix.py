@@ -678,10 +678,12 @@ def main(a):
                                                 tf.int32),
                                         a.num_classes)
             if a.use_yolo:
-                real_output_classes = tf.stack([1 - task_outputs[0][..., -1],
-                                                task_outputs[0][..., -1]])
-                fake_output_classes = tf.stack([1 - task_outputs[1][..., -1],
-                                                task_outputs[1][..., -1]])
+                real_output_classes = tf.stack([1. - task_outputs[0][..., -1],
+                                                task_outputs[0][..., -1]],
+                                                axis=-1)
+                fake_output_classes = tf.stack([1. - task_outputs[1][..., -1],
+                                                task_outputs[1][..., -1]],
+                                                axis=-1)
             else:
                 real_output_classes = task_outputs[0][..., 5:]
                 fake_output_classes = task_outputs[1][..., 5:]
