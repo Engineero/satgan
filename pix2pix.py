@@ -636,10 +636,10 @@ def main(a):
             return gen_loss
 
     with tf.name_scope('task_loss'):
-        @tf.function
-        def calc_yolo_loss(y_true, y_pred):
-            """Wraps YOLO loss function in tf.function decorator."""
-            return task_loss_obj.compute_loss(y_true, y_pred)
+        # @tf.function
+        # def calc_yolo_loss(y_true, y_pred):
+        #     """Wraps YOLO loss function in tf.function decorator."""
+        #     return task_loss_obj.compute_loss(y_true, y_pred)
 
         def calc_iou(targets, outputs):
             y_a = tf.maximum(targets[..., 0], outputs[..., 0])
@@ -677,6 +677,14 @@ def main(a):
             target_classes = tf.one_hot(tf.cast(task_targets[..., -1],
                                                 tf.int32),
                                         a.num_classes)
+            if a.use_yolo:
+                real_output_classes = tf.stack([1 - task_outputs[0][..., -1],
+                                                task_outputs[0][..., -1])
+                fake_output_classes = tf.stack([1 - task_outputs[1][..., -1],
+                                                task_outputs[1][..., -1])
+            else:
+                real_output_classes = task_outputs[0][..., 5:]
+                fake_output_classes = task_outputs[1][..., 5:]
             bool_mask = (task_targets[..., -1] != 0)
             object_target = tf.cast(tf.stack([bool_mask,
                                               tf.logical_not(bool_mask)],
@@ -705,7 +713,7 @@ def main(a):
             )
             class_loss = tf.math.reduce_mean(
                 categorical_crossentropy(target_classes,
-                                         task_outputs[0][..., 5:],
+                                         real_output_classes,
                                          label_smoothing=0.1)
             )
             real_loss = xy_loss + a.iou_weight * iou_loss + \
@@ -731,7 +739,7 @@ def main(a):
             )
             class_loss_fake = tf.math.reduce_mean(
                 categorical_crossentropy(target_classes,
-                                         task_outputs[1][..., 5:],
+                                         fake_output_classes,
                                          label_smoothing=0.1)
             )
             fake_loss = xy_loss_fake + a.iou_weight * iou_loss_fake + \
