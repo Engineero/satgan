@@ -31,10 +31,6 @@ from tensorflow.keras.metrics import Mean
 from yolo_v3 import build_yolo_model, load_yolo_model_weights
 
 
-# Define globals.
-EPS = 1e-12
-
-
 def preprocess(image, add_noise=False):
     """Performs image standardization, optinoally adds Gaussian noise.
 
