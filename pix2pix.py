@@ -641,6 +641,20 @@ def main(a):
             """Wraps YOLO loss function in tf.function decorator."""
             return task_loss_obj.compute_loss(y_true, y_pred)
 
+        def calc_iou(targets, outputs):
+            y_a = tf.maximum(targets[..., 0], outputs[..., 0])
+            x_a = tf.maximum(targets[..., 1], outputs[..., 1])
+            y_b = tf.minimum(targets[..., 2], outputs[..., 2])
+            x_b = tf.minimum(targets[..., 3], outputs[..., 3])
+            intersection = tf.maximum(x_b - x_a + 1., 0.) * \
+                           tf.maximum(y_b - y_a + 1., 0.)
+            target_area = (targets[..., 2] - targets[..., 0] + 1.) * \
+                          (targets[..., 3] - targets[..., 1] + 1.)
+            output_area = (outputs[..., 2] - outputs[..., 0] + 1.) * \
+                          (outputs[..., 3] - outputs[..., 1] + 1.)
+            union = target_area + output_area - intersection
+            return 1. - intersection / union
+
         @tf.function
         def calc_task_loss(model_inputs, model_outputs, step):
             # task_targets are [ymin, xmin, ymax, xmax, class]
@@ -653,109 +667,95 @@ def main(a):
             print(f'task targets: {task_targets}')
             print(f'task outputs: {task_outputs}')
 
-            if a.use_yolo:
-                print('\nComputing real task loss...')
-                real_loss = calc_yolo_loss(task_targets, task_outputs[0])
-                print('Computing fake task loss...')
-                fake_loss = calc_yolo_loss(task_targets, task_outputs[1])
-            else:
-                target_classes = tf.one_hot(tf.cast(task_targets[..., -1],
-                                                    tf.int32),
-                                            a.num_classes)
-                bool_mask = (task_targets[..., -1] != 0)
-                object_target = tf.cast(tf.stack([bool_mask,
-                                                  tf.logical_not(bool_mask)],
-                                                 axis=-1),
-                                        dtype=tf.int32)
+            # if a.use_yolo:
+            #     print('\nComputing real task loss...')
+            #     real_loss = calc_yolo_loss(task_targets, task_outputs[0])
+            #     print('Computing fake task loss...')
+            #     fake_loss = calc_yolo_loss(task_targets, task_outputs[1])
+            # else:
 
-                # TODO (NLT): Calculate intersection and union.
-                def calc_iou(targets, outputs):
-                    y_a = tf.maximum(targets[..., 0], outputs[..., 0])
-                    x_a = tf.maximum(targets[..., 1], outputs[..., 1])
-                    y_b = tf.minimum(targets[..., 2], outputs[..., 2])
-                    x_b = tf.minimum(targets[..., 3], outputs[..., 3])
-                    intersection = tf.maximum(x_b - x_a + 1., 0.) * \
-                                   tf.maximum(y_b - y_a + 1., 0.)
-                    target_area = (targets[..., 2] - targets[..., 0] + 1.) * \
-                                  (targets[..., 3] - targets[..., 1] + 1.)
-                    output_area = (outputs[..., 2] - outputs[..., 0] + 1.) * \
-                                  (outputs[..., 3] - outputs[..., 1] + 1.)
-                    union = target_area + output_area - intersection
-                    return 1. - intersection / union
+            target_classes = tf.one_hot(tf.cast(task_targets[..., -1],
+                                                tf.int32),
+                                        a.num_classes)
+            bool_mask = (task_targets[..., -1] != 0)
+            object_target = tf.cast(tf.stack([bool_mask,
+                                              tf.logical_not(bool_mask)],
+                                             axis=-1),
+                                    dtype=tf.int32)
 
-                # Calculate loss on real images.
-                task_wh = task_targets[..., 2:4] - task_targets[..., :2]
-                task_xy = task_targets[..., :2] + task_wh / 2.
-                xy_loss = tf.reduce_sum(tf.where(
-                    bool_mask,
-                    MSE(task_xy, task_outputs[0][..., :2]),
-                    tf.zeros_like(bool_mask, dtype=tf.float32)
-                ))
-                iou_loss = tf.math.reduce_mean(
-                    calc_iou(task_targets, task_outputs[0])
+            # Calculate loss on real images.
+            task_wh = task_targets[..., 2:4] - task_targets[..., :2]
+            task_xy = task_targets[..., :2] + task_wh / 2.
+            xy_loss = tf.reduce_sum(tf.where(
+                bool_mask,
+                MSE(task_xy, task_outputs[0][..., :2]),
+                tf.zeros_like(bool_mask, dtype=tf.float32)
+            ))
+            iou_loss = tf.math.reduce_mean(
+                calc_iou(task_targets, task_outputs[0])
+            )
+            obj_loss = tf.math.reduce_mean(
+                categorical_crossentropy(
+                    object_target,
+                    tf.stack([1. - task_outputs[0][..., 4],
+                              task_outputs[0][..., 4]],
+                             axis=-1),
+                    label_smoothing=0.1
                 )
-                obj_loss = tf.math.reduce_mean(
-                    categorical_crossentropy(
-                        object_target,
-                        tf.stack([1. - task_outputs[0][..., 4],
-                                  task_outputs[0][..., 4]],
-                                 axis=-1),
-                        label_smoothing=0.1
-                    )
-                )
-                class_loss = tf.math.reduce_mean(
-                    categorical_crossentropy(target_classes,
-                                             task_outputs[0][..., 5:],
-                                             label_smoothing=0.1)
-                )
-                real_loss = xy_loss + a.iou_weight * iou_loss + \
-                            a.class_weight * class_loss + obj_loss
+            )
+            class_loss = tf.math.reduce_mean(
+                categorical_crossentropy(target_classes,
+                                         task_outputs[0][..., 5:],
+                                         label_smoothing=0.1)
+            )
+            real_loss = xy_loss + a.iou_weight * iou_loss + \
+                        a.class_weight * class_loss + obj_loss
 
-                # Calculate loss on fake images.
-                xy_loss_fake = tf.reduce_sum(tf.where(
-                    bool_mask,
-                    MSE(task_xy, task_outputs[1][..., :2]),
-                    tf.zeros_like(bool_mask, dtype=tf.float32)
-                ))
-                iou_loss_fake = tf.math.reduce_mean(
-                    calc_iou(task_targets, task_outputs[1])
+            # Calculate loss on fake images.
+            xy_loss_fake = tf.reduce_sum(tf.where(
+                bool_mask,
+                MSE(task_xy, task_outputs[1][..., :2]),
+                tf.zeros_like(bool_mask, dtype=tf.float32)
+            ))
+            iou_loss_fake = tf.math.reduce_mean(
+                calc_iou(task_targets, task_outputs[1])
+            )
+            obj_loss_fake = tf.math.reduce_mean(
+                categorical_crossentropy(
+                    object_target,
+                    tf.stack([1. - task_outputs[1][..., 4],
+                              task_outputs[1][..., 4]],
+                             axis=-1),
+                    label_smoothing=0.1
                 )
-                obj_loss_fake = tf.math.reduce_mean(
-                    categorical_crossentropy(
-                        object_target,
-                        tf.stack([1. - task_outputs[1][..., 4],
-                                  task_outputs[1][..., 4]],
-                                 axis=-1),
-                        label_smoothing=0.1
-                    )
-                )
-                class_loss_fake = tf.math.reduce_mean(
-                    categorical_crossentropy(target_classes,
-                                             task_outputs[1][..., 5:],
-                                             label_smoothing=0.1)
-                )
-                fake_loss = xy_loss_fake + a.iou_weight * iou_loss_fake + \
-                            a.class_weight * class_loss_fake + obj_loss_fake
+            )
+            class_loss_fake = tf.math.reduce_mean(
+                categorical_crossentropy(target_classes,
+                                         task_outputs[1][..., 5:],
+                                         label_smoothing=0.1)
+            )
+            fake_loss = xy_loss_fake + a.iou_weight * iou_loss_fake + \
+                        a.class_weight * class_loss_fake + obj_loss_fake
 
-                # Write summaries.
-                tf.summary.scalar(name='task_real_xy_loss', data=xy_loss,
-                                  step=step)
-                tf.summary.scalar(name='task_fake_xy_loss', data=xy_loss_fake,
-                                  step=step)
-                tf.summary.scalar(name='task_real_iou_loss', data=iou_loss,
-                                  step=step)
-                tf.summary.scalar(name='task_fake_iou_loss', data=iou_loss_fake,
-                                  step=step)
-                tf.summary.scalar(name='task_real_obj_loss', data=obj_loss,
-                                  step=step)
-                tf.summary.scalar(name='task_fake_obj_loss', data=obj_loss_fake,
-                                  step=step)
-                tf.summary.scalar(name='task_real_class_loss', data=class_loss,
-                                  step=step)
-                tf.summary.scalar(name='task_fake_class_loss',
-                                  data=class_loss_fake,
-                                  step=step)
-            
+            # Write summaries.
+            tf.summary.scalar(name='task_real_xy_loss', data=xy_loss,
+                              step=step)
+            tf.summary.scalar(name='task_fake_xy_loss', data=xy_loss_fake,
+                              step=step)
+            tf.summary.scalar(name='task_real_iou_loss', data=iou_loss,
+                              step=step)
+            tf.summary.scalar(name='task_fake_iou_loss', data=iou_loss_fake,
+                              step=step)
+            tf.summary.scalar(name='task_real_obj_loss', data=obj_loss,
+                              step=step)
+            tf.summary.scalar(name='task_fake_obj_loss', data=obj_loss_fake,
+                              step=step)
+            tf.summary.scalar(name='task_real_class_loss', data=class_loss,
+                              step=step)
+            tf.summary.scalar(name='task_fake_class_loss',
+                              data=class_loss_fake,
+                              step=step)
+
             task_loss = real_loss + fake_loss
             tf.summary.scalar(name='task_real_loss',
                               data=real_loss,
@@ -802,17 +802,17 @@ def main(a):
                 print(f'Task targets shape: {task_targets.shape}')
 
                 # Encode inputs for YOLO if using YOLO.
-                if a.use_yolo:
-                    targets, task_targets = encoder.encode_for_yolo(
-                        targets,
-                        tf.reshape(task_targets,
-                                   [-1, task_targets.shape[-1]]),
-                        None
-                    )
-                    task_targets = tf.expand_dims(task_targets[0], -2)  # encoding somehow makes it a tuple
-                    print(f'Encoded targets shape: {targets.shape}')
-                    print(f'Encoded task targets shape: {task_targets.shape}')
-                    batch = ((inputs, noise, targets), (None, None, task_targets))
+                # if a.use_yolo:
+                #     targets, task_targets = encoder.encode_for_yolo(
+                #         targets,
+                #         tf.reshape(task_targets,
+                #                    [-1, task_targets.shape[-1]]),
+                #         None
+                #     )
+                #     task_targets = tf.expand_dims(task_targets[0], -2)  # encoding somehow makes it a tuple
+                #     print(f'Encoded targets shape: {targets.shape}')
+                #     print(f'Encoded task targets shape: {task_targets.shape}')
+                #     batch = ((inputs, noise, targets), (None, None, task_targets))
 
                 # Save summary images, statistics.
                 if batch_num % a.summary_freq == 0:
@@ -822,25 +822,25 @@ def main(a):
                         [inputs, noise, targets]
                     )
                     task_outputs_copy = tf.identity(task_outputs)
-                    if a.use_yolo:
-                        _, real_task_out = encoder.encode_for_yolo(
-                            targets,
-                            tf.reshape(task_outputs[0],
-                                       [-1, task_outputs[0].shape[-1]]),
-                            None
-                        )
-                        _, fake_task_out = encoder.encode_for_yolo(
-                            targets,
-                            tf.reshape(task_outputs[1],
-                                       [-1, task_outputs[1].shape[-1]]),
-                            None
-                        )
-                        real_task_out = tf.expand_dims(real_task_out[0], -2)
-                        fake_task_out = tf.expand_dims(fake_task_out[0], -2)
-                        task_outputs = tf.stack(
-                            [real_task_out, fake_task_out],
-                            axis=0
-                        )
+                    # if a.use_yolo:
+                    #     _, real_task_out = encoder.encode_for_yolo(
+                    #         targets,
+                    #         tf.reshape(task_outputs[0],
+                    #                    [-1, task_outputs[0].shape[-1]]),
+                    #         None
+                    #     )
+                    #     _, fake_task_out = encoder.encode_for_yolo(
+                    #         targets,
+                    #         tf.reshape(task_outputs[1],
+                    #                    [-1, task_outputs[1].shape[-1]]),
+                    #         None
+                    #     )
+                    #     real_task_out = tf.expand_dims(real_task_out[0], -2)
+                    #     fake_task_out = tf.expand_dims(fake_task_out[0], -2)
+                    #     task_outputs = tf.stack(
+                    #         [real_task_out, fake_task_out],
+                    #         axis=0
+                    #     )
                     print(f'task outputs shape: {task_outputs.shape}')
                     model_inputs = (inputs, targets, task_targets, noise)
                     model_outputs = (gen_outputs, discrim_outputs,
