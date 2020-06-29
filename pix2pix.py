@@ -636,7 +636,7 @@ def main(a):
             return gen_loss
 
     with tf.name_scope('task_loss'):
-        @tf.function
+        # @tf.function
         def calc_task_loss(model_inputs, model_outputs, step):
             # task_targets are [ymin, xmin, ymax, xmax, class]
             # task_outputs are [ymin, xmin, ymax, xmax, *class] where *class
