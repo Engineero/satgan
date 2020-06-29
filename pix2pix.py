@@ -799,7 +799,6 @@ def main(a):
                 task_targets_copy = tf.identity(task_targets)
                 print(f'Targets shape: {targets.shape}')
                 print(f'Task targets shape: {task_targets.shape}')
-                print(f'Task targets: {task_targets}')
 
                 # Encode inputs for YOLO if using YOLO.
                 if a.use_yolo:
@@ -812,7 +811,6 @@ def main(a):
                     task_targets = task_targets[0]  # encoding somehow makes it a tuple
                     print(f'Encoded targets shape: {targets.shape}')
                     print(f'Encoded task targets shape: {task_targets.shape}')
-                    print(f'Encoded task targets: {task_targets}')
                     batch = ((inputs, noise, targets), (None, None, task_targets))
 
                 # Save summary images, statistics.
