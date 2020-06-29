@@ -641,7 +641,7 @@ def main(a):
             """Wraps YOLO loss function in tf.function decorator."""
             return task_loss_obj.compute_loss(y_true, y_pred)
 
-        # @tf.function
+        @tf.function
         def calc_task_loss(model_inputs, model_outputs, step):
             # task_targets are [ymin, xmin, ymax, xmax, class]
             # task_outputs are [ymin, xmin, ymax, xmax, *class] where *class
