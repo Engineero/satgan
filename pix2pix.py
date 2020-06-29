@@ -91,7 +91,7 @@ def _parse_example(serialized_example, a):
     b_image = tf.reshape(b_image, [-1, height[0], width[0], 1])
 
     # Package things up for output.
-    objects = tf.stack([ymin, xmin, ymax, xmax, classes], axis=-1)
+    objects = tf.stack([ymin, xmin, ymax, xmax, classes], axis=1)
     # Need to pad objects to max inferences (not all images will have same
     # number of objects).
     paddings = tf.constant([[0, 0], [0, a.max_inferences], [0, 0]])
