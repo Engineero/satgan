@@ -637,6 +637,11 @@ def main(a):
 
     with tf.name_scope('task_loss'):
         @tf.function
+        def calc_yolo_loss(y_true, y_pred):
+            """Wraps YOLO loss function in tf.function decorator."""
+            return task_loss_obj.compute_loss(y_true, y_pred)
+
+        # @tf.function
         def calc_task_loss(model_inputs, model_outputs, step):
             # task_targets are [ymin, xmin, ymax, xmax, class]
             # task_outputs are [ymin, xmin, ymax, xmax, *class] where *class
@@ -650,15 +655,9 @@ def main(a):
 
             if a.use_yolo:
                 print('\nComputing real task loss...')
-                real_loss = task_loss_obj.compute_loss(
-                    task_targets,
-                    task_outputs[0]
-                )
+                real_loss = calc_yolo_loss(task_targets, task_outputs[0])
                 print('Computing fake task loss...')
-                fake_loss = task_loss_obj.compute_loss(
-                    task_targets,
-                    task_outputs[1]
-                )
+                fake_loss = calc_yolo_loss(task_targets, task_outputs[1])
             else:
                 target_classes = tf.one_hot(tf.cast(task_targets[..., -1],
                                                     tf.int32),
