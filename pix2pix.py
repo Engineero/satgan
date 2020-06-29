@@ -6,16 +6,9 @@ import time
 import tensorflow as tf
 import numpy as np
 import argparse
-import json
-import glob
-import random
-import collections
-import math
-import time
 from pathlib import Path
 from utils import ops
 from utils.darknet import build_darknet_model
-from utils.SaveImagesCallback import SaveImagesCallback
 from tensorflow.keras.layers import (Input, Conv2D, Concatenate,
                                      MaxPooling2D, BatchNormalization,
                                      LeakyReLU, GlobalAveragePooling2D)
@@ -24,9 +17,8 @@ from tensorflow.keras.models import Model, load_model
 from tensorflow.keras.regularizers import l1_l2
 from tensorflow.keras.losses import (MSE, mean_absolute_error,
                                      categorical_crossentropy)
-from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint
 from tensorflow.keras.utils import plot_model
-from tensorflow.keras.optimizers import Adam, SGD
+from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.metrics import Mean
 from yolo_v3 import build_yolo_model, load_yolo_model_weights
 
