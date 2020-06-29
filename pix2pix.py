@@ -821,6 +821,7 @@ def main(a):
                     gen_outputs, discrim_outputs, task_outputs = model(
                         [inputs, noise, targets]
                     )
+                    task_outputs_copy = tf.identity(task_outputs)
                     if a.use_yolo:
                         _, real_task_out = encoder.encode_for_yolo(
                             targets,
@@ -882,8 +883,8 @@ def main(a):
                     )
 
                     # Create object bboxes and summarize task outputs, targets.
-                    real_detects = task_outputs[0]
-                    fake_detects = task_outputs[1]
+                    real_detects = task_outputs_copy[0]
+                    fake_detects = task_outputs_copy[1]
                     real_mask = tf.tile(
                         tf.expand_dims(real_detects[..., -1] > a.obj_threshold,
                                        axis=-1),
