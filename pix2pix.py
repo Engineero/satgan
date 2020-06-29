@@ -556,7 +556,7 @@ def main(a):
                                      task_outputs)
                     loss = weight * loss_function(model_inputs,
                                                   model_outputs,
-                                                  step, encoder=encoder)
+                                                  step)
                 gradients = tape.gradient(loss, model.trainable_variables)
                 optimizer.apply_gradients(zip(gradients, model.trainable_variables))
 
@@ -794,6 +794,8 @@ def main(a):
             for batch_num, batch in enumerate(train_data):
                 (inputs, noise, targets), (_, _, task_targets) = batch
                 task_targets_copy = tf.identity(task_targets)
+                print(f'Targets: {targets}')
+                print(f'Task targets: {task_targets}')
 
                 # Encode inputs for YOLO if using YOLO.
                 if a.use_yolo:
@@ -804,6 +806,8 @@ def main(a):
                         None
                     )
                     task_targets = task_targets[0]  # encoding somehow makes it a tuple
+                    print(f'Encoded targets: {targets}')
+                    print(f'Encoded task targets: {task_targets}')
                     batch = ((inputs, noise, targets), (None, None, task_targets))
 
                 # Save summary images, statistics.
