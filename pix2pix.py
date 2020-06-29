@@ -646,15 +646,15 @@ def main(a):
             print(f'task outputs: {task_outputs}')
 
             if a.use_yolo:
-                print('Computing fake task loss...')
-                fake_loss = task_loss_obj.compute_loss(
-                    tf.expand_dims(task_targets[0], 0),
-                    task_outputs[1]
-                )
                 print('\nComputing real task loss...')
                 real_loss = task_loss_obj.compute_loss(
-                    tf.expand_dims(task_targets[0], 0),
+                    task_targets,
                     task_outputs[0]
+                )
+                print('Computing fake task loss...')
+                fake_loss = task_loss_obj.compute_loss(
+                    task_targets,
+                    task_outputs[1]
                 )
             else:
                 target_classes = tf.one_hot(tf.cast(task_targets[..., -1],
