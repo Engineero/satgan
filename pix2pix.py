@@ -798,6 +798,7 @@ def main(a):
                 task_targets_copy = tf.identity(task_targets)
                 print(f'Targets shape: {targets.shape}')
                 print(f'Task targets shape: {task_targets.shape}')
+                print(f'Task targets: {task_targets}')
 
                 # Encode inputs for YOLO if using YOLO.
                 if a.use_yolo:
