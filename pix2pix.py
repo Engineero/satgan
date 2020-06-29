@@ -821,6 +821,7 @@ def main(a):
                     gen_outputs, discrim_outputs, task_outputs = model(
                         [inputs, noise, targets]
                     )
+                    print(f'task outputs shape: {task_outputs.shape}')
                     model_inputs = (inputs, targets, task_targets, noise)
                     model_outputs = (gen_outputs, discrim_outputs,
                                      task_outputs)
