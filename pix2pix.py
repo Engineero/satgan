@@ -821,6 +821,21 @@ def main(a):
                     gen_outputs, discrim_outputs, task_outputs = model(
                         [inputs, noise, targets]
                     )
+                    if a.use_yolo:
+                        _, real_task_out = encoder.encode_for_yolo(
+                            targets,
+                            tf.reshape(task_outputs[0],
+                                       [-1, task_outputs[0].shape[-1]])
+                        )
+                        _, fake_task_out = encoder.encode_for_yolo(
+                            targets,
+                            tf.reshape(task_outputs[1],
+                                       [-1, task_outputs[1].shape[-1]])
+                        )
+                        task_outputs = tf.stack(
+                            [real_task_out, fake_task_out],
+                            axis=0
+                        )
                     print(f'task outputs shape: {task_outputs.shape}')
                     model_inputs = (inputs, targets, task_targets, noise)
                     model_outputs = (gen_outputs, discrim_outputs,
