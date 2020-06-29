@@ -825,12 +825,14 @@ def main(a):
                         _, real_task_out = encoder.encode_for_yolo(
                             targets,
                             tf.reshape(task_outputs[0],
-                                       [-1, task_outputs[0].shape[-1]])
+                                       [-1, task_outputs[0].shape[-1]]),
+                            None
                         )
                         _, fake_task_out = encoder.encode_for_yolo(
                             targets,
                             tf.reshape(task_outputs[1],
-                                       [-1, task_outputs[1].shape[-1]])
+                                       [-1, task_outputs[1].shape[-1]]),
+                            None
                         )
                         task_outputs = tf.stack(
                             [real_task_out, fake_task_out],
