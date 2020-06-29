@@ -78,9 +78,9 @@ def _parse_example(serialized_example, a):
     ymin = tf.cast(tf.sparse.to_dense(example['ymin']), tf.float32)
     ymax = tf.cast(tf.sparse.to_dense(example['ymax']), tf.float32)
     classes = tf.cast(tf.sparse.to_dense(example['classes']), tf.float32)
-    objectness = tf.where(classes != 0,
-                          tf.ones_like(classes),
-                          tf.zeros_like(classes))
+    # objectness = tf.where(classes != 0,
+    #                       tf.ones_like(classes),
+    #                       tf.zeros_like(classes))
 
     # Parse images and preprocess.
     a_image = tf.sparse.to_dense(example['a_raw'], default_value='')
@@ -91,7 +91,7 @@ def _parse_example(serialized_example, a):
     b_image = tf.reshape(b_image, [-1, height[0], width[0], 1])
 
     # Package things up for output.
-    objects = tf.stack([ymin, xmin, ymax, xmax, objectness, classes], axis=-1)
+    objects = tf.stack([ymin, xmin, ymax, xmax, classes], axis=-1)
     # Need to pad objects to max inferences (not all images will have same
     # number of objects).
     paddings = tf.constant([[0, 0], [0, a.max_inferences], [0, 0]])
@@ -662,10 +662,11 @@ def main(a):
                 target_classes = tf.one_hot(tf.cast(task_targets[..., -1],
                                                     tf.int32),
                                             a.num_classes)
-                target_objects = tf.one_hot(tf.cast(task_targets[..., -2],
-                                                    tf.int32),
-                                            2)
-                bool_mask = (task_targets[..., -2] != 0)
+                bool_mask = (task_targets[..., -1] != 0)
+                object_target = tf.cast(tf.stack([bool_mask,
+                                                  tf.logical_not(bool_mask)],
+                                                 axis=-1),
+                                        dtype=tf.int32)
 
                 # TODO (NLT): Calculate intersection and union.
                 def calc_iou(targets, outputs):
@@ -695,7 +696,7 @@ def main(a):
                 )
                 obj_loss = tf.math.reduce_mean(
                     categorical_crossentropy(
-                        target_objects,
+                        object_target,
                         tf.stack([1. - task_outputs[0][..., 4],
                                   task_outputs[0][..., 4]],
                                  axis=-1),
@@ -721,7 +722,7 @@ def main(a):
                 )
                 obj_loss_fake = tf.math.reduce_mean(
                     categorical_crossentropy(
-                        target_objects,
+                        object_target,
                         tf.stack([1. - task_outputs[1][..., 4],
                                   task_outputs[1][..., 4]],
                                  axis=-1),
