@@ -837,68 +837,68 @@ def main(a):
                                      task_outputs)
 
                     tf.summary.image(
-                        name='fake_image',
+                        name='Fake image',
                         data=gen_outputs[0],
                         step=batches_seen,
                     )
                     tf.summary.image(
-                        name='generated_noise',
+                        name='Generated noise',
                         data=gen_outputs[1],
                         step=batches_seen,
                     )
                     tf.summary.image(
-                        name='blank_image',
+                        name='A image',
                         data=inputs,
                         step=batches_seen,
                     )
                     tf.summary.image(
-                        name='input_noise',
+                        name='Input noise',
                         data=noise,
                         step=batches_seen,
                     )
                     tf.summary.image(
-                        name='target_image',
+                        name='B image',
                         data=targets,
                         step=batches_seen,
                     )
                     tf.summary.image(
-                        name='predict_real',
+                        name='Predict real map',
                         data=tf.expand_dims(discrim_outputs[0][..., 1],
                                             axis=-1),
                         step=batches_seen,
                     )
                     tf.summary.image(
-                        name='predict_fake',
+                        name='Predict fake map',
                         data=tf.expand_dims(discrim_outputs[1][..., 0],
                                             axis=-1),
                         step=batches_seen,
                     )
 
                     # Create object bboxes and summarize task outputs, targets.
-                    real_detects = task_outputs[0]
-                    fake_detects = task_outputs[1]
-                    real_mask = tf.tile(
-                        tf.expand_dims(real_detects[..., -1] > a.obj_threshold,
+                    b_detects = task_outputs[0]
+                    a_detects = task_outputs[1]
+                    b_mask = tf.tile(
+                        tf.expand_dims(b_detects[..., -1] > a.obj_threshold,
                                        axis=-1),
-                        [1, 1, real_detects.shape[-1]]
+                        [1, 1, b_detects.shape[-1]]
                     )
-                    fake_mask = tf.tile(
-                        tf.expand_dims(fake_detects[..., -1] > a.obj_threshold,
+                    a_mask = tf.tile(
+                        tf.expand_dims(a_detects[..., -1] > a.obj_threshold,
                                        axis=-1),
-                        [1, 1, real_detects.shape[-1]]
+                        [1, 1, b_detects.shape[-1]]
                     )
-                    real_detects = tf.where(real_mask,
-                                            real_detects,
-                                            tf.zeros_like(real_detects))
-                    fake_detects = tf.where(fake_mask,
-                                            fake_detects,
-                                            tf.zeros_like(fake_detects))
+                    b_detects = tf.where(b_mask,
+                                         b_detects,
+                                         tf.zeros_like(b_detects))
+                    a_detects = tf.where(a_mask,
+                                         a_detects,
+                                         tf.zeros_like(a_detects))
 
                     # Bounding boxes are [ymin, xmin, ymax, xmax].
                     a_true_bboxes = a_task_targets[..., :4]
                     b_true_bboxes = b_task_targets[..., :4]
-                    bboxes_real = real_detects[..., :4]
-                    bboxes_fake = fake_detects[..., :4]
+                    a_fake_bboxes = a_detects[..., :4]
+                    b_fake_bboxes = b_detects[..., :4]
 
                     # Add bounding boxes to sample images.
                     target_bboxes = tf.image.draw_bounding_boxes(
@@ -908,7 +908,7 @@ def main(a):
                     )
                     target_bboxes = tf.image.draw_bounding_boxes(
                         images=target_bboxes,
-                        boxes=bboxes_real,
+                        boxes=b_fake_bboxes,
                         colors=np.array([[0., 1., 0.]])
                     )
                     generated_bboxes = tf.image.draw_bounding_boxes(
@@ -918,19 +918,19 @@ def main(a):
                     )
                     generated_bboxes = tf.image.draw_bounding_boxes(
                         images=generated_bboxes,
-                        boxes=bboxes_fake,
+                        boxes=a_fake_bboxes,
                         colors=np.array([[0., 1., 0.]])
                     )
 
                     # Save task outputs.
                     tf.summary.image(
-                        name='task_real',
-                        data=target_bboxes,
+                        name='Task output on A domain',
+                        data=generated_bboxes,
                         step=batches_seen,
                     )
                     tf.summary.image(
-                        name='task_fake',
-                        data=generated_bboxes,
+                        name='Task output on B domain',
+                        data=target_bboxes,
                         step=batches_seen,
                     )
 
