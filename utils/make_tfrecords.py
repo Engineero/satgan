@@ -27,15 +27,30 @@ def _check_args(args):
     """
     a_dir = Path(args.a_dir).resolve()
     b_dir = Path(args.b_dir).resolve()
-    annotation_dir = Path(args.annotation_dir).resolve()
+    if args.a_annotation_dir is not None:
+        a_annotation_dir = Path(args.a_annotation_dir).resolve()
+    else:
+        a_annotation_dir = None
+    if args.b_annotation_dir is not None:
+        b_annotation_dir = Path(args.b_annotation_dir).resolve()
+    else:
+        b_annotation_dir = None
     output_dir = Path(args.output_dir).resolve()
     if not a_dir.is_dir():
         raise NotADirectoryError(f'Path A {args.a_dir} is not a directory!')
     if not b_dir.is_dir():
         raise NotADirectoryError(f'Path B {args.b_dir} is not a directory!')
-    if not annotation_dir.is_dir():
+    if a_annotation_dir is None and b_annotation_dir is None:
+        raise ValueError(
+            'Either A or B annotation directory (or both) must be given!'
+        )
+    if a_annotation_dir is not None and not a_annotation_dir.is_dir():
         raise NotADirectoryError(
-            f'Annotation path {args.annotation_dir} is not a directory!'
+            f'Annotation path A {args.a_annotation_dir} is not a directory!'
+        )
+    if b_annotation_dir is not None and not b_annotation_dir.is_dir():
+        raise NotADirectoryError(
+            f'Annotation path A {args.b_annotation_dir} is not a directory!'
         )
     if output_dir.is_dir():
         try:
@@ -45,7 +60,7 @@ def _check_args(args):
     else:
         print(f'Making output directory {output_dir}...')
         output_dir.mkdir(parents=True)
-    path_list = [a_dir, b_dir, annotation_dir]
+    path_list = [a_dir, b_dir, a_annotation_dir, b_annotation_dir]
     for path in path_list:
         if not path.glob('*'):
             raise ValueError(f'Path {path} is empty!')
@@ -132,26 +147,21 @@ def _partition_examples(examples, splits_dict):
     return partitions
 
 
-def _serialize_example(example, pad_for_satsim=False, skip_empty=False):
-    """Builds a TFRecords Example object from the example data.
+def _parse_annotations(annotations, pad_amount=0., skip_empty=False):
+    """Parses annotation file data into features.
     
     Args:
-        example: example structure with (a_path, b_path, annotation_path).
-        
-    Keyword Args:
-        pad_for_satsim: whether to pad images for satsim. Default is False.
-        skip_empty: whether to skip frames with no object. Default is False.
-    """
-    # Handle satsim offsets.
-    if pad_for_satsim:
-        pad_amount = 0.02
-    else:
-        pad_amount = 0.00
+        annotations: annotation file contents.
 
-    # Load annotation data and check for valid image (with objects).
-    (a_path, b_path, annotation) = example
-    with open(annotation, 'r') as fp:
-        annotations = json.load(fp)['data']
+    Keyword Args:
+        pad_amount: padding amount used for satsim offsets. Default is 0.
+        skip_empty: whether to skip empty frames. Default is False.
+
+    Returns:
+        Tuple of (class_id, y_min, y_max, y_center, x_min, x_max, x_center,
+            magnitude, path_name)
+    """
+
     class_id = [obj['class_id'] for obj in annotations['objects']]
     y_min = [obj['y_min'] - pad_amount for obj in annotations['objects']]
     y_max = [obj['y_max'] + pad_amount for obj in annotations['objects']]
@@ -165,28 +175,74 @@ def _serialize_example(example, pad_for_satsim=False, skip_empty=False):
     path_name = (Path(dir_name) / Path(file_name)).as_posix()
     if skip_empty and not x_center:
         return None
-    a_data = _read_fits(a_path)
-    b_data = _read_fits(b_path)
-
     # Replace the unknown magnitude's with NaN's
     for i in range(len(magnitude)):
         if magnitude[i] is None:
             magnitude[i] = float('NaN')
+    return (class_id, y_min, y_max, y_center, x_min, x_max, x_center,
+            magnitude, path_name)
+
+
+def _serialize_example(example, pad_for_satsim=False, skip_empty=False):
+    """Builds a TFRecords Example object from the example data.
+    
+    Args:
+        example: example structure with (a_path, b_path, annotation_path).
+        
+    Keyword Args:
+        pad_for_satsim: whether to pad images for satsim. Default is False.
+        skip_empty: whether to skip frames with no object. Default is False.
+    """
+
+    # Handle satsim offsets.
+    if pad_for_satsim:
+        pad_amount = 0.02
+    else:
+        pad_amount = 0.00
+
+    # Load annotation data.
+    (a_path, b_path, a_annotation, b_annotation) = example
+    with open(a_annotation, 'r') as fp:
+        a_annotations = json.load(fp)['data']
+    with open(b_annotation, 'r') as fp:
+        b_annotations = json.load(fp)['data']
+
+    # Parse annotation data.
+    (a_class_id, a_y_min, a_y_max, a_y_center, a_x_min, a_x_max, a_x_center, a_magnitude,
+     a_path_name) = _parse_annotations(a_annotations, pad_amount, skip_empty)
+    (b_class_id, b_y_min, b_y_max, b_y_center, b_x_min, b_x_max, b_x_center, b_magnitude,
+     b_path_name) = _parse_annotations(b_annotations, pad_amount, skip_empty)
+
+    # Load raw image data.
+    a_data = _read_fits(a_path)
+    b_data = _read_fits(b_path)
     
     # Create the features for this example
     features = {
         'a_raw': _bytes_feature([a_data.tostring()]),
         'b_raw': _bytes_feature([b_data.tostring()]),
-        'filename': _bytes_feature([path_name.encode()]),
-        'height': _int64_feature([annotations['sensor']['height']]),
-        'width': _int64_feature([annotations['sensor']['width']]),
-        'classes': _int64_feature(class_id),
-        'ymin': _float_feature(y_min),
-        'ymax': _float_feature(y_max),
-        'ycenter': _float_feature(y_center),
-        'xmin': _float_feature(x_min),
-        'xmax': _float_feature(x_max),
-        'xcenter': _float_feature(x_center),
+        'a_filename': _bytes_feature([a_path_name.encode()]),
+        'a_height': _int64_feature([a_annotations['sensor']['height']]),
+        'a_width': _int64_feature([a_annotations['sensor']['width']]),
+        'a_classes': _int64_feature(a_class_id),
+        'a_ymin': _float_feature(a_y_min),
+        'a_ymax': _float_feature(a_y_max),
+        'a_ycenter': _float_feature(a_y_center),
+        'a_xmin': _float_feature(a_x_min),
+        'a_xmax': _float_feature(a_x_max),
+        'a_xcenter': _float_feature(a_x_center),
+        'a_magnitude': _float_feature(a_magnitude),
+        'b_filename': _bytes_feature([b_path_name.encode()]),
+        'b_height': _int64_feature([b_annotations['sensor']['height']]),
+        'b_width': _int64_feature([b_annotations['sensor']['width']]),
+        'b_classes': _int64_feature(b_class_id),
+        'b_ymin': _float_feature(b_y_min),
+        'b_ymax': _float_feature(b_y_max),
+        'b_ycenter': _float_feature(b_y_center),
+        'b_xmin': _float_feature(b_x_min),
+        'b_xmax': _float_feature(b_x_max),
+        'b_xcenter': _float_feature(b_x_center),
+        'b_magnitude': _float_feature(b_magnitude),
     }
     # Create an example protocol buffer
     return tf.train.Example(features=tf.train.Features(feature=features))
@@ -196,14 +252,30 @@ def make_tf_records(args):
     """Make TFRecords files from images and annotations."""
     a_dir = Path(args.a_dir).resolve()
     b_dir = Path(args.b_dir).resolve()
-    annotation_dir = Path(args.annotation_dir).resolve()
+    if args.a_annotation_dir is not None:
+        a_annotation_dir = Path(args.a_annotation_dir).resolve()
+    else:
+        a_annotation_dir = None
+    if args.b_annotation_dir is not None:
+        b_annotation_dir = Path(args.b_annotation_dir).resolve()
+    else:
+        b_annotation_dir = None
     output_dir = Path(args.output_dir).resolve()
     a_paths = sorted(a_dir.glob('**/*.fits'))
     b_paths = sorted(b_dir.glob('**/*.fits'))
-    annotation_paths = sorted(annotation_dir.glob('**/Annotations/*.json'))
+    if a_annotation_dir is not None:
+        a_annotation_paths = sorted(a_annotation_dir.glob('**/Annotations/*.json'))
+        if b_annotation_dir is None:
+            b_annotation_paths = a_annotation_paths
+    if b_annotation_dir is not None:
+        b_annotation_paths = sorted(b_annotation_dir.glob('**/Annotations/*.json'))
+        if a_annotation_dir is None:
+            a_annotation_paths = b_annotation_paths
     examples = []
-    for a_path, b_path, annotation in zip(a_paths, b_paths, annotation_paths):
-        examples.append((a_path, b_path, annotation))
+    for a_path, b_path, a_annotation, b_annotation in zip(a_paths, b_paths,
+                                                          a_annotation_paths,
+                                                          b_annotation_paths):
+        examples.append((a_path, b_path, a_annotation, b_annotation))
     splits_dict = {'train': 0.8, 'valid': 0.1, 'test': 0.1}
     partitions = _partition_examples(examples, splits_dict)
     # Make TFRecords from partitions.
@@ -232,10 +304,15 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Generate TFRecords files from FITS images.'
     )
-    parser.add_argument('--a_dir', help='Path to directory for data A.')
-    parser.add_argument('--b_dir', help='Path to directory for data B.')
-    parser.add_argument('--annotation_dir', help='Path to annotation files.')
-    parser.add_argument('--output_dir',
+    parser.add_argument('--a_dir', type=str,
+                        help='Path to directory for data A.')
+    parser.add_argument('--b_dir', type=str,
+                        help='Path to directory for data B.')
+    parser.add_argument('--a_annotation_dir', type=str, default=None,
+                        help='Path to annotation files for data A.')
+    parser.add_argument('--b_annotation_dir', type=str, default=None,
+                        help='Path to annotation files for data B.')
+    parser.add_argument('--output_dir', type=str,
                         help='Output directory for TFRecords files.')
     parser.add_argument('--group_size', type=int, default=256,
                         help='Number of records per TFRecords file.')
