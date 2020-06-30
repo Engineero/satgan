@@ -55,60 +55,83 @@ def _parse_example(serialized_example, a):
         {
             'a_raw': tf.io.VarLenFeature(dtype=tf.string),
             'b_raw': tf.io.VarLenFeature(dtype=tf.string),
-            'filename': tf.io.VarLenFeature(dtype=tf.string),
-            'height': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
-            'width': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
-            'classes': tf.io.VarLenFeature(dtype=tf.int64),
-            'ymin': tf.io.VarLenFeature(dtype=tf.float32),
-            'ymax': tf.io.VarLenFeature(dtype=tf.float32),
-            'ycenter': tf.io.VarLenFeature(dtype=tf.float32),
-            'xmin': tf.io.VarLenFeature(dtype=tf.float32),
-            'xmax': tf.io.VarLenFeature(dtype=tf.float32),
-            'xcenter': tf.io.VarLenFeature(dtype=tf.float32),
+            'a_filename': tf.io.VarLenFeature(dtype=tf.string),
+            'a_height': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
+            'a_width': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
+            'a_classes': tf.io.VarLenFeature(dtype=tf.int64),
+            'a_ymin': tf.io.VarLenFeature(dtype=tf.float32),
+            'a_ymax': tf.io.VarLenFeature(dtype=tf.float32),
+            'a_ycenter': tf.io.VarLenFeature(dtype=tf.float32),
+            'a_xmin': tf.io.VarLenFeature(dtype=tf.float32),
+            'a_xmax': tf.io.VarLenFeature(dtype=tf.float32),
+            'a_xcenter': tf.io.VarLenFeature(dtype=tf.float32),
+            'a_magnitude': tf.io.VarLenFeature(dtype=tf.float32),
+            'b_filename': tf.io.VarLenFeature(dtype=tf.string),
+            'b_height': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
+            'b_width': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
+            'b_classes': tf.io.VarLenFeature(dtype=tf.int64),
+            'b_ymin': tf.io.VarLenFeature(dtype=tf.float32),
+            'b_ymax': tf.io.VarLenFeature(dtype=tf.float32),
+            'b_ycenter': tf.io.VarLenFeature(dtype=tf.float32),
+            'b_xmin': tf.io.VarLenFeature(dtype=tf.float32),
+            'b_xmax': tf.io.VarLenFeature(dtype=tf.float32),
+            'b_xcenter': tf.io.VarLenFeature(dtype=tf.float32),
+            'b_magnitude': tf.io.VarLenFeature(dtype=tf.float32),
         }
     )
 
     # Cast parsed objects into usable types.
-    width = tf.cast(example['width'], tf.int32)
-    height = tf.cast(example['height'], tf.int32)
-    # xcenter = tf.cast(tf.sparse.to_dense(example['xcenter']), tf.float32)
-    xmin = tf.cast(tf.sparse.to_dense(example['xmin']), tf.float32)
-    xmax = tf.cast(tf.sparse.to_dense(example['xmax']), tf.float32)
-    # ycenter = tf.cast(tf.sparse.to_dense(example['ycenter']), tf.float32)
-    ymin = tf.cast(tf.sparse.to_dense(example['ymin']), tf.float32)
-    ymax = tf.cast(tf.sparse.to_dense(example['ymax']), tf.float32)
-    classes = tf.cast(tf.sparse.to_dense(example['classes']), tf.float32)
-    # objectness = tf.where(classes != 0,
-    #                       tf.ones_like(classes),
-    #                       tf.zeros_like(classes))
+    a_width = tf.cast(example['a_width'], tf.int32)
+    a_height = tf.cast(example['a_height'], tf.int32)
+    # a_xcenter = tf.cast(tf.sparse.to_dense(example['a_xcenter']), tf.float32)
+    a_xmin = tf.cast(tf.sparse.to_dense(example['a_xmin']), tf.float32)
+    a_xmax = tf.cast(tf.sparse.to_dense(example['a_xmax']), tf.float32)
+    # a_ycenter = tf.cast(tf.sparse.to_dense(example['a_ycenter']), tf.float32)
+    a_ymin = tf.cast(tf.sparse.to_dense(example['a_ymin']), tf.float32)
+    a_ymax = tf.cast(tf.sparse.to_dense(example['a_ymax']), tf.float32)
+    a_classes = tf.cast(tf.sparse.to_dense(example['a_classes']), tf.float32)
+    b_width = tf.cast(example['b_width'], tf.int32)
+    b_height = tf.cast(example['b_height'], tf.int32)
+    # b_xcenter = tf.cast(tf.sparse.to_dense(example['b_xcenter']), tf.float32)
+    b_xmin = tf.cast(tf.sparse.to_dense(example['b_xmin']), tf.float32)
+    b_xmax = tf.cast(tf.sparse.to_dense(example['b_xmax']), tf.float32)
+    # b_ycenter = tf.cast(tf.sparse.to_dense(example['b_ycenter']), tf.float32)
+    b_ymin = tf.cast(tf.sparse.to_dense(example['b_ymin']), tf.float32)
+    b_ymax = tf.cast(tf.sparse.to_dense(example['b_ymax']), tf.float32)
+    b_classes = tf.cast(tf.sparse.to_dense(example['b_classes']), tf.float32)
 
     # Parse images and preprocess.
     a_image = tf.sparse.to_dense(example['a_raw'], default_value='')
     a_image = tf.io.decode_raw(a_image, tf.uint16)
-    a_image = tf.reshape(a_image, [-1, height[0], width[0], 1])
+    a_image = tf.reshape(a_image, [-1, a_height[0], a_width[0], 1])
     b_image = tf.sparse.to_dense(example['b_raw'], default_value='')
     b_image = tf.io.decode_raw(b_image, tf.uint16)
-    b_image = tf.reshape(b_image, [-1, height[0], width[0], 1])
+    b_image = tf.reshape(b_image, [-1, b_height[0], b_width[0], 1])
 
     # Package things up for output.
-    objects = tf.stack([ymin, xmin, ymax, xmax, classes], axis=-1)
+    a_objects = tf.stack([a_ymin, a_xmin, a_ymax, a_xmax, a_classes], axis=-1)
+    b_objects = tf.stack([b_ymin, b_xmin, b_ymax, b_xmax, b_classes], axis=-1)
 
     # Need to pad objects to max inferences (not all images will have same
     # number of objects).
-    paddings = tf.constant([[0, 0], [0, a.max_inferences], [0, 0]])
-    paddings = paddings - (tf.constant([[0, 0], [0, 1], [0, 0]]) * tf.shape(objects)[1])
-    objects = tf.pad(tensor=objects, paddings=paddings, constant_values=0.)
-    objects = tf.tile(objects, [1, a.num_pred_layers, 1])
+    a_paddings = tf.constant([[0, 0], [0, a.max_inferences], [0, 0]])
+    a_paddings = a_paddings - (tf.constant([[0, 0], [0, 1], [0, 0]]) * tf.shape(a_objects)[1])
+    a_objects = tf.pad(tensor=a_objects, paddings=a_paddings, constant_values=0.)
+    a_objects = tf.tile(a_objects, [1, a.num_pred_layers, 1])
+    b_paddings = tf.constant([[0, 0], [0, a.max_inferences], [0, 0]])
+    b_paddings = b_paddings - (tf.constant([[0, 0], [0, 1], [0, 0]]) * tf.shape(b_objects)[1])
+    b_objects = tf.pad(tensor=b_objects, paddings=b_paddings, constant_values=0.)
+    b_objects = tf.tile(b_objects, [1, a.num_pred_layers, 1])
 
     # task_targets = (objects, width, height)
     if a.which_direction == 'AtoB':
         a_image, gen_input = preprocess(a_image, add_noise=True)
         b_image = preprocess(b_image, add_noise=False)
-        return ((a_image, gen_input, b_image), (b_image, 0, objects))
+        return ((a_image, gen_input, b_image), (b_image, a_objects, b_objects))
     else:
         b_image, gen_input = preprocess(b_image, add_noise=True)
         a_image = preprocess(a_image, add_noise=False)
-        return ((b_image, gen_input, a_image), (a_image, 0, objects))
+        return ((b_image, gen_input, a_image), (a_image, b_objects, a_objects))
 
 
 def load_examples(a):
@@ -258,12 +281,11 @@ def create_generator(a, input_shape, generator_outputs_channels):
         return Model(inputs=x_in, outputs=x, name='generator')
 
 
-def create_discriminator(a, input_shape, target_shape):
+def create_discriminator(a, target_shape):
     """Creates the discriminator network.
 
     Args:
         a: command-line arguments object.
-        input_shape: input images shape (generator priors).
         target_shape: target images shape (real or generator outputs).
 
     Returns:
@@ -271,12 +293,10 @@ def create_discriminator(a, input_shape, target_shape):
     """
 
     # 2x [batch, height, width, in_channels] => [batch, height, width, in_channels * 2]
-    x_in = Input(shape=input_shape)
-    y_in = Input(shape=target_shape)
-    input_concat = Concatenate(axis=-1)([x_in, y_in])
+    x_in = Input(shape=target_shape)
 
     # layer_1: [batch, h, w, in_channels * 2] => [batch, h//2, w//2, ndf]
-    x = ops.down_resblock(input_concat, filters=a.ndf,
+    x = ops.down_resblock(x_in, filters=a.ndf,
                           sn=a.spec_norm, scope='layer_1')
 
     # layer_2: [batch, h//2, w//2, ndf] => [batch, h//4, w//4, ndf * 2]
@@ -296,7 +316,7 @@ def create_discriminator(a, input_shape, target_shape):
                           scope=f'layer_{a.n_layer_dsc + 1}')
     x = tf.nn.softmax(x, name='discriminator')
 
-    return Model(inputs=[x_in, y_in], outputs=x, name='discriminator')
+    return Model(inputs=x_in, outputs=x, name='discriminator')
 
 
 def create_task_net(a, input_shape):
@@ -404,15 +424,18 @@ def create_task_net(a, input_shape):
 
 
 def create_model(a, train_data):
-    (inputs, noise, targets), (_, _, task_targets) = next(iter(train_data))
+    (inputs, noise, targets), (_, a_task_targets, b_task_targets) = \
+        next(iter(train_data))
     input_shape = inputs.shape.as_list()[1:]  # don't give Input the batch dim
     noise_shape = noise.shape.as_list()[1:]
     target_shape = targets.shape.as_list()[1:]
-    task_targets_shape = task_targets.shape.as_list()[1:]
+    a_task_targets_shape = a_task_targets.shape.as_list()[1:]
+    b_task_targets_shape = b_task_targets.shape.as_list()[1:]
     inputs = Input(input_shape)
     noise = Input(noise_shape)
     targets = Input(target_shape)
-    task_targets = Input(task_targets_shape)
+    a_task_targets = Input(a_task_targets_shape)
+    b_task_targets = Input(b_task_targets_shape)
     with tf.name_scope("generator"):
         out_channels = target_shape[-1]
         generator = create_generator(a, input_shape, out_channels)
@@ -453,10 +476,10 @@ def create_model(a, train_data):
     # pairs they share the same underlying variables
     with tf.name_scope("discriminator"):
         # TODO (NLT): figure out discriminator loss, interaction with Keras changes.
-        discriminator = create_discriminator(a, input_shape, target_shape)
+        discriminator = create_discriminator(a, target_shape)
         print(f'Discriminator model summary\n:{discriminator.summary()}')
-        predict_real = discriminator([inputs, targets])  # should -> [0, 1]
-        predict_fake = discriminator([inputs, fake_img])  # should -> [1, 0]
+        predict_real = discriminator(targets)  # should -> [0, 1]
+        predict_fake = discriminator(fake_img)  # should -> [1, 0]
         discrim_outputs = tf.stack([predict_real, predict_fake], axis=0,
                                    name='discriminator')
 
@@ -543,7 +566,8 @@ def main(a):
             if not isinstance(loss_weight_list, list):
                 loss_weight_list = [loss_weight_list]
             # Parse out the batch data.
-            (inputs, noise, targets), (_, _, task_targets) = data
+            (inputs, noise, targets), (_, a_task_targets, b_task_targets) = \
+                data
             # Compute and apply gradients.
             for optimizer, loss_function, weight in zip(optimizer_list,
                                                         loss_function_list,
@@ -551,7 +575,8 @@ def main(a):
                 with tf.GradientTape() as tape:
                     gen_outputs, discrim_outputs, task_outputs = \
                         model([inputs, noise, targets])
-                    model_inputs = (inputs, targets, task_targets, noise)
+                    model_inputs = (inputs, targets, a_task_targets,
+                                    b_task_targets, noise)
                     model_outputs = (gen_outputs,
                                      discrim_outputs,
                                      task_outputs)
@@ -653,11 +678,15 @@ def main(a):
             # is a one-hot encoded score for each class in the dataset for
             # custom detector. For YOLO model, *class is just a scalar class
             # score.
-            task_targets = model_inputs[2]
+            a_task_targets = model_inputs[2]  # input's objects
+            b_task_targets = model_inputs[3]  # target's objects
             task_outputs = model_outputs[2]
-            target_classes = tf.one_hot(tf.cast(task_targets[..., -1],
-                                                tf.int32),
-                                        a.num_classes)
+            a_target_classes = tf.one_hot(tf.cast(a_task_targets[..., -1],
+                                                  tf.int32),
+                                          a.num_classes)
+            b_target_classes = tf.one_hot(tf.cast(b_task_targets[..., -1],
+                                                  tf.int32),
+                                          a.num_classes)
 
             # Handle YOLO's class output only being a scalar.
             if a.use_yolo:
@@ -670,91 +699,96 @@ def main(a):
             else:
                 real_output_classes = task_outputs[0][..., 5:]
                 fake_output_classes = task_outputs[1][..., 5:]
-            bool_mask = (task_targets[..., -1] != 0)
-            object_target = tf.cast(tf.stack([bool_mask,
-                                              tf.logical_not(bool_mask)],
-                                             axis=-1),
-                                    dtype=tf.int32)
+            a_bool_mask = (a_task_targets[..., -1] != 0)
+            b_bool_mask = (b_task_targets[..., -1] != 0)
+            a_object_target = tf.cast(tf.stack([a_bool_mask,
+                                                tf.logical_not(a_bool_mask)],
+                                               axis=-1),
+                                      dtype=tf.int32)
+            b_object_target = tf.cast(tf.stack([b_bool_mask,
+                                                tf.logical_not(b_bool_mask)],
+                                               axis=-1),
+                                      dtype=tf.int32)
 
             # Calculate loss on real images.
-            task_wh = task_targets[..., 2:4] - task_targets[..., :2]
-            task_xy = task_targets[..., :2] + task_wh / 2.
-            xy_loss = tf.reduce_sum(tf.where(
-                bool_mask,
-                MSE(task_xy, task_outputs[0][..., :2]),
-                tf.zeros_like(bool_mask, dtype=tf.float32)
+            a_task_wh = a_task_targets[..., 2:4] - a_task_targets[..., :2]
+            a_task_xy = a_task_targets[..., :2] + a_task_wh / 2.
+            b_task_wh = b_task_targets[..., 2:4] - b_task_targets[..., :2]
+            b_task_xy = b_task_targets[..., :2] + b_task_wh / 2.
+            b_xy_loss = tf.reduce_sum(tf.where(
+                b_bool_mask,
+                MSE(b_task_xy, task_outputs[0][..., :2]),
+                tf.zeros_like(b_bool_mask, dtype=tf.float32)
             ))
-            iou_loss = tf.math.reduce_mean(
-                calc_iou(task_targets, task_outputs[0])
+            b_iou_loss = tf.math.reduce_mean(
+                calc_iou(b_task_targets, task_outputs[0])
             )
-            obj_loss = tf.math.reduce_mean(
+            b_obj_loss = tf.math.reduce_mean(
                 categorical_crossentropy(
-                    object_target,
+                    b_object_target,
                     tf.stack([1. - task_outputs[0][..., 4],
                               task_outputs[0][..., 4]],
                              axis=-1),
                     label_smoothing=0.1
                 )
             )
-            class_loss = tf.math.reduce_mean(
-                categorical_crossentropy(target_classes,
+            b_class_loss = tf.math.reduce_mean(
+                categorical_crossentropy(b_target_classes,
                                          real_output_classes,
                                          label_smoothing=0.1)
             )
-            real_loss = xy_loss + a.iou_weight * iou_loss + \
-                        a.class_weight * class_loss + obj_loss
+            b_loss = b_xy_loss + a.iou_weight * b_iou_loss + \
+                     a.class_weight * b_class_loss + b_obj_loss
 
             # Calculate loss on fake images.
-            xy_loss_fake = tf.reduce_sum(tf.where(
-                bool_mask,
-                MSE(task_xy, task_outputs[1][..., :2]),
-                tf.zeros_like(bool_mask, dtype=tf.float32)
+            a_xy_loss = tf.reduce_sum(tf.where(
+                a_bool_mask,
+                MSE(a_task_xy, task_outputs[1][..., :2]),
+                tf.zeros_like(a_bool_mask, dtype=tf.float32)
             ))
-            iou_loss_fake = tf.math.reduce_mean(
+            a_iou_loss = tf.math.reduce_mean(
                 calc_iou(task_targets, task_outputs[1])
             )
-            obj_loss_fake = tf.math.reduce_mean(
+            a_obj_loss = tf.math.reduce_mean(
                 categorical_crossentropy(
-                    object_target,
+                    a_object_target,
                     tf.stack([1. - task_outputs[1][..., 4],
                               task_outputs[1][..., 4]],
                              axis=-1),
                     label_smoothing=0.1
                 )
             )
-            class_loss_fake = tf.math.reduce_mean(
-                categorical_crossentropy(target_classes,
+            a_class_loss = tf.math.reduce_mean(
+                categorical_crossentropy(a_target_classes,
                                          fake_output_classes,
                                          label_smoothing=0.1)
             )
-            fake_loss = xy_loss_fake + a.iou_weight * iou_loss_fake + \
-                        a.class_weight * class_loss_fake + obj_loss_fake
+            a_loss = a_xy_loss + a.iou_weight * a_iou_loss + \
+                     a.class_weight * a_class_loss + a_obj_loss
+            task_loss = a_loss + b_loss
 
             # Write summaries.
-            tf.summary.scalar(name='task_real_xy_loss', data=xy_loss,
+            tf.summary.scalar(name='task_b_xy_loss', data=b_xy_loss,
                               step=step)
-            tf.summary.scalar(name='task_fake_xy_loss', data=xy_loss_fake,
+            tf.summary.scalar(name='task_a_xy_loss', data=a_xy_loss,
                               step=step)
-            tf.summary.scalar(name='task_real_iou_loss', data=iou_loss,
+            tf.summary.scalar(name='task_b_iou_loss', data=b_iou_loss,
                               step=step)
-            tf.summary.scalar(name='task_fake_iou_loss', data=iou_loss_fake,
+            tf.summary.scalar(name='task_a_iou_loss', data=a_iou_loss,
                               step=step)
-            tf.summary.scalar(name='task_real_obj_loss', data=obj_loss,
+            tf.summary.scalar(name='task_b_obj_loss', data=b_obj_loss,
                               step=step)
-            tf.summary.scalar(name='task_fake_obj_loss', data=obj_loss_fake,
+            tf.summary.scalar(name='task_a_obj_loss', data=a_obj_loss,
                               step=step)
-            tf.summary.scalar(name='task_real_class_loss', data=class_loss,
+            tf.summary.scalar(name='task_b_class_loss', data=b_class_loss,
                               step=step)
-            tf.summary.scalar(name='task_fake_class_loss',
-                              data=class_loss_fake,
+            tf.summary.scalar(name='task_a_class_loss', data=a_class_loss,
                               step=step)
-
-            task_loss = real_loss + fake_loss
-            tf.summary.scalar(name='task_real_loss',
-                              data=real_loss,
+            tf.summary.scalar(name='total b_loss',
+                              data=b_loss,
                               step=step)
-            tf.summary.scalar(name='task_fake_loss',
-                              data=fake_loss,
+            tf.summary.scalar(name='total a_loss',
+                              data=a_loss,
                               step=step)
             tf.summary.scalar(name='task_loss', data=task_loss,
                               step=step)
@@ -788,16 +822,17 @@ def main(a):
             epoch_start = time.time()
 
             for batch_num, batch in enumerate(train_data):
-                (inputs, noise, targets), (_, _, task_targets) = batch
+                (inputs, noise, targets), (_, a_task_targets, b_task_targets) = batch
 
                 # Save summary images, statistics.
                 if batch_num % a.summary_freq == 0:
                     print(f'Writing outputs for epoch {epoch+1}, batch {batch_num}.')
-                    (inputs, noise, targets), (_, _, task_targets) = batch
+                    (inputs, noise, targets), (_, a_task_targets, b_task_targets) = batch
                     gen_outputs, discrim_outputs, task_outputs = model(
                         [inputs, noise, targets]
                     )
-                    model_inputs = (inputs, targets, task_targets, noise)
+                    model_inputs = (inputs, targets, a_task_targets,
+                                    b_task_targets, noise)
                     model_outputs = (gen_outputs, discrim_outputs,
                                      task_outputs)
 
@@ -860,30 +895,31 @@ def main(a):
                                             tf.zeros_like(fake_detects))
 
                     # Bounding boxes are [ymin, xmin, ymax, xmax].
-                    true_bboxes = task_targets[..., :4]
+                    a_true_bboxes = a_task_targets[..., :4]
+                    b_true_bboxes = b_task_targets[..., :4]
                     bboxes_real = real_detects[..., :4]
                     bboxes_fake = fake_detects[..., :4]
 
                     # Add bounding boxes to sample images.
                     target_bboxes = tf.image.draw_bounding_boxes(
                         images=tf.image.grayscale_to_rgb(targets),
-                        boxes=bboxes_real,
-                        colors=np.array([[0., 1., 0.]])
+                        boxes=b_true_bboxes,
+                        colors=np.array([[1., 0., 0.]])
                     )
                     target_bboxes = tf.image.draw_bounding_boxes(
                         images=target_bboxes,
-                        boxes=true_bboxes,
-                        colors=np.array([[1., 0., 0.]])
-                    )
-                    generated_bboxes = tf.image.draw_bounding_boxes(
-                        images=tf.image.grayscale_to_rgb(gen_outputs[0]),
-                        boxes=bboxes_fake,
+                        boxes=bboxes_real,
                         colors=np.array([[0., 1., 0.]])
                     )
                     generated_bboxes = tf.image.draw_bounding_boxes(
-                        images=generated_bboxes,
-                        boxes=true_bboxes,
+                        images=tf.image.grayscale_to_rgb(gen_outputs[0]),
+                        boxes=a_true_bboxes,
                         colors=np.array([[1., 0., 0.]])
+                    )
+                    generated_bboxes = tf.image.draw_bounding_boxes(
+                        images=generated_bboxes,
+                        boxes=bboxes_fake,
+                        colors=np.array([[0., 1., 0.]])
                     )
 
                     # Save task outputs.
