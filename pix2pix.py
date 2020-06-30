@@ -254,30 +254,97 @@ def create_generator(a, input_shape, generator_outputs_channels):
     num_filters = a.ngf
     # encoder_1: [batch, 256, 256, in_channels] => [batch, 128, 128, ngf]
     with tf.name_scope("generator"):
-        skip_layers = []
-        x = ops.down_resblock(x_in, filters=num_filters, sn=a.spec_norm,
-                              scope='front_down_resblock_0')
-        for i in range(a.n_blocks_gen // 2):
-            x = ops.down_resblock(x, filters=num_filters // 2, sn=a.spec_norm,
-                                  scope=f'mid_down_resblock_{i}')
-            num_filters = num_filters // 2
-            skip_layers.append(x)
+        if a.use_sagan:
+            skip_layers = []
+            x = ops.down_resblock(x_in, filters=num_filters, sn=a.spec_norm,
+                                  scope='front_down_resblock_0')
+            for i in range(a.n_blocks_gen // 2):
+                x = ops.down_resblock(x, filters=num_filters // 2, sn=a.spec_norm,
+                                      scope=f'mid_down_resblock_{i}')
+                num_filters = num_filters // 2
+                skip_layers.append(x)
 
-        x = google_attention(x, filters=num_filters, scope='self_attention')
+            x = google_attention(x, filters=num_filters, scope='self_attention')
 
-        # Build the back end of the generator with skip connections.
-        for i in range(a.n_blocks_gen // 2, a.n_blocks_gen):
-            x = ops.up_resblock(Concatenate()([x, skip_layers.pop()]),
-                                filters=num_filters,
-                                sn=a.spec_norm,
-                                scope=f'back_up_resblock_{i}')
-            num_filters = num_filters * 2
+            # Build the back end of the generator with skip connections.
+            for i in range(a.n_blocks_gen // 2, a.n_blocks_gen):
+                x = ops.up_resblock(Concatenate()([x, skip_layers.pop()]),
+                                    filters=num_filters,
+                                    sn=a.spec_norm,
+                                    scope=f'back_up_resblock_{i}')
+                num_filters = num_filters * 2
 
-        x = BatchNormalization()(x)
-        x = LeakyReLU()(x)
-        x = ops.deconv(x, filters=generator_outputs_channels, padding='same',
-                       scope='g_logit')
-        x = tanh(x)
+            x = BatchNormalization()(x)
+            x = LeakyReLU()(x)
+            x = ops.deconv(x, filters=generator_outputs_channels, padding='same',
+                           scope='g_logit')
+            x = tanh(x)
+        else:
+            layers = []
+            gen_conv = lambda x, n: ops.conv(x, n, kernel_size=(4, 4),
+                                             strides=(2, 2), padding='same')
+            gen_deconv = lambda x, n: ops.deconv(x, n, kernel_size=(4, 4),
+                                                 strides=(2, 2),
+                                                 padding='same')
+            x = gen_conv(x_in, a.ngf)
+            layers.append(x)
+
+            layer_specs = [
+                a.ngf * 2,
+                a.ngf * 4,
+                a.ngf * 8,
+                a.ngf * 8,
+                a.ngf * 8,
+                a.ngf * 8,
+                a.ngf * 8,
+                a.ngf * 8,
+            ]
+
+            for layer_num, out_channels in enumerate(layer_specs):
+                if layer_num == 3:
+                    x = google_attention(layers[-1], out_channels, sn=True,
+                                         scope='gen_self_attention')
+                else:
+                    with tf.name_scope(f'encoder_{len(layers) + 1}'):
+                        x = BatchNormalization()(layers[-1])
+                        x = LeakyReLU()(x)
+                        x = gen_conv(x, out_channels)
+                layers.append(x)
+
+            layer_specs = [
+                (a.ngf * 8, 0.5),
+                (a.ngf * 8, 0.5),
+                (a.ngf * 8, 0.5),
+                (a.ngf * 8, 0.),
+                (a.ngf * 4, 0.),
+                (a.ngf * 2, 0.),
+                (a.ngf, 0.),
+            ]
+
+            num_encoder_layers = len(layers) - 1  # -1 for attention layer
+            for decoder_layer, (out_channels, dropout) in enumerate(layer_specs):
+                skip_layer = num_encoder_layers - decoder_layer - 1
+                if decoder_layer <= 3:
+                    skip_layer += 1  # offset for attention layer
+                with tf.name_scope(f'decoder_{skip_layer + 1}'):
+                    if decoder_layer == 0:
+                        # First decoder layer doesn't have skip connections.
+                        x = layers[-1]
+                    else:
+                        x = Concatenate(axis=3)([layers[-1], layers[skip_layer]])
+                    x = BatchNormalization()(x)
+                    x = LeakyReLU()(x)
+                    x = gen_deconv(x, out_channels)
+                    if dropout > 0.0:
+                        x = tf.nn.dropout(x, keep_prob=1 - dropout)
+                    layers.append(x)
+            
+            with tf.name_scope('decoder_1'):
+                x = Concatenate(axis=3)([layers[-1], layers[0]])
+                x = LeakyReLU()(x)
+                x = gen_deconv(x, generator_outputs_channels)
+                x = tanh(x)
+
         return Model(inputs=x_in, outputs=x, name='generator')
 
 
@@ -295,26 +362,45 @@ def create_discriminator(a, target_shape):
     # 2x [batch, height, width, in_channels] => [batch, height, width, in_channels * 2]
     x_in = Input(shape=target_shape)
 
-    # layer_1: [batch, h, w, in_channels * 2] => [batch, h//2, w//2, ndf]
-    x = ops.down_resblock(x_in, filters=a.ndf,
-                          sn=a.spec_norm, scope='layer_1')
+    if a.use_sagan:
+        # layer_1: [batch, h, w, in_channels * 2] => [batch, h//2, w//2, ndf]
+        x = ops.down_resblock(x_in, filters=a.ndf,
+                              sn=a.spec_norm, scope='layer_1')
 
-    # layer_2: [batch, h//2, w//2, ndf] => [batch, h//4, w//4, ndf * 2]
-    # layer_3: [batch, h//4, w//4, ndf * 2] => [batch, h//8, w//8, ndf * 4]
-    # layer_4: [batch, h//8, w//8, ndf * 4] => [batch, h//16, w//16, ndf * 8]
-    for i in range(a.n_layer_dsc):
-        out_channels = a.ndf * min(2**(i+1), 8)
-        x = ops.down_resblock(x, filters=out_channels, sn=a.spec_norm,
-                              scope=f'layer_{i+1}')
+        # layer_2: [batch, h//2, w//2, ndf] => [batch, h//4, w//4, ndf * 2]
+        # layer_3: [batch, h//4, w//4, ndf * 2] => [batch, h//8, w//8, ndf * 4]
+        # layer_4: [batch, h//8, w//8, ndf * 4] => [batch, h//16, w//16, ndf * 8]
+        for i in range(a.n_layer_dsc):
+            out_channels = a.ndf * min(2**(i+1), 8)
+            x = ops.down_resblock(x, filters=out_channels, sn=a.spec_norm,
+                                  scope=f'layer_{i+1}')
 
-    # Add self attention layer before final down resblock.
-    x = google_attention(x, out_channels, sn=a.spec_norm,
-                         scope='discrim_attention')
+        # Add self attention layer before final down resblock.
+        x = google_attention(x, out_channels, sn=a.spec_norm,
+                             scope='discrim_attention')
 
-    # layer_5: [batch, h//16, w//16, ndf * 8] => [batch, h//16-1, w//16-1, 2]
-    x = ops.down_resblock(x, filters=2, to_down=False, sn=a.spec_norm,
-                          scope=f'layer_{a.n_layer_dsc + 1}')
-    x = tf.nn.softmax(x, name='discriminator')
+        # layer_5: [batch, h//16, w//16, ndf * 8] => [batch, h//16-1, w//16-1, 2]
+        x = ops.down_resblock(x, filters=2, to_down=False, sn=a.spec_norm,
+                              scope=f'layer_{a.n_layer_dsc + 1}')
+        x = tf.nn.softmax(x, name='discriminator')
+    else:
+        n_layers = 3
+        discrim_conv = lambda x, n, s: ops.conv(x, n, kernel_size=(4, 4),
+                                                strides=(s, s), padding='same')
+        with tf.name_scope('layer_1'):
+            x = BatchNormalization()(x_in)
+            x = LeakyReLU()(x)
+            x = discrim_conv(x, a.ndf, 2)
+        for i in range(n_layers):
+            out_channels = a.ndf * min(2**(i+1), 8)
+            stride = 1 if i == n_layers - 1 else 2  # last layer stride = 2
+            with tf.name_scope(f'layer_{i+2}'):
+                x = BatchNormalization()(x)
+                x = LeakyReLU()(x)
+                x = discrim_conv(x, out_channels, stride)
+        with tf.name_scope('output_layer'):
+            x = discrim_conv(x, 2, 1)
+            x = tf.nn.softmax(x, name='discriminator')
 
     return Model(inputs=x_in, outputs=x, name='discriminator')
 
@@ -1167,6 +1253,8 @@ if __name__ == '__main__':
                         help='Objectness threshold, under which a detection is ignored.')
     parser.add_argument('--use_yolo', default=False, action='store_true',
                         help='Whether to use existing YOLO SatNet for task network.')
+    parser.add_argument('--use_sagan', default=False, action='store_true',
+                        help='Whether to use self-attending GAN architecture with ResNet blocks.')
     parser.add_argument('--checkpoint_load_path', type=str,
                         default=None,
                         help='Path to the model checkpoint to load.')
