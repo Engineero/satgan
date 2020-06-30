@@ -690,15 +690,15 @@ def main(a):
 
             # Handle YOLO's class output only being a scalar.
             if a.use_yolo:
-                real_output_classes = tf.stack([1. - task_outputs[0][..., -1],
-                                                task_outputs[0][..., -1]],
-                                                axis=-1)
-                fake_output_classes = tf.stack([1. - task_outputs[1][..., -1],
-                                                task_outputs[1][..., -1]],
-                                                axis=-1)
+                b_output_class = tf.stack([1. - task_outputs[0][..., -1],
+                                           task_outputs[0][..., -1]],
+                                          axis=-1)
+                a_output_class = tf.stack([1. - task_outputs[1][..., -1],
+                                           task_outputs[1][..., -1]],
+                                          axis=-1)
             else:
-                real_output_classes = task_outputs[0][..., 5:]
-                fake_output_classes = task_outputs[1][..., 5:]
+                b_output_class = task_outputs[0][..., 5:]
+                a_output_class = task_outputs[1][..., 5:]
             a_bool_mask = (a_task_targets[..., -1] != 0)
             b_bool_mask = (b_task_targets[..., -1] != 0)
             a_object_target = tf.cast(tf.stack([a_bool_mask,
@@ -734,7 +734,7 @@ def main(a):
             )
             b_class_loss = tf.math.reduce_mean(
                 categorical_crossentropy(b_target_classes,
-                                         real_output_classes,
+                                         b_output_class,
                                          label_smoothing=0.1)
             )
             b_loss = b_xy_loss + a.iou_weight * b_iou_loss + \
@@ -760,7 +760,7 @@ def main(a):
             )
             a_class_loss = tf.math.reduce_mean(
                 categorical_crossentropy(a_target_classes,
-                                         fake_output_classes,
+                                         a_output_class,
                                          label_smoothing=0.1)
             )
             a_loss = a_xy_loss + a.iou_weight * a_iou_loss + \
