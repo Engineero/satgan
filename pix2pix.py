@@ -747,7 +747,7 @@ def main(a):
                 tf.zeros_like(a_bool_mask, dtype=tf.float32)
             ))
             a_iou_loss = tf.math.reduce_mean(
-                calc_iou(task_targets, task_outputs[1])
+                calc_iou(a_task_targets, task_outputs[1])
             )
             a_obj_loss = tf.math.reduce_mean(
                 categorical_crossentropy(
