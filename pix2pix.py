@@ -908,8 +908,6 @@ def main(a):
             epoch_start = time.time()
 
             for batch_num, batch in enumerate(train_data):
-                (inputs, noise, targets), (_, a_task_targets, b_task_targets) = batch
-
                 # Save summary images, statistics.
                 if batch_num % a.summary_freq == 0:
                     print(f'Writing outputs for epoch {epoch+1}, batch {batch_num}.')
@@ -1049,17 +1047,10 @@ def main(a):
             for m in mean_list:
                 m.reset_states()
             for batch in val_data:
-                (inputs, noise, targets), (_, _, task_targets) = batch
-                if a.use_yolo:
-                    targets, task_targets = encoder.encode_for_yolo(
-                        targets,
-                        tf.reshape(task_targets,
-                                   [-1, task_targets.shape[-1]]),
-                        None
-                    )
+                (inputs, noise, targets), (_, a_task_targets, b_task_targets) = batch
                 gen_outputs, discrim_outputs, task_outputs = model([inputs,
                                                                     targets])
-                model_inputs = (inputs, targets, task_targets)
+                model_inputs = (inputs, targets, a_task_targets, b_task_targets)
                 model_outputs = (gen_outputs, discrim_outputs, task_outputs)
 
                 total_loss, discrim_loss, gen_loss, task_loss = \
@@ -1102,17 +1093,10 @@ def main(a):
         for m in mean_list:
             m.reset_states()
         for batch in test_data:
-            (inputs, noise, targets), (_, _, task_targets) = batch
-            if a.use_yolo:
-                targets, task_targets = encoder.encode_for_yolo(
-                    targets,
-                    tf.reshape(task_targets,
-                               [-1, task_targets.shape[-1]]),
-                    None
-                )
+            (inputs, noise, targets), (_, a_task_targets, b_task_targets) = batch
             gen_outputs, discrim_outputs, task_outputs = model([inputs,
                                                                 targets])
-            model_inputs = (inputs, targets, task_targets)
+            model_inputs = (inputs, targets, a_task_targets, b_task_targets)
             model_outputs = (gen_outputs, discrim_outputs, task_outputs)
 
             total_loss, discrim_loss, gen_loss, task_loss = \
