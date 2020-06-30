@@ -9,7 +9,7 @@ import argparse
 from pathlib import Path
 from utils import ops
 from utils.darknet import build_darknet_model
-from tensorflow.keras.layers import (Input, Conv2D, Concatenate,
+from tensorflow.keras.layers import (Input, Conv2D, Concatenate, Dropout,
                                      MaxPooling2D, BatchNormalization,
                                      LeakyReLU, GlobalAveragePooling2D)
 from tensorflow.keras.activations import tanh
@@ -322,7 +322,7 @@ def create_generator(a, input_shape, generator_outputs_channels):
             ]
 
             num_encoder_layers = len(layers) - 1  # -1 for attention layer
-            for decoder_layer, (out_channels, dropout) in enumerate(layer_specs):
+            for decoder_layer, (out_channels, rate) in enumerate(layer_specs):
                 skip_layer = num_encoder_layers - decoder_layer - 1
                 if decoder_layer <= 3:
                     skip_layer += 1  # offset for attention layer
@@ -335,8 +335,8 @@ def create_generator(a, input_shape, generator_outputs_channels):
                     x = BatchNormalization()(x)
                     x = LeakyReLU()(x)
                     x = gen_deconv(x, out_channels)
-                    if dropout > 0.0:
-                        x = tf.nn.dropout(x, keep_prob=1 - dropout)
+                    if rate > 0.0:
+                        x = Dropout(rate)(x)
                     layers.append(x)
             
             with tf.name_scope('decoder_1'):
