@@ -889,7 +889,7 @@ def main(a):
         loss_list = [calc_generator_loss, calc_discriminator_loss, calc_task_loss]
         loss_weights = [a.gen_weight, a.dsc_weight, a.task_weight]
     else:
-        optimizer_list = [Adam(learning_rate=1e-4, amsgrad=a.ams_grad)]
+        optimizer_list = [Adam(learning_rate=a.lr_single, amsgrad=a.ams_grad)]
         loss_list = [compute_total_loss]
         loss_weights = None
 
@@ -1181,6 +1181,8 @@ if __name__ == '__main__':
                         help="initial learning rate for discriminator adam")
     parser.add_argument("--lr_task", type=float, default=1e-4,
                         help="initial learning rate for task adam")
+    parser.add_argument("--lr_single", type=float, default=1e-4,
+                        help="initial learning rate for single adam optimizer")
     parser.add_argument("--beta1_gen", type=float, default=0.5,
                         help="momentum term of generator adam")
     parser.add_argument("--beta1_dsc", type=float, default=0.5,
