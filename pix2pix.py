@@ -598,10 +598,9 @@ def main(a):
 
     # Build the model.
     if a.use_yolo:
-        model, _, encoder = create_model(a, train_data)
+        model, _, _ = create_model(a, train_data)
     else:
         model = create_model(a, train_data)
-        encoder = None
     print(f'Overall model summary:\n{model.summary()}')
 
     # Define model losses and helpers for computing and applying gradients.
@@ -799,11 +798,18 @@ def main(a):
             # Calculate loss on real images.
             a_task_wh = a_task_targets[..., 2:4] - a_task_targets[..., :2]
             a_task_xy = a_task_targets[..., :2] + a_task_wh / 2.
+            a_real_wh = task_outputs[1][..., 2:4] - task_outputs[1][..., :2]
             b_task_wh = b_task_targets[..., 2:4] - b_task_targets[..., :2]
             b_task_xy = b_task_targets[..., :2] + b_task_wh / 2.
+            b_real_wh = task_outputs[0][..., 2:4] - task_outputs[0][..., :2]
             b_xy_loss = tf.reduce_sum(tf.where(
                 b_bool_mask,
                 MSE(b_task_xy, task_outputs[0][..., :2]),
+                tf.zeros_like(b_bool_mask, dtype=tf.float32)
+            ))
+            b_wh_loss = tf.reduce_sum(tf.where(
+                b_bool_mask,
+                MSE(b_task_wh, b_real_wh),
                 tf.zeros_like(b_bool_mask, dtype=tf.float32)
             ))
             b_iou_loss = tf.math.reduce_mean(
@@ -823,13 +829,20 @@ def main(a):
                                          b_output_class,
                                          label_smoothing=0.1)
             )
-            b_loss = b_xy_loss + a.iou_weight * b_iou_loss + \
-                     a.class_weight * b_class_loss + b_obj_loss
+            b_loss = a.xy_weight * b_xy_loss + a.wh_weight * b_wh_loss + \
+                     a.iou_weight * b_iou_loss + \
+                     a.class_weight * b_class_loss + \
+                     a.obj_weight * b_obj_loss
 
             # Calculate loss on fake images.
             a_xy_loss = tf.reduce_sum(tf.where(
                 a_bool_mask,
                 MSE(a_task_xy, task_outputs[1][..., :2]),
+                tf.zeros_like(a_bool_mask, dtype=tf.float32)
+            ))
+            a_wh_loss = tf.reduce_sum(tf.where(
+                a_bool_mask,
+                MSE(a_task_wh, a_real_wh),
                 tf.zeros_like(a_bool_mask, dtype=tf.float32)
             ))
             a_iou_loss = tf.math.reduce_mean(
@@ -849,14 +862,20 @@ def main(a):
                                          a_output_class,
                                          label_smoothing=0.1)
             )
-            a_loss = a_xy_loss + a.iou_weight * a_iou_loss + \
-                     a.class_weight * a_class_loss + a_obj_loss
+            a_loss = a.xy_weight * a_xy_loss + a.wh_weight * a_wh_loss + \
+                     a.iou_weight * a_iou_loss + \
+                     a.class_weight * a_class_loss + \
+                     a.obj_weight * a_obj_loss
             task_loss = a_loss + b_loss
 
             # Write summaries.
             tf.summary.scalar(name='task_b_xy_loss', data=b_xy_loss,
                               step=step)
             tf.summary.scalar(name='task_a_xy_loss', data=a_xy_loss,
+                              step=step)
+            tf.summary.scalar(name='task_b_wh_loss', data=b_wh_loss,
+                              step=step)
+            tf.summary.scalar(name='task_a_wh_loss', data=a_wh_loss,
                               step=step)
             tf.summary.scalar(name='task_b_iou_loss', data=b_iou_loss,
                               step=step)
@@ -1225,10 +1244,16 @@ if __name__ == '__main__':
                         help='Relative weight of discriminator loss.')
     parser.add_argument('--task_weight', default=1., type=float,
                         help='Relative weight of task loss.')
+    parser.add_argument('--xy_weight', default=1., type=float,
+                        help='Relative weight of xy task loss component.')
+    parser.add_argument('--wh_weight', default=1., type=float,
+                        help='Relative weight of wh task loss component.')
     parser.add_argument('--iou_weight', default=1., type=float,
                         help='Relative weight of IoU task loss component.')
     parser.add_argument('--class_weight', default=1., type=float,
                         help='Relative weight of class task loss component.')
+    parser.add_argument('--obj_weight', default=1., type=float,
+                        help='Relative weight of objectness task loss component.')
     parser.add_argument('--early_stop_patience', default=10, type=int,
                         help='Early stopping patience, epochs. Default 10.')
     parser.add_argument('--multi_optim', default=False, action='store_true',
