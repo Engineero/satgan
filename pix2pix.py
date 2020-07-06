@@ -83,12 +83,12 @@ def _parse_example(serialized_example, a):
     # Cast parsed objects into usable types.
     a_width = tf.cast(example['a_width'], tf.int32)
     a_height = tf.cast(example['a_height'], tf.int32)
-    # a_xcenter = tf.cast(tf.sparse.to_dense(example['a_xcenter']), tf.float32)
-    a_xmin = tf.cast(tf.sparse.to_dense(example['a_xmin']), tf.float32)
-    a_xmax = tf.cast(tf.sparse.to_dense(example['a_xmax']), tf.float32)
-    # a_ycenter = tf.cast(tf.sparse.to_dense(example['a_ycenter']), tf.float32)
-    a_ymin = tf.cast(tf.sparse.to_dense(example['a_ymin']), tf.float32)
-    a_ymax = tf.cast(tf.sparse.to_dense(example['a_ymax']), tf.float32)
+    a_xcenter = tf.cast(tf.sparse.to_dense(example['a_xcenter']), tf.float32)
+    # a_xmin = tf.cast(tf.sparse.to_dense(example['a_xmin']), tf.float32)
+    # a_xmax = tf.cast(tf.sparse.to_dense(example['a_xmax']), tf.float32)
+    a_ycenter = tf.cast(tf.sparse.to_dense(example['a_ycenter']), tf.float32)
+    # a_ymin = tf.cast(tf.sparse.to_dense(example['a_ymin']), tf.float32)
+    # a_ymax = tf.cast(tf.sparse.to_dense(example['a_ymax']), tf.float32)
     a_classes = tf.cast(tf.sparse.to_dense(example['a_classes']), tf.float32)
     b_width = tf.cast(example['b_width'], tf.int32)
     b_height = tf.cast(example['b_height'], tf.int32)
@@ -99,6 +99,12 @@ def _parse_example(serialized_example, a):
     b_ymin = tf.cast(tf.sparse.to_dense(example['b_ymin']), tf.float32)
     b_ymax = tf.cast(tf.sparse.to_dense(example['b_ymax']), tf.float32)
     b_classes = tf.cast(tf.sparse.to_dense(example['b_classes']), tf.float32)
+
+    # Calculate bounding boxes for A images (SatSim makes really tight boxes).
+    a_xmin = a_xcenter - 10. / a_width
+    a_xmax = a_xcenter + 10. / a_width
+    a_ymin = a_ycenter - 10. / a_height
+    a_ymax = a_ycenter + 10. / a_height
 
     # Parse images and preprocess.
     a_image = tf.sparse.to_dense(example['a_raw'], default_value='')
