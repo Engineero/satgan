@@ -604,10 +604,10 @@ def main(a):
     physical_devices = tf.config.list_physical_devices('GPU')
     used_devices = [physical_devices[i] for i in a.devices]
     try:
-        # Disable first GPU
+        # Specify enabled GPUs.
         tf.config.set_visible_devices(used_devices, 'GPU')
         logical_devices = tf.config.list_logical_devices('GPU')
-        print(f'{len(pysical_devices)} phsyical GPUs,',
+        print(f'{len(physical_devices)} physical GPUs,',
               f'{len(logical_devices)} logical GPUs.')
     except:
         # Invalid device or cannot modify virtual devices once initialized.
