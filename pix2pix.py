@@ -910,11 +910,11 @@ def main(a):
 
     # Define the optimizer, losses, and weights.
     if a.multi_optim:
-        optimizer_gen = Adam(learning_rate=a.lr_gen, amsgrad=a.ams_grad)
         optimizer_discrim = Adam(learning_rate=a.lr_dsc, amsgrad=a.ams_grad)
+        optimizer_gen = Adam(learning_rate=a.lr_gen, amsgrad=a.ams_grad)
         optimizer_task = Adam(learning_rate=a.lr_task, amsgrad=a.ams_grad)
-        optimizer_list = [optimizer_gen, optimizer_discrim, optimizer_task]
-        loss_list = [calc_generator_loss, calc_discriminator_loss, calc_task_loss]
+        optimizer_list = [optimizer_discrim, optimizer_gen, optimizer_task]
+        loss_list = [calc_discriminator_loss, calc_generator_loss, calc_task_loss]
     else:
         optimizer_list = [Adam(learning_rate=a.lr_single, amsgrad=a.ams_grad)]
         loss_list = [compute_total_loss]
