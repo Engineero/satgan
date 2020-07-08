@@ -806,24 +806,12 @@ def main(a):
             a_task_xy = a_task_targets[..., :2] + a_task_wh / 2.
             b_task_wh = b_task_targets[..., 2:4] - b_task_targets[..., :2]
             b_task_xy = b_task_targets[..., :2] + b_task_wh / 2.
-            if a.use_yolo:
-                a_real_wh = task_outputs[1][..., 2:4]
-                a_real_xy = task_outputs[1][..., :2]
-                b_real_wh = task_outputs[0][..., 2:4]
-                b_real_xy = task_outputs[0][..., :2]
-                a_iou_outputs = tf.concat([a_real_xy - a_real_wh / 2.,
-                                           a_real_xy + a_real_wh / 2.],
-                                           axis=-1)
-                b_iou_outputs = tf.concat([b_real_xy - b_real_wh / 2.,
-                                           b_real_xy + b_real_wh / 2.],
-                                           axis=-1)
-            else:
-                a_real_wh = task_outputs[1][..., 2:4] - task_outputs[1][..., :2]
-                a_real_xy = task_outputs[1][..., :2] + a_task_wh / 2.
-                b_real_wh = task_outputs[0][..., 2:4] - task_outputs[0][..., :2]
-                b_real_xy = task_outputs[0][..., :2] + a_task_wh / 2.
-                a_iou_outputs = task_outputs[1]
-                b_iou_outputs = task_outputs[0]
+            a_real_wh = task_outputs[1][..., 2:4] - task_outputs[1][..., :2]
+            a_real_xy = task_outputs[1][..., :2] + a_task_wh / 2.
+            b_real_wh = task_outputs[0][..., 2:4] - task_outputs[0][..., :2]
+            b_real_xy = task_outputs[0][..., :2] + a_task_wh / 2.
+            a_iou_outputs = task_outputs[1]
+            b_iou_outputs = task_outputs[0]
 
             # Calculate loss on real images.
             b_xy_loss = tf.reduce_sum(tf.where(
@@ -1025,20 +1013,8 @@ def main(a):
                     # calculate that from YOLO.
                     a_true_bboxes = a_task_targets[..., :4]
                     b_true_bboxes = b_task_targets[..., :4]
-                    if a.use_yolo:
-                        a_wh = a_detects[..., 2:4]
-                        b_wh = b_detects[..., 2:4]
-                        a_xy_min = a_detects[..., :2] - a_wh / 2.
-                        a_xy_max = a_detects[..., :2] + a_wh / 2.
-                        b_xy_min = b_detects[..., :2] - b_wh / 2.
-                        b_xy_max = b_detects[..., :2] + b_wh / 2.
-                        a_fake_bboxes = tf.concat([a_xy_min, a_xy_max],
-                                                  axis=-1)
-                        b_fake_bboxes = tf.concat([b_xy_min, b_xy_max],
-                                                  axis=-1)
-                    else:
-                        a_fake_bboxes = a_detects[..., :4]
-                        b_fake_bboxes = b_detects[..., :4]
+                    a_fake_bboxes = a_detects[..., :4]
+                    b_fake_bboxes = b_detects[..., :4]
 
                     # Add bounding boxes to sample images.
                     target_bboxes = tf.image.draw_bounding_boxes(
