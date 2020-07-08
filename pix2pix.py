@@ -669,14 +669,15 @@ def main(a):
                 model_outputs = (gen_outputs,
                                  discrim_outputs,
                                  task_outputs)
-                for optimizer, loss_function, weight in zip(optimizer_list,
-                                                            loss_function_list,
-                                                            loss_weight_list):
+                for loss_function, weight in zip(loss_function_list,
+                                                 loss_weight_list):
                     loss += weight * loss_function(model_inputs,
                                                   model_outputs,
                                                   step)
             gradients = tape.gradient(loss, model.trainable_variables)
-            optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+            for optimizer in optimizer_list:
+                optimizer.apply_gradients(zip(gradients,
+                                              model.trainable_variables))
 
     with tf.name_scope("discriminator_loss"):
         def calc_discriminator_loss(model_inputs, model_outputs, step,
