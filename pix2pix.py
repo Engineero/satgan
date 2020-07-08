@@ -802,13 +802,13 @@ def main(a):
                                       dtype=tf.int32)
 
             # Grab/calculate yolo/custom network outputs.
+            a_task_wh = a_task_targets[..., 2:4] - a_task_targets[..., :2]
+            a_task_xy = a_task_targets[..., :2] + a_task_wh / 2.
+            b_task_wh = b_task_targets[..., 2:4] - b_task_targets[..., :2]
+            b_task_xy = b_task_targets[..., :2] + b_task_wh / 2.
             if a.use_yolo:
-                a_task_wh = a_task_targets[..., 2:4]
-                a_task_xy = a_task_targets[..., :2]
                 a_real_wh = task_outputs[1][..., 2:4]
                 a_real_xy = task_outputs[1][..., :2]
-                b_task_wh = b_task_targets[..., 2:4]
-                b_task_xy = b_task_targets[..., :2]
                 b_real_wh = task_outputs[0][..., 2:4]
                 b_real_xy = task_outputs[0][..., :2]
                 a_iou_outputs = tf.concat([a_task_xy - a_task_wh / 2.,
@@ -818,12 +818,8 @@ def main(a):
                                            b_task_xy + b_task_wh / 2.],
                                            axis=-1)
             else:
-                a_task_wh = a_task_targets[..., 2:4] - a_task_targets[..., :2]
-                a_task_xy = a_task_targets[..., :2] + a_task_wh / 2.
                 a_real_wh = task_outputs[1][..., 2:4] - task_outputs[1][..., :2]
                 a_real_xy = task_outputs[1][..., :2] + a_task_wh / 2.
-                b_task_wh = b_task_targets[..., 2:4] - b_task_targets[..., :2]
-                b_task_xy = b_task_targets[..., :2] + b_task_wh / 2.
                 b_real_wh = task_outputs[0][..., 2:4] - task_outputs[0][..., :2]
                 b_real_xy = task_outputs[0][..., :2] + a_task_wh / 2.
                 a_iou_outputs = task_outputs[1]
@@ -1030,10 +1026,12 @@ def main(a):
                     a_true_bboxes = a_task_targets[..., :4]
                     b_true_bboxes = b_task_targets[..., :4]
                     if a.use_yolo:
-                        a_xy_min = a_detects[..., :2] - a_detects[..., 2:4] / 2.
-                        a_xy_max = a_detects[..., :2] + a_detects[..., 2:4] / 2.
-                        b_xy_min = b_detects[..., :2] - b_detects[..., 2:4] / 2.
-                        b_xy_max = b_detects[..., :2] + b_detects[..., 2:4] / 2.
+                        a_wh = a_detects[..., 2:4]
+                        b_wh = b_detects[..., 2:4]
+                        a_xy_min = a_detects[..., :2] - a_wh / 2.
+                        a_xy_max = a_detects[..., :2] + a_wh / 2.
+                        b_xy_min = b_detects[..., :2] - b_wh / 2.
+                        b_xy_max = b_detects[..., :2] + b_wh / 2.
                         a_fake_bboxes = tf.concat([a_xy_min, a_xy_max],
                                                   axis=-1)
                         b_fake_bboxes = tf.concat([b_xy_min, b_xy_max],
