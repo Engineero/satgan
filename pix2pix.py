@@ -532,13 +532,14 @@ def create_model(a, train_data):
     a_task_targets = Input(a_task_targets_shape)
     b_task_targets = Input(b_task_targets_shape)
     with tf.name_scope("generator"):
-        out_channels = target_shape[-1]
-        generator = create_generator(a, input_shape, out_channels)
-        print(f'Generator model summary:\n{generator.summary()}')
-        gen_noise = generator(noise)
-        fake_img = gen_noise + inputs
-        gen_outputs = tf.stack([fake_img, gen_noise], axis=0,
-                               name='generator')
+        with tf.device(f'/device:GPU:{a.devices[0]}'):
+            out_channels = target_shape[-1]
+            generator = create_generator(a, input_shape, out_channels)
+            print(f'Generator model summary:\n{generator.summary()}')
+            gen_noise = generator(noise)
+            fake_img = gen_noise + inputs
+            gen_outputs = tf.stack([fake_img, gen_noise], axis=0,
+                                   name='generator')
 
     # Create two copies of the task network, one for real images (targets
     # input to this method) and one for generated images (outputs from
@@ -571,13 +572,14 @@ def create_model(a, train_data):
     # Create two copies of discriminator, one for real pairs and one for fake
     # pairs they share the same underlying variables
     with tf.name_scope("discriminator"):
-        # TODO (NLT): figure out discriminator loss, interaction with Keras changes.
-        discriminator = create_discriminator(a, target_shape)
-        print(f'Discriminator model summary\n:{discriminator.summary()}')
-        predict_real = discriminator(targets)  # should -> [0, 1]
-        predict_fake = discriminator(fake_img)  # should -> [1, 0]
-        discrim_outputs = tf.stack([predict_real, predict_fake], axis=0,
-                                   name='discriminator')
+        with tf.device(f'/device:GPU:{a.devices[0]}'):
+            # TODO (NLT): figure out discriminator loss, interaction with Keras changes.
+            discriminator = create_discriminator(a, target_shape)
+            print(f'Discriminator model summary\n:{discriminator.summary()}')
+            predict_real = discriminator(targets)  # should -> [0, 1]
+            predict_fake = discriminator(fake_img)  # should -> [1, 0]
+            discrim_outputs = tf.stack([predict_real, predict_fake], axis=0,
+                                       name='discriminator')
 
     model = Model(inputs=[inputs, noise, targets],
                   outputs=[gen_outputs, discrim_outputs, task_outputs])
@@ -605,11 +607,12 @@ def main(a):
         # Disable first GPU
         tf.config.set_visible_devices(used_devices, 'GPU')
         logical_devices = tf.config.list_logical_devices('GPU')
-        # Logical device was not created for first GPU
-        assert len(logical_devices) == len(physical_devices) - 1
+        print(f'{len(pysical_devices)} phsyical GPUs,',
+              f'{len(logical_devices)} logical GPUs.')
     except:
         # Invalid device or cannot modify virtual devices once initialized.
-        pass
+        print(f'{len(physical_devices)} physical GPUs.',
+              'Could not set visible devices!')
 
     # Set up the summary writer.
     output_path = Path(a.output_dir).resolve()
