@@ -695,7 +695,7 @@ def main(a):
 
 
     with tf.name_scope("discriminator_loss"):
-        with tf.device(f'/devices:GPU:{a.devices[0]}'):
+        with tf.device(f'/device:GPU:{a.devices[0]}'):
             def calc_discriminator_loss(model_inputs, model_outputs, step,
                                         **kwargs):
                 # minimizing -tf.log will try to get inputs to 1
@@ -735,7 +735,7 @@ def main(a):
                 return a.dsc_weight * discrim_loss
 
     with tf.name_scope("generator_loss"):
-        with tf.device(f'/devices:GPU:{a.devices[0]}'):
+        with tf.device(f'/device:GPU:{a.devices[0]}'):
             def calc_generator_loss(model_inputs, model_outputs, step, **kwargs):
                 # predict_fake => [0, 1]
                 # abs(targets - outputs) => 0
@@ -767,7 +767,7 @@ def main(a):
                 return a.gen_weight * gen_loss
 
     with tf.name_scope('task_loss'):
-        with tf.device(f'/devices:GPU:{a.devices[-1]}'):
+        with tf.device(f'/device:GPU:{a.devices[-1]}'):
             def calc_iou(targets, outputs):
                 y_a = tf.maximum(targets[..., 0], outputs[..., 0])
                 x_a = tf.maximum(targets[..., 1], outputs[..., 1])
