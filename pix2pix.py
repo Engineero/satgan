@@ -801,16 +801,38 @@ def main(a):
                                                axis=-1),
                                       dtype=tf.int32)
 
+            # Grab/calculate yolo/custom network outputs.
+            if a.use_yolo:
+                a_task_wh = a_task_targets[..., 2:4]
+                a_task_xy = a_task_targets[..., :2]
+                a_real_wh = task_outputs[1][..., 2:4]
+                a_real_xy = task_outputs[1][..., :2]
+                b_task_wh = b_task_targets[..., 2:4]
+                b_task_xy = b_task_targets[..., :2]
+                b_real_wh = task_outputs[0][..., 2:4]
+                b_real_xy = task_outputs[0][..., :2]
+                a_iou_outputs = tf.concat([a_task_xy - a_task_wh / 2.,
+                                           a_task_xy + a_task_wh / 2.],
+                                           axis=-1)
+                b_iou_outputs = tf.concat([b_task_xy - b_task_wh / 2.,
+                                           b_task_xy + b_task_wh / 2.],
+                                           axis=-1)
+            else:
+                a_task_wh = a_task_targets[..., 2:4] - a_task_targets[..., :2]
+                a_task_xy = a_task_targets[..., :2] + a_task_wh / 2.
+                a_real_wh = task_outputs[1][..., 2:4] - task_outputs[1][..., :2]
+                a_real_xy = task_outputs[1][..., :2] + a_task_wh / 2.
+                b_task_wh = b_task_targets[..., 2:4] - b_task_targets[..., :2]
+                b_task_xy = b_task_targets[..., :2] + b_task_wh / 2.
+                b_real_wh = task_outputs[0][..., 2:4] - task_outputs[0][..., :2]
+                b_real_xy = task_outputs[0][..., :2] + a_task_wh / 2.
+                a_iou_outputs = task_outputs[1]
+                b_iou_outputs = task_outputs[0]
+
             # Calculate loss on real images.
-            a_task_wh = a_task_targets[..., 2:4] - a_task_targets[..., :2]
-            a_task_xy = a_task_targets[..., :2] + a_task_wh / 2.
-            a_real_wh = task_outputs[1][..., 2:4] - task_outputs[1][..., :2]
-            b_task_wh = b_task_targets[..., 2:4] - b_task_targets[..., :2]
-            b_task_xy = b_task_targets[..., :2] + b_task_wh / 2.
-            b_real_wh = task_outputs[0][..., 2:4] - task_outputs[0][..., :2]
             b_xy_loss = tf.reduce_sum(tf.where(
                 b_bool_mask,
-                MSE(b_task_xy, task_outputs[0][..., :2]),
+                MSE(b_task_xy, b_real_xy),
                 tf.zeros_like(b_bool_mask, dtype=tf.float32)
             ))
             b_wh_loss = tf.reduce_sum(tf.where(
@@ -819,7 +841,7 @@ def main(a):
                 tf.zeros_like(b_bool_mask, dtype=tf.float32)
             ))
             b_iou_loss = tf.math.reduce_mean(
-                calc_iou(b_task_targets, task_outputs[0])
+                calc_iou(b_task_targets, b_iou_outputs)
             )
             b_obj_loss = tf.math.reduce_mean(
                 categorical_crossentropy(
@@ -843,7 +865,7 @@ def main(a):
             # Calculate loss on fake images.
             a_xy_loss = tf.reduce_sum(tf.where(
                 a_bool_mask,
-                MSE(a_task_xy, task_outputs[1][..., :2]),
+                MSE(a_task_xy, a_real_xy),
                 tf.zeros_like(a_bool_mask, dtype=tf.float32)
             ))
             a_wh_loss = tf.reduce_sum(tf.where(
@@ -852,7 +874,7 @@ def main(a):
                 tf.zeros_like(a_bool_mask, dtype=tf.float32)
             ))
             a_iou_loss = tf.math.reduce_mean(
-                calc_iou(a_task_targets, task_outputs[1])
+                calc_iou(a_task_targets, a_iou_outputs)
             )
             a_obj_loss = tf.math.reduce_mean(
                 categorical_crossentropy(
@@ -994,7 +1016,7 @@ def main(a):
                     a_mask = tf.tile(
                         tf.expand_dims(a_detects[..., -1] > a.obj_threshold,
                                        axis=-1),
-                        [1, 1, b_detects.shape[-1]]
+                        [1, 1, a_detects.shape[-1]]
                     )
                     b_detects = tf.where(b_mask,
                                          b_detects,
