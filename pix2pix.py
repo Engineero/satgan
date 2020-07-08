@@ -650,17 +650,20 @@ def main(a):
             # Parse out the batch data.
             (inputs, noise, targets), (_, a_task_targets, b_task_targets) = \
                 data
+
+            # Run the model.
+            gen_outputs, discrim_outputs, task_outputs = \
+                model([inputs, noise, targets])
+            model_inputs = (inputs, targets, a_task_targets,
+                            b_task_targets, noise)
+            model_outputs = (gen_outputs,
+                             discrim_outputs,
+                             task_outputs)
+
             # Compute and apply gradients.
             for optimizer, loss_function in zip(optimizer_list,
                                                 loss_function_list):
                 with tf.GradientTape() as tape:
-                    gen_outputs, discrim_outputs, task_outputs = \
-                        model([inputs, noise, targets])
-                    model_inputs = (inputs, targets, a_task_targets,
-                                    b_task_targets, noise)
-                    model_outputs = (gen_outputs,
-                                     discrim_outputs,
-                                     task_outputs)
                     loss = loss_function(model_inputs,
                                          model_outputs,
                                          step)
