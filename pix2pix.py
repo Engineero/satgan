@@ -18,7 +18,7 @@ from tensorflow.keras.regularizers import l1_l2
 from tensorflow.keras.losses import (MSE, mean_absolute_error,
                                      categorical_crossentropy)
 from tensorflow.keras.utils import plot_model
-from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.optimizers import Adam, SGD
 from tensorflow.keras.metrics import Mean
 from yolo_v3 import build_yolo_model, load_yolo_model_weights
 
@@ -531,8 +531,10 @@ def create_model(a, train_data):
     targets = Input(target_shape)
     a_task_targets = Input(a_task_targets_shape)
     b_task_targets = Input(b_task_targets_shape)
-    with tf.name_scope("generator"):
-        with tf.device(f'/device:GPU:{a.devices[0]}'):
+
+    with tf.device(f'/device:GPU:{a.devices[0]}'):
+        # Create the generator.
+        with tf.name_scope("generator"):
             out_channels = target_shape[-1]
             generator = create_generator(a, input_shape, out_channels)
             print(f'Generator model summary:\n{generator.summary()}')
@@ -541,12 +543,23 @@ def create_model(a, train_data):
             gen_outputs = tf.stack([fake_img, gen_noise], axis=0,
                                    name='generator')
 
+        # Create two copies of discriminator, one for real pairs and one for
+        # fake pairs they share the same underlying variables.
+        with tf.name_scope("discriminator"):
+            # TODO (NLT): figure out discriminator loss, interaction with Keras changes.
+            discriminator = create_discriminator(a, target_shape)
+            print(f'Discriminator model summary\n:{discriminator.summary()}')
+            predict_real = discriminator(targets)  # should -> [0, 1]
+            predict_fake = discriminator(fake_img)  # should -> [1, 0]
+            discrim_outputs = tf.stack([predict_real, predict_fake], axis=0,
+                                       name='discriminator')
+
     # Create two copies of the task network, one for real images (targets
     # input to this method) and one for generated images (outputs from
     # generator). The task targets (detected objects) should be the same for
     # both.
-    with tf.name_scope('task_net'):
-        with tf.device(f'/device:GPU:{a.devices[-1]}'):
+    with tf.device(f'/device:GPU:{a.devices[-1]}'):
+        with tf.name_scope('task_net'):
             if a.use_yolo:
                 task_net, task_loss, encoder = build_yolo_model(
                     base_model_name=a.base_model_name,
@@ -568,18 +581,6 @@ def create_model(a, train_data):
         print(f'Task Net model summary:\n{task_net.summary()}')
         task_outputs = tf.stack([pred_task, pred_task_fake], axis=0,
                                 name='task_net')
-
-    # Create two copies of discriminator, one for real pairs and one for fake
-    # pairs they share the same underlying variables
-    with tf.name_scope("discriminator"):
-        with tf.device(f'/device:GPU:{a.devices[0]}'):
-            # TODO (NLT): figure out discriminator loss, interaction with Keras changes.
-            discriminator = create_discriminator(a, target_shape)
-            print(f'Discriminator model summary\n:{discriminator.summary()}')
-            predict_real = discriminator(targets)  # should -> [0, 1]
-            predict_fake = discriminator(fake_img)  # should -> [1, 0]
-            discrim_outputs = tf.stack([predict_real, predict_fake], axis=0,
-                                       name='discriminator')
 
     model = Model(inputs=[inputs, noise, targets],
                   outputs=[gen_outputs, discrim_outputs, task_outputs])
@@ -694,8 +695,8 @@ def main(a):
                 # optimizer.apply_gradients(zip(gradients, watched_vars))
 
 
-    with tf.name_scope("discriminator_loss"):
-        with tf.device(f'/device:GPU:{a.devices[0]}'):
+    with tf.device(f'/device:GPU:{a.devices[0]}'):
+        with tf.name_scope("discriminator_loss"):
             def calc_discriminator_loss(model_inputs, model_outputs, step,
                                         **kwargs):
                 # minimizing -tf.log will try to get inputs to 1
@@ -734,8 +735,7 @@ def main(a):
                                   step=step)
                 return a.dsc_weight * discrim_loss
 
-    with tf.name_scope("generator_loss"):
-        with tf.device(f'/device:GPU:{a.devices[0]}'):
+        with tf.name_scope("generator_loss"):
             def calc_generator_loss(model_inputs, model_outputs, step, **kwargs):
                 # predict_fake => [0, 1]
                 # abs(targets - outputs) => 0
@@ -766,8 +766,8 @@ def main(a):
                                   step=step)
                 return a.gen_weight * gen_loss
 
-    with tf.name_scope('task_loss'):
-        with tf.device(f'/device:GPU:{a.devices[-1]}'):
+    with tf.device(f'/device:GPU:{a.devices[-1]}'):
+        with tf.name_scope('task_loss'):
             def calc_iou(targets, outputs):
                 y_a = tf.maximum(targets[..., 0], outputs[..., 0])
                 x_a = tf.maximum(targets[..., 1], outputs[..., 1])
@@ -933,9 +933,11 @@ def main(a):
 
     # Define the optimizer, losses, and weights.
     if a.multi_optim:
-        optimizer_discrim = Adam(learning_rate=a.lr_dsc, amsgrad=a.ams_grad)
-        optimizer_gen = Adam(learning_rate=a.lr_gen, amsgrad=a.ams_grad)
-        optimizer_task = Adam(learning_rate=a.lr_task, amsgrad=a.ams_grad)
+        with tf.device(f'/device:GPU:{a.devices[0]}'):
+            optimizer_discrim = Adam(learning_rate=a.lr_dsc, amsgrad=a.ams_grad)
+            optimizer_gen = Adam(learning_rate=a.lr_gen, amsgrad=a.ams_grad)
+        with tf.device(f'/device:GPU:{a.devices[-1]}'):
+            optimizer_task = Adam(learning_rate=a.lr_task, amsgrad=a.ams_grad)
         optimizer_list = [optimizer_discrim, optimizer_gen, optimizer_task]
         loss_list = [calc_discriminator_loss, calc_generator_loss, calc_task_loss]
     else:
