@@ -347,6 +347,7 @@ def create_generator(a, input_shape, generator_outputs_channels):
             
             with tf.name_scope('decoder_1'):
                 x = Concatenate(axis=3)([layers[-1], layers[0]])
+                x = BatchNormalization()(x)
                 x = LeakyReLU()(x)
                 x = gen_deconv(x, generator_outputs_channels)
                 x = tanh(x)
@@ -405,6 +406,8 @@ def create_discriminator(a, target_shape):
                 x = LeakyReLU()(x)
                 x = discrim_conv(x, out_channels, stride)
         with tf.name_scope('output_layer'):
+            x = BatchNormalization()(x)
+            x = LeakyReLU()(x)
             x = discrim_conv(x, 2, 1)
             x = tf.nn.softmax(x, name='discriminator')
 
