@@ -677,9 +677,9 @@ def main(a):
                 # gradients = tape.gradient(loss, model.trainable_variables)
                 # optimizer.apply_gradients(zip(gradients,
                 #                               model.trainable_variables))
-                gradients = tape.gradient(loss, tape.watched_variables())
-                optimizer.apply_gradients(zip(gradients,
-                                              tape.watched_variables()))
+                watched_vars = tape.watched_variables()
+                gradients = tape.gradient(loss, watched_vars)
+                optimizer.apply_gradients(zip(gradients, watched_vars))
 
     with tf.name_scope("discriminator_loss"):
         def calc_discriminator_loss(model_inputs, model_outputs, step,
