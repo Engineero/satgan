@@ -653,14 +653,14 @@ def main(a):
             # Compute and apply gradients.
             for optimizer, loss_function in zip(optimizer_list,
                                                 loss_function_list):
-                gen_outputs, discrim_outputs, task_outputs = \
-                    model([inputs, noise, targets])
-                model_inputs = (inputs, targets, a_task_targets,
-                                b_task_targets, noise)
-                model_outputs = (gen_outputs,
-                                 discrim_outputs,
-                                 task_outputs)
                 with tf.GradientTape() as tape:
+                    gen_outputs, discrim_outputs, task_outputs = \
+                        model([inputs, noise, targets])
+                    model_inputs = (inputs, targets, a_task_targets,
+                                    b_task_targets, noise)
+                    model_outputs = (gen_outputs,
+                                     discrim_outputs,
+                                     task_outputs)
                     loss = loss_function(model_inputs,
                                          model_outputs,
                                          step)
