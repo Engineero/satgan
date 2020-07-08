@@ -811,11 +811,11 @@ def main(a):
                 a_real_xy = task_outputs[1][..., :2]
                 b_real_wh = task_outputs[0][..., 2:4]
                 b_real_xy = task_outputs[0][..., :2]
-                a_iou_outputs = tf.concat([a_task_xy - a_task_wh / 2.,
-                                           a_task_xy + a_task_wh / 2.],
+                a_iou_outputs = tf.concat([a_real_xy - a_real_wh / 2.,
+                                           a_real_xy + a_real_wh / 2.],
                                            axis=-1)
-                b_iou_outputs = tf.concat([b_task_xy - b_task_wh / 2.,
-                                           b_task_xy + b_task_wh / 2.],
+                b_iou_outputs = tf.concat([b_real_xy - b_real_wh / 2.,
+                                           b_real_xy + b_real_wh / 2.],
                                            axis=-1)
             else:
                 a_real_wh = task_outputs[1][..., 2:4] - task_outputs[1][..., :2]
