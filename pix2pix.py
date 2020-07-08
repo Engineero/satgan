@@ -618,8 +618,7 @@ def main(a):
                                                    step)
             gen_loss = calc_generator_loss(model_inputs, model_outputs, step)
             task_loss = calc_task_loss(model_inputs, model_outputs, step)
-            total_loss = a.dsc_weight * discrim_loss + \
-                a.gen_weight * gen_loss + a.task_weight * task_loss
+            total_loss = discrim_loss + gen_loss + task_loss
             tf.summary.scalar(name='total_loss', data=total_loss,
                               step=step)
             if return_all:
@@ -629,8 +628,7 @@ def main(a):
 
     with tf.name_scope('apply_gradients'):
         def compute_apply_gradients(model, data, optimizer_list,
-                                    loss_function_list, step,
-                                    loss_weight_list=None):
+                                    loss_function_list, step):
             """Computes and applies gradients with optional lists of
             optimizers and corresponding loss functions.
 
@@ -643,26 +641,18 @@ def main(a):
                     function for full model.
                 step: training step.
 
-            Keyword Args:
-                loss_weight_list: weights associated with loss function.
-                    Default is None which applies even weight to all losses.
             """
 
             if not isinstance(optimizer_list, list):
                 optimizer_list = [optimizer_list]
             if not isinstance(loss_function_list, list):
                 loss_function_list = [loss_function_list]
-            if loss_weight_list is None:
-                loss_weight_list = [1.] * len(optimizer_list)
-            if not isinstance(loss_weight_list, list):
-                loss_weight_list = [loss_weight_list]
             # Parse out the batch data.
             (inputs, noise, targets), (_, a_task_targets, b_task_targets) = \
                 data
             # Compute and apply gradients.
-            for optimizer, loss_function, weight in zip(optimizer_list,
-                                                        loss_function_list,
-                                                        loss_weight_list):
+            for optimizer, loss_function in zip(optimizer_list,
+                                                loss_function_list):
                 gen_outputs, discrim_outputs, task_outputs = \
                     model([inputs, noise, targets])
                 model_inputs = (inputs, targets, a_task_targets,
@@ -671,12 +661,16 @@ def main(a):
                                  discrim_outputs,
                                  task_outputs)
                 with tf.GradientTape() as tape:
-                    loss = weight * loss_function(model_inputs,
-                                                  model_outputs,
-                                                  step)
-                gradients = tape.gradient(loss, model.trainable_variables)
-                optimizer.apply_gradients(zip(gradients,
-                                              model.trainable_variables))
+                    loss = loss_function(model_inputs,
+                                         model_outputs,
+                                         step)
+                # gradients = tape.gradient(loss, model.trainable_variables)
+                # optimizer.apply_gradients(zip(gradients,
+                #                               model.trainable_variables))
+                watched_vars = tape.watched_variables()
+                gradients = tape.gradient(loss, watched_vars)
+                optimizer.apply_gradients(zip(gradients, watched_vars))
+
 
     with tf.name_scope("discriminator_loss"):
         def calc_discriminator_loss(model_inputs, model_outputs, step,
@@ -715,7 +709,7 @@ def main(a):
             tf.summary.scalar(name='discrim_total_loss',
                               data=discrim_loss,
                               step=step)
-            return discrim_loss
+            return a.dsc_weight * discrim_loss
 
     with tf.name_scope("generator_loss"):
         def calc_generator_loss(model_inputs, model_outputs, step, **kwargs):
@@ -746,7 +740,7 @@ def main(a):
                               step=step)
             tf.summary.scalar(name='gen_total_loss', data=gen_loss,
                               step=step)
-            return gen_loss
+            return a.gen_weight * gen_loss
 
     with tf.name_scope('task_loss'):
         def calc_iou(targets, outputs):
@@ -910,7 +904,7 @@ def main(a):
                               step=step)
             tf.summary.scalar(name='task_loss', data=task_loss,
                               step=step)
-            return task_loss
+            return a.task_weight * task_loss
 
     # Define the optimizer, losses, and weights.
     if a.multi_optim:
@@ -919,11 +913,9 @@ def main(a):
         optimizer_task = Adam(learning_rate=a.lr_task, amsgrad=a.ams_grad)
         optimizer_list = [optimizer_gen, optimizer_discrim, optimizer_task]
         loss_list = [calc_generator_loss, calc_discriminator_loss, calc_task_loss]
-        loss_weights = [a.gen_weight, a.dsc_weight, a.task_weight]
     else:
         optimizer_list = [Adam(learning_rate=a.lr_single, amsgrad=a.ams_grad)]
         loss_list = [compute_total_loss]
-        loss_weights = None
 
     # Train the model.
     batches_seen = tf.Variable(0, dtype=tf.int64)
@@ -1068,8 +1060,7 @@ def main(a):
                                         batch,
                                         optimizer_list,
                                         loss_list,
-                                        batches_seen,
-                                        loss_weight_list=loss_weights)
+                                        batches_seen)
                 batches_seen.assign_add(1)
                 writer.flush()
 
