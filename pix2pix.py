@@ -695,238 +695,241 @@ def main(a):
 
 
     with tf.name_scope("discriminator_loss"):
-        def calc_discriminator_loss(model_inputs, model_outputs, step,
-                                    **kwargs):
-            # minimizing -tf.log will try to get inputs to 1
-            # discrim_outputs[0] = predict_real => [0, 1]
-            # discrim_outputs[1] = predict_fake => [1, 0]
-            discrim_outputs = model_outputs[1]
-            predict_real = discrim_outputs[0]
-            predict_fake = discrim_outputs[1]
-            predict_real = tf.reshape(predict_real, [predict_real.shape[0], -1, 2])
-            predict_fake = tf.reshape(predict_fake, [predict_fake.shape[0], -1, 2])
-            targets_one = tf.ones(shape=predict_real.shape[:-1])
-            targets_zero = tf.zeros(shape=predict_fake.shape[:-1])
-            real_loss = tf.math.reduce_mean(
-                categorical_crossentropy(
-                    tf.stack([targets_zero, targets_one], axis=-1),
-                    predict_real,
-                    label_smoothing=0.1,
+        with tf.device(f'/devices:GPU:{a.devices[0]}'):
+            def calc_discriminator_loss(model_inputs, model_outputs, step,
+                                        **kwargs):
+                # minimizing -tf.log will try to get inputs to 1
+                # discrim_outputs[0] = predict_real => [0, 1]
+                # discrim_outputs[1] = predict_fake => [1, 0]
+                discrim_outputs = model_outputs[1]
+                predict_real = discrim_outputs[0]
+                predict_fake = discrim_outputs[1]
+                predict_real = tf.reshape(predict_real, [predict_real.shape[0], -1, 2])
+                predict_fake = tf.reshape(predict_fake, [predict_fake.shape[0], -1, 2])
+                targets_one = tf.ones(shape=predict_real.shape[:-1])
+                targets_zero = tf.zeros(shape=predict_fake.shape[:-1])
+                real_loss = tf.math.reduce_mean(
+                    categorical_crossentropy(
+                        tf.stack([targets_zero, targets_one], axis=-1),
+                        predict_real,
+                        label_smoothing=0.1,
+                    )
                 )
-            )
-            fake_loss = tf.math.reduce_mean(
-                categorical_crossentropy(
-                    tf.stack([targets_one, targets_zero], axis=-1),
-                    predict_fake,
-                    label_smoothing=0.1,
+                fake_loss = tf.math.reduce_mean(
+                    categorical_crossentropy(
+                        tf.stack([targets_one, targets_zero], axis=-1),
+                        predict_fake,
+                        label_smoothing=0.1,
+                    )
                 )
-            )
-            discrim_loss = real_loss + fake_loss
+                discrim_loss = real_loss + fake_loss
 
-            # Write summaries.
-            tf.summary.scalar(name='discrim_real_loss', data=real_loss,
-                              step=step)
-            tf.summary.scalar(name='discrim_fake_loss', data=fake_loss,
-                              step=step)
-            tf.summary.scalar(name='discrim_total_loss',
-                              data=discrim_loss,
-                              step=step)
-            return a.dsc_weight * discrim_loss
+                # Write summaries.
+                tf.summary.scalar(name='discrim_real_loss', data=real_loss,
+                                  step=step)
+                tf.summary.scalar(name='discrim_fake_loss', data=fake_loss,
+                                  step=step)
+                tf.summary.scalar(name='discrim_total_loss',
+                                  data=discrim_loss,
+                                  step=step)
+                return a.dsc_weight * discrim_loss
 
     with tf.name_scope("generator_loss"):
-        def calc_generator_loss(model_inputs, model_outputs, step, **kwargs):
-            # predict_fake => [0, 1]
-            # abs(targets - outputs) => 0
-            fake_img = model_outputs[0][0]
-            discrim_fake = model_outputs[1][1]
-            discrim_fake = tf.reshape(discrim_fake,
-                                      [discrim_fake.shape[0], -1, 2])
-            targets_ones = tf.ones(shape=discrim_fake.shape[:-1])
-            targets_zeros = tf.zeros(shape=discrim_fake.shape[:-1])
-            targets = model_inputs[1]
-            gen_loss_GAN = tf.reduce_mean(
-                categorical_crossentropy(
-                    tf.stack([targets_zeros, targets_ones], axis=-1),
-                    discrim_fake,
-                    label_smoothing=0.1,
+        with tf.device(f'/devices:GPU:{a.devices[0]}'):
+            def calc_generator_loss(model_inputs, model_outputs, step, **kwargs):
+                # predict_fake => [0, 1]
+                # abs(targets - outputs) => 0
+                fake_img = model_outputs[0][0]
+                discrim_fake = model_outputs[1][1]
+                discrim_fake = tf.reshape(discrim_fake,
+                                          [discrim_fake.shape[0], -1, 2])
+                targets_ones = tf.ones(shape=discrim_fake.shape[:-1])
+                targets_zeros = tf.zeros(shape=discrim_fake.shape[:-1])
+                targets = model_inputs[1]
+                gen_loss_GAN = tf.reduce_mean(
+                    categorical_crossentropy(
+                        tf.stack([targets_zeros, targets_ones], axis=-1),
+                        discrim_fake,
+                        label_smoothing=0.1,
+                    )
                 )
-            )
-            gen_loss_L1 = tf.reduce_mean(mean_absolute_error(targets,
-                                                             fake_img))
-            gen_loss = a.gan_weight * gen_loss_GAN + a.l1_weight * gen_loss_L1
+                gen_loss_L1 = tf.reduce_mean(mean_absolute_error(targets,
+                                                                 fake_img))
+                gen_loss = a.gan_weight * gen_loss_GAN + a.l1_weight * gen_loss_L1
 
-            # Write summaries.
-            tf.summary.scalar(name='gen_L1_loss', data=gen_loss_L1,
-                              step=step)
-            tf.summary.scalar(name='gen_GAN_loss', data=gen_loss_GAN,
-                              step=step)
-            tf.summary.scalar(name='gen_total_loss', data=gen_loss,
-                              step=step)
-            return a.gen_weight * gen_loss
+                # Write summaries.
+                tf.summary.scalar(name='gen_L1_loss', data=gen_loss_L1,
+                                  step=step)
+                tf.summary.scalar(name='gen_GAN_loss', data=gen_loss_GAN,
+                                  step=step)
+                tf.summary.scalar(name='gen_total_loss', data=gen_loss,
+                                  step=step)
+                return a.gen_weight * gen_loss
 
     with tf.name_scope('task_loss'):
-        def calc_iou(targets, outputs):
-            y_a = tf.maximum(targets[..., 0], outputs[..., 0])
-            x_a = tf.maximum(targets[..., 1], outputs[..., 1])
-            y_b = tf.minimum(targets[..., 2], outputs[..., 2])
-            x_b = tf.minimum(targets[..., 3], outputs[..., 3])
-            intersection = tf.maximum(x_b - x_a + 1., 0.) * \
-                           tf.maximum(y_b - y_a + 1., 0.)
-            target_area = (targets[..., 2] - targets[..., 0] + 1.) * \
-                          (targets[..., 3] - targets[..., 1] + 1.)
-            output_area = (outputs[..., 2] - outputs[..., 0] + 1.) * \
-                          (outputs[..., 3] - outputs[..., 1] + 1.)
-            union = target_area + output_area - intersection
-            return 1. - intersection / union
+        with tf.device(f'/devices:GPU:{a.devices[-1]}'):
+            def calc_iou(targets, outputs):
+                y_a = tf.maximum(targets[..., 0], outputs[..., 0])
+                x_a = tf.maximum(targets[..., 1], outputs[..., 1])
+                y_b = tf.minimum(targets[..., 2], outputs[..., 2])
+                x_b = tf.minimum(targets[..., 3], outputs[..., 3])
+                intersection = tf.maximum(x_b - x_a + 1., 0.) * \
+                               tf.maximum(y_b - y_a + 1., 0.)
+                target_area = (targets[..., 2] - targets[..., 0] + 1.) * \
+                              (targets[..., 3] - targets[..., 1] + 1.)
+                output_area = (outputs[..., 2] - outputs[..., 0] + 1.) * \
+                              (outputs[..., 3] - outputs[..., 1] + 1.)
+                union = target_area + output_area - intersection
+                return 1. - intersection / union
 
-        @tf.function
-        def calc_task_loss(model_inputs, model_outputs, step):
-            # task_targets are [ymin, xmin, ymax, xmax, class]
-            # task_outputs are [ymin, xmin, ymax, xmax, *class] where *class
-            # is a one-hot encoded score for each class in the dataset for
-            # custom detector. For YOLO model, *class is just a scalar class
-            # score.
-            a_task_targets = model_inputs[2]  # input's objects
-            b_task_targets = model_inputs[3]  # target's objects
-            task_outputs = model_outputs[2]
-            a_target_classes = tf.one_hot(tf.cast(a_task_targets[..., -1],
-                                                  tf.int32),
-                                          a.num_classes)
-            b_target_classes = tf.one_hot(tf.cast(b_task_targets[..., -1],
-                                                  tf.int32),
-                                          a.num_classes)
+            @tf.function
+            def calc_task_loss(model_inputs, model_outputs, step):
+                # task_targets are [ymin, xmin, ymax, xmax, class]
+                # task_outputs are [ymin, xmin, ymax, xmax, *class] where *class
+                # is a one-hot encoded score for each class in the dataset for
+                # custom detector. For YOLO model, *class is just a scalar class
+                # score.
+                a_task_targets = model_inputs[2]  # input's objects
+                b_task_targets = model_inputs[3]  # target's objects
+                task_outputs = model_outputs[2]
+                a_target_classes = tf.one_hot(tf.cast(a_task_targets[..., -1],
+                                                      tf.int32),
+                                              a.num_classes)
+                b_target_classes = tf.one_hot(tf.cast(b_task_targets[..., -1],
+                                                      tf.int32),
+                                              a.num_classes)
 
-            # Handle YOLO's class output only being a scalar.
-            if a.use_yolo:
-                b_output_class = tf.stack([1. - task_outputs[0][..., -1],
-                                           task_outputs[0][..., -1]],
-                                          axis=-1)
-                a_output_class = tf.stack([1. - task_outputs[1][..., -1],
-                                           task_outputs[1][..., -1]],
-                                          axis=-1)
-            else:
-                b_output_class = task_outputs[0][..., 5:]
-                a_output_class = task_outputs[1][..., 5:]
-            a_bool_mask = (a_task_targets[..., -1] != 0)
-            b_bool_mask = (b_task_targets[..., -1] != 0)
-            a_object_target = tf.cast(tf.stack([a_bool_mask,
-                                                tf.logical_not(a_bool_mask)],
-                                               axis=-1),
-                                      dtype=tf.int32)
-            b_object_target = tf.cast(tf.stack([b_bool_mask,
-                                                tf.logical_not(b_bool_mask)],
-                                               axis=-1),
-                                      dtype=tf.int32)
+                # Handle YOLO's class output only being a scalar.
+                if a.use_yolo:
+                    b_output_class = tf.stack([1. - task_outputs[0][..., -1],
+                                               task_outputs[0][..., -1]],
+                                              axis=-1)
+                    a_output_class = tf.stack([1. - task_outputs[1][..., -1],
+                                               task_outputs[1][..., -1]],
+                                              axis=-1)
+                else:
+                    b_output_class = task_outputs[0][..., 5:]
+                    a_output_class = task_outputs[1][..., 5:]
+                a_bool_mask = (a_task_targets[..., -1] != 0)
+                b_bool_mask = (b_task_targets[..., -1] != 0)
+                a_object_target = tf.cast(tf.stack([a_bool_mask,
+                                                    tf.logical_not(a_bool_mask)],
+                                                   axis=-1),
+                                          dtype=tf.int32)
+                b_object_target = tf.cast(tf.stack([b_bool_mask,
+                                                    tf.logical_not(b_bool_mask)],
+                                                   axis=-1),
+                                          dtype=tf.int32)
 
-            # Grab/calculate yolo/custom network outputs.
-            a_task_wh = a_task_targets[..., 2:4] - a_task_targets[..., :2]
-            a_task_xy = a_task_targets[..., :2] + a_task_wh / 2.
-            b_task_wh = b_task_targets[..., 2:4] - b_task_targets[..., :2]
-            b_task_xy = b_task_targets[..., :2] + b_task_wh / 2.
-            a_real_wh = task_outputs[1][..., 2:4] - task_outputs[1][..., :2]
-            a_real_xy = task_outputs[1][..., :2] + a_task_wh / 2.
-            b_real_wh = task_outputs[0][..., 2:4] - task_outputs[0][..., :2]
-            b_real_xy = task_outputs[0][..., :2] + a_task_wh / 2.
-            a_iou_outputs = task_outputs[1]
-            b_iou_outputs = task_outputs[0]
+                # Grab/calculate yolo/custom network outputs.
+                a_task_wh = a_task_targets[..., 2:4] - a_task_targets[..., :2]
+                a_task_xy = a_task_targets[..., :2] + a_task_wh / 2.
+                b_task_wh = b_task_targets[..., 2:4] - b_task_targets[..., :2]
+                b_task_xy = b_task_targets[..., :2] + b_task_wh / 2.
+                a_real_wh = task_outputs[1][..., 2:4] - task_outputs[1][..., :2]
+                a_real_xy = task_outputs[1][..., :2] + a_task_wh / 2.
+                b_real_wh = task_outputs[0][..., 2:4] - task_outputs[0][..., :2]
+                b_real_xy = task_outputs[0][..., :2] + a_task_wh / 2.
+                a_iou_outputs = task_outputs[1]
+                b_iou_outputs = task_outputs[0]
 
-            # Calculate loss on real images.
-            b_xy_loss = tf.reduce_sum(tf.where(
-                b_bool_mask,
-                MSE(b_task_xy, b_real_xy),
-                tf.zeros_like(b_bool_mask, dtype=tf.float32)
-            ))
-            b_wh_loss = tf.reduce_sum(tf.where(
-                b_bool_mask,
-                MSE(b_task_wh, b_real_wh),
-                tf.zeros_like(b_bool_mask, dtype=tf.float32)
-            ))
-            b_iou_loss = tf.math.reduce_mean(
-                calc_iou(b_task_targets, b_iou_outputs)
-            )
-            b_obj_loss = tf.math.reduce_mean(
-                categorical_crossentropy(
-                    b_object_target,
-                    tf.stack([1. - task_outputs[0][..., 4],
-                              task_outputs[0][..., 4]],
-                             axis=-1),
-                    label_smoothing=0.1
+                # Calculate loss on real images.
+                b_xy_loss = tf.reduce_sum(tf.where(
+                    b_bool_mask,
+                    MSE(b_task_xy, b_real_xy),
+                    tf.zeros_like(b_bool_mask, dtype=tf.float32)
+                ))
+                b_wh_loss = tf.reduce_sum(tf.where(
+                    b_bool_mask,
+                    MSE(b_task_wh, b_real_wh),
+                    tf.zeros_like(b_bool_mask, dtype=tf.float32)
+                ))
+                b_iou_loss = tf.math.reduce_mean(
+                    calc_iou(b_task_targets, b_iou_outputs)
                 )
-            )
-            b_class_loss = tf.math.reduce_mean(
-                categorical_crossentropy(b_target_classes,
-                                         b_output_class,
-                                         label_smoothing=0.1)
-            )
-            b_loss = a.xy_weight * b_xy_loss + a.wh_weight * b_wh_loss + \
-                     a.iou_weight * b_iou_loss + \
-                     a.class_weight * b_class_loss + \
-                     a.obj_weight * b_obj_loss
-
-            # Calculate loss on fake images.
-            a_xy_loss = tf.reduce_sum(tf.where(
-                a_bool_mask,
-                MSE(a_task_xy, a_real_xy),
-                tf.zeros_like(a_bool_mask, dtype=tf.float32)
-            ))
-            a_wh_loss = tf.reduce_sum(tf.where(
-                a_bool_mask,
-                MSE(a_task_wh, a_real_wh),
-                tf.zeros_like(a_bool_mask, dtype=tf.float32)
-            ))
-            a_iou_loss = tf.math.reduce_mean(
-                calc_iou(a_task_targets, a_iou_outputs)
-            )
-            a_obj_loss = tf.math.reduce_mean(
-                categorical_crossentropy(
-                    a_object_target,
-                    tf.stack([1. - task_outputs[1][..., 4],
-                              task_outputs[1][..., 4]],
-                             axis=-1),
-                    label_smoothing=0.1
+                b_obj_loss = tf.math.reduce_mean(
+                    categorical_crossentropy(
+                        b_object_target,
+                        tf.stack([1. - task_outputs[0][..., 4],
+                                  task_outputs[0][..., 4]],
+                                 axis=-1),
+                        label_smoothing=0.1
+                    )
                 )
-            )
-            a_class_loss = tf.math.reduce_mean(
-                categorical_crossentropy(a_target_classes,
-                                         a_output_class,
-                                         label_smoothing=0.1)
-            )
-            a_loss = a.xy_weight * a_xy_loss + a.wh_weight * a_wh_loss + \
-                     a.iou_weight * a_iou_loss + \
-                     a.class_weight * a_class_loss + \
-                     a.obj_weight * a_obj_loss
-            task_loss = a_loss + b_loss
+                b_class_loss = tf.math.reduce_mean(
+                    categorical_crossentropy(b_target_classes,
+                                             b_output_class,
+                                             label_smoothing=0.1)
+                )
+                b_loss = a.xy_weight * b_xy_loss + a.wh_weight * b_wh_loss + \
+                         a.iou_weight * b_iou_loss + \
+                         a.class_weight * b_class_loss + \
+                         a.obj_weight * b_obj_loss
 
-            # Write summaries.
-            tf.summary.scalar(name='task_b_xy_loss', data=b_xy_loss,
-                              step=step)
-            tf.summary.scalar(name='task_a_xy_loss', data=a_xy_loss,
-                              step=step)
-            tf.summary.scalar(name='task_b_wh_loss', data=b_wh_loss,
-                              step=step)
-            tf.summary.scalar(name='task_a_wh_loss', data=a_wh_loss,
-                              step=step)
-            tf.summary.scalar(name='task_b_iou_loss', data=b_iou_loss,
-                              step=step)
-            tf.summary.scalar(name='task_a_iou_loss', data=a_iou_loss,
-                              step=step)
-            tf.summary.scalar(name='task_b_obj_loss', data=b_obj_loss,
-                              step=step)
-            tf.summary.scalar(name='task_a_obj_loss', data=a_obj_loss,
-                              step=step)
-            tf.summary.scalar(name='task_b_class_loss', data=b_class_loss,
-                              step=step)
-            tf.summary.scalar(name='task_a_class_loss', data=a_class_loss,
-                              step=step)
-            tf.summary.scalar(name='total b_loss',
-                              data=b_loss,
-                              step=step)
-            tf.summary.scalar(name='total a_loss',
-                              data=a_loss,
-                              step=step)
-            tf.summary.scalar(name='task_loss', data=task_loss,
-                              step=step)
-            return a.task_weight * task_loss
+                # Calculate loss on fake images.
+                a_xy_loss = tf.reduce_sum(tf.where(
+                    a_bool_mask,
+                    MSE(a_task_xy, a_real_xy),
+                    tf.zeros_like(a_bool_mask, dtype=tf.float32)
+                ))
+                a_wh_loss = tf.reduce_sum(tf.where(
+                    a_bool_mask,
+                    MSE(a_task_wh, a_real_wh),
+                    tf.zeros_like(a_bool_mask, dtype=tf.float32)
+                ))
+                a_iou_loss = tf.math.reduce_mean(
+                    calc_iou(a_task_targets, a_iou_outputs)
+                )
+                a_obj_loss = tf.math.reduce_mean(
+                    categorical_crossentropy(
+                        a_object_target,
+                        tf.stack([1. - task_outputs[1][..., 4],
+                                  task_outputs[1][..., 4]],
+                                 axis=-1),
+                        label_smoothing=0.1
+                    )
+                )
+                a_class_loss = tf.math.reduce_mean(
+                    categorical_crossentropy(a_target_classes,
+                                             a_output_class,
+                                             label_smoothing=0.1)
+                )
+                a_loss = a.xy_weight * a_xy_loss + a.wh_weight * a_wh_loss + \
+                         a.iou_weight * a_iou_loss + \
+                         a.class_weight * a_class_loss + \
+                         a.obj_weight * a_obj_loss
+                task_loss = a_loss + b_loss
+
+                # Write summaries.
+                tf.summary.scalar(name='task_b_xy_loss', data=b_xy_loss,
+                                  step=step)
+                tf.summary.scalar(name='task_a_xy_loss', data=a_xy_loss,
+                                  step=step)
+                tf.summary.scalar(name='task_b_wh_loss', data=b_wh_loss,
+                                  step=step)
+                tf.summary.scalar(name='task_a_wh_loss', data=a_wh_loss,
+                                  step=step)
+                tf.summary.scalar(name='task_b_iou_loss', data=b_iou_loss,
+                                  step=step)
+                tf.summary.scalar(name='task_a_iou_loss', data=a_iou_loss,
+                                  step=step)
+                tf.summary.scalar(name='task_b_obj_loss', data=b_obj_loss,
+                                  step=step)
+                tf.summary.scalar(name='task_a_obj_loss', data=a_obj_loss,
+                                  step=step)
+                tf.summary.scalar(name='task_b_class_loss', data=b_class_loss,
+                                  step=step)
+                tf.summary.scalar(name='task_a_class_loss', data=a_class_loss,
+                                  step=step)
+                tf.summary.scalar(name='total b_loss',
+                                  data=b_loss,
+                                  step=step)
+                tf.summary.scalar(name='total a_loss',
+                                  data=a_loss,
+                                  step=step)
+                tf.summary.scalar(name='task_loss', data=task_loss,
+                                  step=step)
+                return a.task_weight * task_loss
 
     # Define the optimizer, losses, and weights.
     if a.multi_optim:
