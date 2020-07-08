@@ -545,24 +545,25 @@ def create_model(a, train_data):
     # generator). The task targets (detected objects) should be the same for
     # both.
     with tf.name_scope('task_net'):
-        if a.use_yolo:
-            task_net, task_loss, encoder = build_yolo_model(
-                base_model_name=a.base_model_name,
-                is_recurrent=a.is_recurrent,
-                num_predictor_heads=a.num_pred_layers,
-                max_inferences_per_image=a.max_inferences,
-                max_bbox_overlap=a.max_bbox_overlap,
-                confidence_threshold=a.confidence_threshold,
-            )
-            task_net = load_yolo_model_weights(task_net,
-                                               a.checkpoint_load_path)
-            # TODO (NLT): batch task_net inputs using miss data generator, encoder?
-            pred_task = task_net(targets)
-            pred_task_fake = task_net(fake_img)
-        else:
-            task_net = create_task_net(a, input_shape)
-            pred_task = task_net(targets)
-            pred_task_fake = task_net(fake_img)
+        with tf.device(f'/device:GPU:{a.devices[-1]}'):
+            if a.use_yolo:
+                task_net, task_loss, encoder = build_yolo_model(
+                    base_model_name=a.base_model_name,
+                    is_recurrent=a.is_recurrent,
+                    num_predictor_heads=a.num_pred_layers,
+                    max_inferences_per_image=a.max_inferences,
+                    max_bbox_overlap=a.max_bbox_overlap,
+                    confidence_threshold=a.confidence_threshold,
+                )
+                task_net = load_yolo_model_weights(task_net,
+                                                   a.checkpoint_load_path)
+                # TODO (NLT): batch task_net inputs using miss data generator, encoder?
+                pred_task = task_net(targets)
+                pred_task_fake = task_net(fake_img)
+            else:
+                task_net = create_task_net(a, input_shape)
+                pred_task = task_net(targets)
+                pred_task_fake = task_net(fake_img)
         print(f'Task Net model summary:\n{task_net.summary()}')
         task_outputs = tf.stack([pred_task, pred_task_fake], axis=0,
                                 name='task_net')
@@ -597,6 +598,19 @@ def create_model(a, train_data):
 
 
 def main(a):
+    # Set the visible devices to those specified:
+    physical_devices = tf.config.list_physical_devices('GPU')
+    used_devices = [physical_devices[i] for i in a.devices]
+    try:
+        # Disable first GPU
+        tf.config.set_visible_devices(used_devices, 'GPU')
+        logical_devices = tf.config.list_logical_devices('GPU')
+        # Logical device was not created for first GPU
+        assert len(logical_devices) == len(physical_devices) - 1
+    except:
+        # Invalid device or cannot modify virtual devices once initialized.
+        pass
+
     # Set up the summary writer.
     output_path = Path(a.output_dir).resolve()
     output_path.mkdir(parents=True, exist_ok=True)
@@ -718,7 +732,7 @@ def main(a):
 
     with tf.name_scope("generator_loss"):
         def calc_generator_loss(model_inputs, model_outputs, step, **kwargs):
-            # predict_fake => 1
+            # predict_fake => [0, 1]
             # abs(targets - outputs) => 0
             fake_img = model_outputs[0][0]
             discrim_fake = model_outputs[1][1]
@@ -1292,6 +1306,8 @@ if __name__ == '__main__':
                         default=False,
                         help='Should we use a recurrent (Convolutional LSTM) '
                              'variant of the model')
+    parser.add_argument('--devices', nargs='+', type=int,   
+                        help='List of physical devices for TensorFlow to use.')
 
     # export options
     parser.add_argument("--output_filetype", default="png",
