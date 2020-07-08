@@ -1025,11 +1025,22 @@ def main(a):
                                          a_detects,
                                          tf.zeros_like(a_detects))
 
-                    # Bounding boxes are [ymin, xmin, ymax, xmax].
+                    # Bounding boxes are [ymin, xmin, ymax, xmax]. Need to
+                    # calculate that from YOLO.
                     a_true_bboxes = a_task_targets[..., :4]
                     b_true_bboxes = b_task_targets[..., :4]
-                    a_fake_bboxes = a_detects[..., :4]
-                    b_fake_bboxes = b_detects[..., :4]
+                    if a.use_yolo:
+                        a_xy_min = a_detects[..., :2] - a_detects[..., 2:4] / 2.
+                        a_xy_max = a_detects[..., :2] + a_detects[..., 2:4] / 2.
+                        b_xy_min = b_detects[..., :2] - b_detects[..., 2:4] / 2.
+                        b_xy_max = b_detects[..., :2] + b_detects[..., 2:4] / 2.
+                        a_fake_bboxes = tf.concat([a_xy_min, a_xy_max],
+                                                  axis=-1)
+                        b_fake_bboxes = tf.concat([b_xy_min, b_xy_max],
+                                                  axis=-1)
+                    else:
+                        a_fake_bboxes = a_detects[..., :4]
+                        b_fake_bboxes = b_detects[..., :4]
 
                     # Add bounding boxes to sample images.
                     target_bboxes = tf.image.draw_bounding_boxes(
