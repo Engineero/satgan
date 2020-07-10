@@ -620,10 +620,7 @@ def main(a):
     train_data, val_data, test_data = load_examples(a)
 
     # Build the model.
-    if a.use_yolo:
-        model, _, _ = create_model(a, train_data)
-    else:
-        model = create_model(a, train_data)
+    model = create_model(a, train_data)
     print(f'Overall model summary:\n{model.summary()}')
 
     # Define model losses and helpers for computing and applying gradients.
