@@ -561,7 +561,7 @@ def create_model(a, train_data):
     with tf.device(f'/device:GPU:{a.devices[-1]}'):
         with tf.name_scope('task_net'):
             if a.use_yolo:
-                task_net, task_loss, encoder = build_yolo_model(
+                task_net, _, _ = build_yolo_model(
                     base_model_name=a.base_model_name,
                     is_recurrent=a.is_recurrent,
                     num_predictor_heads=a.num_pred_layers,
@@ -571,15 +571,14 @@ def create_model(a, train_data):
                 )
                 task_net = load_yolo_model_weights(task_net,
                                                    a.checkpoint_load_path)
-                # TODO (NLT): batch task_net inputs using miss data generator, encoder?
-                pred_task = task_net(targets)
-                pred_task_fake = task_net(fake_img)
             else:
                 task_net = create_task_net(a, input_shape)
-                pred_task = task_net(targets)
-                pred_task_fake = task_net(fake_img)
+            pred_task = task_net(targets)
+            pred_task_fake = task_net(fake_img)
+            pred_task_noise = task_net(gen_noise)
         print(f'Task Net model summary:\n{task_net.summary()}')
-        task_outputs = tf.stack([pred_task, pred_task_fake], axis=0,
+        task_outputs = tf.stack([pred_task, pred_task_fake, pred_task_noise],
+                                axis=0,
                                 name='task_net')
 
     model = Model(inputs=[inputs, noise, targets],
@@ -594,10 +593,7 @@ def create_model(a, train_data):
 
     # Return the model. We'll define losses and a training loop back in the
     # main function.
-    if a.use_yolo:
-        return model, task_loss, encoder
-    else:
-        return model
+    return model
 
 
 def main(a):
@@ -798,6 +794,11 @@ def main(a):
                 b_target_classes = tf.one_hot(tf.cast(b_task_targets[..., -1],
                                                       tf.int32),
                                               a.num_classes)
+                # Create noise target classes (should be no objects).
+                targets_ones = tf.ones_like(shape=a_task_targets[..., -1])
+                targets_zeros = tf.zeros_like(shape=a_task_targets[..., -1])
+                n_target_classes = tf.stack([targets_ones, targets_zeros],
+                                            axis=-1)
 
                 # Handle YOLO's class output only being a scalar.
                 if a.use_yolo:
@@ -807,9 +808,13 @@ def main(a):
                     a_output_class = tf.stack([1. - task_outputs[1][..., -1],
                                                task_outputs[1][..., -1]],
                                               axis=-1)
+                    n_output_class = tf.stack([1. - task_outputs[2][..., -1],
+                                               task_outputs[2][..., -1]],
+                                              axis=-1)
                 else:
                     b_output_class = task_outputs[0][..., 5:]
                     a_output_class = task_outputs[1][..., 5:]
+                    n_output_class = task_outputs[2][..., 5:]
                 a_bool_mask = (a_task_targets[..., -1] != 0)
                 b_bool_mask = (b_task_targets[..., -1] != 0)
                 a_object_target = tf.cast(tf.stack([a_bool_mask,
@@ -827,9 +832,9 @@ def main(a):
                 b_task_wh = b_task_targets[..., 2:4] - b_task_targets[..., :2]
                 b_task_xy = b_task_targets[..., :2] + b_task_wh / 2.
                 a_real_wh = task_outputs[1][..., 2:4] - task_outputs[1][..., :2]
-                a_real_xy = task_outputs[1][..., :2] + a_task_wh / 2.
+                a_real_xy = task_outputs[1][..., :2] + a_real_wh / 2.
                 b_real_wh = task_outputs[0][..., 2:4] - task_outputs[0][..., :2]
-                b_real_xy = task_outputs[0][..., :2] + a_task_wh / 2.
+                b_real_xy = task_outputs[0][..., :2] + a_real_wh / 2.
                 a_iou_outputs = task_outputs[1]
                 b_iou_outputs = task_outputs[0]
 
@@ -898,36 +903,47 @@ def main(a):
                          a.iou_weight * a_iou_loss + \
                          a.class_weight * a_class_loss + \
                          a.obj_weight * a_obj_loss
-                task_loss = a_loss + b_loss
+
+                # Calculate loss on generated noise.
+                n_class_loss = tf.math.reduce_sum(
+                    categorical_crossentropy(n_target_classes,
+                                             n_output_class,
+                                             label_smoothing=0.1)
+                )
+                n_loss = a.class_weight * n_class_loss
+
+                task_loss = a_loss + b_loss + n_loss
 
                 # Write summaries.
-                tf.summary.scalar(name='task_b_xy_loss', data=b_xy_loss,
+                tf.summary.scalar(name='Task B XY Loss', data=b_xy_loss,
                                   step=step)
-                tf.summary.scalar(name='task_a_xy_loss', data=a_xy_loss,
+                tf.summary.scalar(name='Task A XY Loss', data=a_xy_loss,
                                   step=step)
-                tf.summary.scalar(name='task_b_wh_loss', data=b_wh_loss,
+                tf.summary.scalar(name='Task B wh Loss', data=b_wh_loss,
                                   step=step)
-                tf.summary.scalar(name='task_a_wh_loss', data=a_wh_loss,
+                tf.summary.scalar(name='Task A wh Loss', data=a_wh_loss,
                                   step=step)
-                tf.summary.scalar(name='task_b_iou_loss', data=b_iou_loss,
+                tf.summary.scalar(name='Task B IoU Loss', data=b_iou_loss,
                                   step=step)
-                tf.summary.scalar(name='task_a_iou_loss', data=a_iou_loss,
+                tf.summary.scalar(name='Task A IoU Loss', data=a_iou_loss,
                                   step=step)
-                tf.summary.scalar(name='task_b_obj_loss', data=b_obj_loss,
+                tf.summary.scalar(name='Task B Objectness Loss', data=b_obj_loss,
                                   step=step)
-                tf.summary.scalar(name='task_a_obj_loss', data=a_obj_loss,
+                tf.summary.scalar(name='Task A Objectness Loss', data=a_obj_loss,
                                   step=step)
-                tf.summary.scalar(name='task_b_class_loss', data=b_class_loss,
+                tf.summary.scalar(name='Task B Class Loss', data=b_class_loss,
                                   step=step)
-                tf.summary.scalar(name='task_a_class_loss', data=a_class_loss,
+                tf.summary.scalar(name='Task A Class Loss', data=a_class_loss,
                                   step=step)
-                tf.summary.scalar(name='total b_loss',
+                tf.summary.scalar(name='Noise Class Loss', data=n_class_loss,
+                                  step=step)
+                tf.summary.scalar(name='Total Task B Loss',
                                   data=b_loss,
                                   step=step)
-                tf.summary.scalar(name='total a_loss',
+                tf.summary.scalar(name='Total Task A Loss',
                                   data=a_loss,
                                   step=step)
-                tf.summary.scalar(name='task_loss', data=task_loss,
+                tf.summary.scalar(name='Total Task Loss', data=task_loss,
                                   step=step)
                 return a.task_weight * task_loss
 
