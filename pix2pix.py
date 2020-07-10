@@ -792,8 +792,8 @@ def main(a):
                                                       tf.int32),
                                               a.num_classes)
                 # Create noise target classes (should be no objects).
-                targets_ones = tf.ones_like(shape=a_task_targets[..., -1])
-                targets_zeros = tf.zeros_like(shape=a_task_targets[..., -1])
+                targets_ones = tf.ones_like(a_task_targets[..., -1])
+                targets_zeros = tf.zeros_like(a_task_targets[..., -1])
                 n_target_classes = tf.stack([targets_ones, targets_zeros],
                                             axis=-1)
 
