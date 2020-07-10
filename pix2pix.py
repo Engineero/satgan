@@ -1028,6 +1028,7 @@ def main(a):
                     # Create object bboxes and summarize task outputs, targets.
                     b_detects = task_outputs[0]
                     a_detects = task_outputs[1]
+                    n_detects = task_outputs[2]
                     b_mask = tf.tile(
                         tf.expand_dims(b_detects[..., -1] > a.obj_threshold,
                                        axis=-1),
@@ -1038,12 +1039,20 @@ def main(a):
                                        axis=-1),
                         [1, 1, a_detects.shape[-1]]
                     )
+                    n_mask = tf.tile(
+                        tf.expand_dims(n_detects[..., -1] > a.obj_threshold,
+                                       axis=-1),
+                        [1, 1, n_detects.shape[-1]]
+                    )
                     b_detects = tf.where(b_mask,
                                          b_detects,
                                          tf.zeros_like(b_detects))
                     a_detects = tf.where(a_mask,
                                          a_detects,
                                          tf.zeros_like(a_detects))
+                    n_detects = tf.where(n_mask,
+                                         n_detects,
+                                         tf.zeros_like(n_detects))
 
                     # Bounding boxes are [ymin, xmin, ymax, xmax]. Need to
                     # calculate that from YOLO.
@@ -1051,6 +1060,7 @@ def main(a):
                     b_true_bboxes = b_task_targets[..., :4]
                     a_fake_bboxes = a_detects[..., :4]
                     b_fake_bboxes = b_detects[..., :4]
+                    n_fake_bboxes = n_detects[..., :4]
 
                     # Add bounding boxes to sample images.
                     target_bboxes = tf.image.draw_bounding_boxes(
@@ -1073,6 +1083,11 @@ def main(a):
                         boxes=a_fake_bboxes,
                         colors=np.array([[0., 1., 0.]])
                     )
+                    noise_bboxes = tf.image.draw_bounding_boxes(
+                        images=tf.image.grayscale_to_rgb(gen_outputs[1]),
+                        boxes=n_fake_bboxes,
+                        colors=np.array([[0., 1., 0.]])
+                    )
 
                     # Save task outputs.
                     tf.summary.image(
@@ -1083,6 +1098,11 @@ def main(a):
                     tf.summary.image(
                         name='Task output on B domain',
                         data=target_bboxes,
+                        step=batches_seen,
+                    )
+                    tf.summary.image(
+                        name='Task output on gen noise',
+                        data=noise_bboxes,
                         step=batches_seen,
                     )
 
