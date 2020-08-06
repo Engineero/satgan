@@ -187,22 +187,22 @@ def load_examples(a):
         test_data = None
 
     # Specify transformations on datasets.
+    train_data = train_data.shuffle(a.buffer_size)
+    train_data = train_data.batch(a.batch_size, drop_remainder=True)
     train_data = train_data.map(
         lambda x: _parse_example(x, a)
     )
-    train_data = train_data.shuffle(a.buffer_size)
-    train_data = train_data.batch(a.batch_size, drop_remainder=True)
 
+    valid_data = valid_data.batch(a.batch_size, drop_remainder=True)
     valid_data = valid_data.map(
         lambda x: _parse_example(x, a)
     )
-    valid_data = valid_data.batch(a.batch_size, drop_remainder=True)
 
     if a.test_dir is not None:
+        test_data = test_data.batch(a.batch_size, drop_remainder=True)
         test_data = test_data.map(
             lambda x: _parse_example(x, a)
         )
-        test_data = test_data.batch(a.batch_size, drop_remainder=True)
     return train_data, valid_data, test_data
 
 
