@@ -1129,6 +1129,7 @@ def main(a):
             for batch in val_data:
                 (inputs, noise, targets), (_, a_task_targets, b_task_targets) = batch
                 gen_outputs, discrim_outputs, task_outputs = model([inputs,
+                                                                    noise,
                                                                     targets])
                 model_inputs = (inputs, targets, a_task_targets, b_task_targets)
                 model_outputs = (gen_outputs, discrim_outputs, task_outputs)
@@ -1175,6 +1176,7 @@ def main(a):
         for batch in test_data:
             (inputs, noise, targets), (_, a_task_targets, b_task_targets) = batch
             gen_outputs, discrim_outputs, task_outputs = model([inputs,
+                                                                noise,
                                                                 targets])
             model_inputs = (inputs, targets, a_task_targets, b_task_targets)
             model_outputs = (gen_outputs, discrim_outputs, task_outputs)
