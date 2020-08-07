@@ -1146,7 +1146,7 @@ def main(a):
                                                discrim_loss,
                                                gen_loss,
                                                task_loss]):
-                    m.update_states([loss])
+                    m.update_state([loss])
             if mean_list[0].result().numpy() <= min_loss \
                 and a.output_dir is not None:
                 min_loss = mean_list[0].result().numpy()
@@ -1190,7 +1190,7 @@ def main(a):
                                            discrim_loss,
                                            gen_loss,
                                            task_loss]):
-                m.update_states([loss])
+                m.update_state([loss])
         print(f'Test performance\n',
               f'total loss: {mean_list[0].result().numpy():.4f}\t',
               f'discriminator loss: {mean_list[1].result().numpy():.4f}\t',
