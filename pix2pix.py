@@ -622,15 +622,21 @@ def main(a):
     # Define model losses and helpers for computing and applying gradients.
     with tf.name_scope("compute_total_loss"):
         def compute_total_loss(model_inputs, model_outputs, step,
-                               return_all=False):
+                               return_all=False, val=False):
             discrim_loss = calc_discriminator_loss(model_inputs,
                                                    model_outputs,
-                                                   step)
-            gen_loss = calc_generator_loss(model_inputs, model_outputs, step)
-            task_loss = calc_task_loss(model_inputs, model_outputs, step)
+                                                   step, val=val)
+            gen_loss = calc_generator_loss(model_inputs, model_outputs, step,
+                                           val=val)
+            task_loss = calc_task_loss(model_inputs, model_outputs, step,
+                                       val=val)
             total_loss = discrim_loss + gen_loss + task_loss
-            tf.summary.scalar(name='total_loss', data=total_loss,
-                              step=step)
+            if val:
+                tf.summary.scalar(name='total_loss_val', data=total_loss,
+                                  step=step)
+            else:
+                tf.summary.scalar(name='total_loss', data=total_loss,
+                                  step=step)
             if return_all:
                 return total_loss, discrim_loss, gen_loss, task_loss
             else:
@@ -687,15 +693,17 @@ def main(a):
     with tf.device(f'/device:GPU:{a.devices[0]}'):
         with tf.name_scope("discriminator_loss"):
             def calc_discriminator_loss(model_inputs, model_outputs, step,
-                                        **kwargs):
+                                        val=False, **kwargs):
                 # minimizing -tf.log will try to get inputs to 1
                 # discrim_outputs[0] = predict_real => [0, 1]
                 # discrim_outputs[1] = predict_fake => [1, 0]
                 discrim_outputs = model_outputs[1]
                 predict_real = discrim_outputs[0]
                 predict_fake = discrim_outputs[1]
-                predict_real = tf.reshape(predict_real, [predict_real.shape[0], -1, 2])
-                predict_fake = tf.reshape(predict_fake, [predict_fake.shape[0], -1, 2])
+                predict_real = tf.reshape(predict_real,
+                                          [predict_real.shape[0], -1, 2])
+                predict_fake = tf.reshape(predict_fake,
+                                          [predict_fake.shape[0], -1, 2])
                 targets_one = tf.ones(shape=predict_real.shape[:-1])
                 targets_zero = tf.zeros(shape=predict_fake.shape[:-1])
                 real_loss = tf.math.reduce_mean(
@@ -715,17 +723,29 @@ def main(a):
                 discrim_loss = real_loss + fake_loss
 
                 # Write summaries.
-                tf.summary.scalar(name='discrim_real_loss', data=real_loss,
-                                  step=step)
-                tf.summary.scalar(name='discrim_fake_loss', data=fake_loss,
-                                  step=step)
-                tf.summary.scalar(name='discrim_total_loss',
-                                  data=discrim_loss,
-                                  step=step)
+                if val:
+                    tf.summary.scalar(name='discrim_real_loss_val',
+                                      data=real_loss,
+                                      step=step)
+                    tf.summary.scalar(name='discrim_fake_loss_val',
+                                      data=fake_loss,
+                                      step=step)
+                    tf.summary.scalar(name='discrim_total_loss_val',
+                                      data=discrim_loss,
+                                      step=step)
+                else:
+                    tf.summary.scalar(name='discrim_real_loss', data=real_loss,
+                                      step=step)
+                    tf.summary.scalar(name='discrim_fake_loss', data=fake_loss,
+                                      step=step)
+                    tf.summary.scalar(name='discrim_total_loss',
+                                      data=discrim_loss,
+                                      step=step)
                 return a.dsc_weight * discrim_loss
 
         with tf.name_scope("generator_loss"):
-            def calc_generator_loss(model_inputs, model_outputs, step, **kwargs):
+            def calc_generator_loss(model_inputs, model_outputs, step,
+                                    val=False, **kwargs):
                 # predict_fake => [0, 1]
                 # abs(targets - outputs) => 0
                 fake_img = model_outputs[0][0]
@@ -747,12 +767,21 @@ def main(a):
                 gen_loss = a.gan_weight * gen_loss_GAN + a.l1_weight * gen_loss_L1
 
                 # Write summaries.
-                tf.summary.scalar(name='gen_L1_loss', data=gen_loss_L1,
-                                  step=step)
-                tf.summary.scalar(name='gen_GAN_loss', data=gen_loss_GAN,
-                                  step=step)
-                tf.summary.scalar(name='gen_total_loss', data=gen_loss,
-                                  step=step)
+                if val:
+                    tf.summary.scalar(name='gen_L1_loss_val', data=gen_loss_L1,
+                                      step=step)
+                    tf.summary.scalar(name='gen_GAN_loss_val',
+                                      data=gen_loss_GAN,
+                                      step=step)
+                    tf.summary.scalar(name='gen_total_loss_val', data=gen_loss,
+                                      step=step)
+                else:
+                    tf.summary.scalar(name='gen_L1_loss', data=gen_loss_L1,
+                                      step=step)
+                    tf.summary.scalar(name='gen_GAN_loss', data=gen_loss_GAN,
+                                      step=step)
+                    tf.summary.scalar(name='gen_total_loss', data=gen_loss,
+                                      step=step)
                 return a.gen_weight * gen_loss
 
     with tf.device(f'/device:GPU:{a.devices[-1]}'):
@@ -772,7 +801,8 @@ def main(a):
                 return 1. - intersection / union
 
             @tf.function
-            def calc_task_loss(model_inputs, model_outputs, step):
+            def calc_task_loss(model_inputs, model_outputs, step, val=False,
+                               **kwargs):
                 # task_targets are [ymin, xmin, ymax, xmax, class]
                 # task_outputs are [ymin, xmin, ymax, xmax, *class] where *class
                 # is a one-hot encoded score for each class in the dataset for
@@ -908,36 +938,85 @@ def main(a):
                 task_loss = a_loss + b_loss + n_loss
 
                 # Write summaries.
-                tf.summary.scalar(name='Task B XY Loss', data=b_xy_loss,
-                                  step=step)
-                tf.summary.scalar(name='Task A XY Loss', data=a_xy_loss,
-                                  step=step)
-                tf.summary.scalar(name='Task B wh Loss', data=b_wh_loss,
-                                  step=step)
-                tf.summary.scalar(name='Task A wh Loss', data=a_wh_loss,
-                                  step=step)
-                tf.summary.scalar(name='Task B IoU Loss', data=b_iou_loss,
-                                  step=step)
-                tf.summary.scalar(name='Task A IoU Loss', data=a_iou_loss,
-                                  step=step)
-                tf.summary.scalar(name='Task B Objectness Loss', data=b_obj_loss,
-                                  step=step)
-                tf.summary.scalar(name='Task A Objectness Loss', data=a_obj_loss,
-                                  step=step)
-                tf.summary.scalar(name='Task B Class Loss', data=b_class_loss,
-                                  step=step)
-                tf.summary.scalar(name='Task A Class Loss', data=a_class_loss,
-                                  step=step)
-                tf.summary.scalar(name='Noise Class Loss', data=n_class_loss,
-                                  step=step)
-                tf.summary.scalar(name='Total Task B Loss',
-                                  data=b_loss,
-                                  step=step)
-                tf.summary.scalar(name='Total Task A Loss',
-                                  data=a_loss,
-                                  step=step)
-                tf.summary.scalar(name='Total Task Loss', data=task_loss,
-                                  step=step)
+                if val:
+                    tf.summary.scalar(name='Task B XY Loss Val',
+                                      data=b_xy_loss,
+                                      step=step)
+                    tf.summary.scalar(name='Task A XY Loss Val',
+                                      data=a_xy_loss,
+                                      step=step)
+                    tf.summary.scalar(name='Task B wh Loss Val',
+                                      data=b_wh_loss,
+                                      step=step)
+                    tf.summary.scalar(name='Task A wh Loss Val',
+                                      data=a_wh_loss,
+                                      step=step)
+                    tf.summary.scalar(name='Task B IoU Loss Val',
+                                      data=b_iou_loss,
+                                      step=step)
+                    tf.summary.scalar(name='Task A IoU Loss Val',
+                                      data=a_iou_loss,
+                                      step=step)
+                    tf.summary.scalar(name='Task B Objectness Loss Val',
+                                      data=b_obj_loss,
+                                      step=step)
+                    tf.summary.scalar(name='Task A Objectness Loss Val',
+                                      data=a_obj_loss,
+                                      step=step)
+                    tf.summary.scalar(name='Task B Class Loss Val',
+                                      data=b_class_loss,
+                                      step=step)
+                    tf.summary.scalar(name='Task A Class Loss Val',
+                                      data=a_class_loss,
+                                      step=step)
+                    tf.summary.scalar(name='Noise Class Loss Val',
+                                      data=n_class_loss,
+                                      step=step)
+                    tf.summary.scalar(name='Total Task B Loss Val',
+                                      data=b_loss,
+                                      step=step)
+                    tf.summary.scalar(name='Total Task A Loss Val',
+                                      data=a_loss,
+                                      step=step)
+                    tf.summary.scalar(name='Total Task Loss Val',
+                                      data=task_loss,
+                                      step=step)
+                else:
+                    tf.summary.scalar(name='Task B XY Loss', data=b_xy_loss,
+                                      step=step)
+                    tf.summary.scalar(name='Task A XY Loss', data=a_xy_loss,
+                                      step=step)
+                    tf.summary.scalar(name='Task B wh Loss', data=b_wh_loss,
+                                      step=step)
+                    tf.summary.scalar(name='Task A wh Loss', data=a_wh_loss,
+                                      step=step)
+                    tf.summary.scalar(name='Task B IoU Loss', data=b_iou_loss,
+                                      step=step)
+                    tf.summary.scalar(name='Task A IoU Loss', data=a_iou_loss,
+                                      step=step)
+                    tf.summary.scalar(name='Task B Objectness Loss',
+                                      data=b_obj_loss,
+                                      step=step)
+                    tf.summary.scalar(name='Task A Objectness Loss',
+                                      data=a_obj_loss,
+                                      step=step)
+                    tf.summary.scalar(name='Task B Class Loss',
+                                      data=b_class_loss,
+                                      step=step)
+                    tf.summary.scalar(name='Task A Class Loss',
+                                      data=a_class_loss,
+                                      step=step)
+                    tf.summary.scalar(name='Noise Class Loss',
+                                      data=n_class_loss,
+                                      step=step)
+                    tf.summary.scalar(name='Total Task B Loss',
+                                      data=b_loss,
+                                      step=step)
+                    tf.summary.scalar(name='Total Task A Loss',
+                                      data=a_loss,
+                                      step=step)
+                    tf.summary.scalar(name='Total Task Loss', data=task_loss,
+                                      step=step)
                 return a.task_weight * task_loss
 
     # Define the optimizer, losses, and weights.
@@ -1121,7 +1200,7 @@ def main(a):
                 writer.flush()
 
             epoch_time = time.time() - epoch_start
-            print(f'Epoch {epoch+1} completed in {epoch_time}.\n')
+            print(f'Epoch {epoch+1} completed in {epoch_time} sec.\n')
 
             # Eval on validation data, save best model, early stopping...
             for m in mean_list:
@@ -1129,6 +1208,7 @@ def main(a):
             for batch in val_data:
                 (inputs, noise, targets), (_, a_task_targets, b_task_targets) = batch
                 gen_outputs, discrim_outputs, task_outputs = model([inputs,
+                                                                    noise,
                                                                     targets])
                 model_inputs = (inputs, targets, a_task_targets, b_task_targets)
                 model_outputs = (gen_outputs, discrim_outputs, task_outputs)
@@ -1145,7 +1225,8 @@ def main(a):
                                                discrim_loss,
                                                gen_loss,
                                                task_loss]):
-                    m.update_states([loss])
+                    m.update_state([loss])
+            print(f'Total validation loss: {mean_list[0].result().numpy()}')
             if mean_list[0].result().numpy() <= min_loss \
                 and a.output_dir is not None:
                 min_loss = mean_list[0].result().numpy()
@@ -1175,6 +1256,7 @@ def main(a):
         for batch in test_data:
             (inputs, noise, targets), (_, a_task_targets, b_task_targets) = batch
             gen_outputs, discrim_outputs, task_outputs = model([inputs,
+                                                                noise,
                                                                 targets])
             model_inputs = (inputs, targets, a_task_targets, b_task_targets)
             model_outputs = (gen_outputs, discrim_outputs, task_outputs)
@@ -1188,7 +1270,7 @@ def main(a):
                                            discrim_loss,
                                            gen_loss,
                                            task_loss]):
-                m.update_states([loss])
+                m.update_state([loss])
         print(f'Test performance\n',
               f'total loss: {mean_list[0].result().numpy():.4f}\t',
               f'discriminator loss: {mean_list[1].result().numpy():.4f}\t',
