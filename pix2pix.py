@@ -1218,14 +1218,14 @@ def main(a):
                                        model_outputs,
                                        batches_seen,
                                        return_all=True)
-                if epoch == 0:
-                    min_loss = total_loss
-                    epochs_without_improvement = 0
                 for m, loss in zip(mean_list, [total_loss,
                                                discrim_loss,
                                                gen_loss,
                                                task_loss]):
                     m.update_state([loss])
+                if epoch == 0:
+                    min_loss = mean_list[0].result().numpy()
+                    epochs_without_improvement = 0
             print(f'Total validation loss: {mean_list[0].result().numpy()}')
             if mean_list[0].result().numpy() <= min_loss \
                 and a.output_dir is not None:
