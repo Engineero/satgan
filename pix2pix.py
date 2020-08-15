@@ -261,9 +261,9 @@ def create_generator(a, input_shape, generator_outputs_channels):
             x = ops.down_resblock(x_in, filters=num_filters, sn=a.spec_norm,
                                   scope='front_down_resblock_0')
             for i in range(a.n_blocks_gen // 2):
-                x = ops.down_resblock(x, filters=num_filters // 2, sn=a.spec_norm,
-                                      scope=f'mid_down_resblock_{i}')
                 num_filters = num_filters * 2
+                x = ops.down_resblock(x, filters=num_filters, sn=a.spec_norm,
+                                      scope=f'mid_down_resblock_{i}')
                 skip_layers.append(x)
 
             x = google_attention(x, filters=num_filters, scope='self_attention')
