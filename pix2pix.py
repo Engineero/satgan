@@ -261,11 +261,12 @@ def create_generator(a, input_shape, generator_outputs_channels):
             x = ops.down_resblock(x_in, filters=num_filters, sn=a.spec_norm,
                                   scope='front_down_resblock_0')
             for i in range(a.n_blocks_gen // 2):
-                num_filters = num_filters * 2
                 x = ops.down_resblock(x, filters=num_filters, sn=a.spec_norm,
                                       scope=f'mid_down_resblock_{i}')
+                num_filters = num_filters * 2
                 skip_layers.append(x)
 
+            num_filters = num_filters // 2
             x = google_attention(x, filters=num_filters, scope='self_attention')
 
             # Build the back end of the generator with skip connections.
