@@ -589,7 +589,7 @@ def create_model(a, train_data):
 
     # Return the model. We'll define losses and a training loop back in the
     # main function.
-    return model
+    return model, generator, task_net
 
 
 def main(a):
@@ -616,7 +616,7 @@ def main(a):
     train_data, val_data, test_data = load_examples(a)
 
     # Build the model.
-    model = create_model(a, train_data)
+    model, generator, task_net = create_model(a, train_data)
     print(f'Overall model summary:\n{model.summary()}')
 
     # Define model losses and helpers for computing and applying gradients.
@@ -1233,6 +1233,8 @@ def main(a):
                 print(f'Saving model with total loss {min_loss:.4f} ',
                       f'to {a.output_dir}.')
                 model.save(a.output_dir)
+                generator.save(a.output_dir)
+                task_net.save(a.output_dir)
                 epochs_without_improvement = 0
             else:
                 epochs_without_improvement += 1
