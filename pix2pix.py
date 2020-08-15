@@ -1234,9 +1234,9 @@ def main(a):
                 min_loss = mean_list[0].result().numpy()
                 print(f'Saving model with total loss {min_loss:.4f} ',
                       f'to {a.output_dir}.')
-                model.save(a.output_dir)
-                generator.save(a.output_dir)
-                task_net.save(a.output_dir)
+                model.save(a.output_dir + 'full_model')
+                generator.save(a.output_dir + 'generator')
+                task_net.save(a.output_dir + 'task_net')
                 epochs_without_improvement = 0
             else:
                 epochs_without_improvement += 1
