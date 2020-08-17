@@ -4,6 +4,7 @@ from tensorflow.keras.layers import (Conv2D, Flatten, Conv2DTranspose, Dense,
                                      UpSampling2D, LeakyReLU, ReLU,
                                      AveragePooling2D, MaxPooling2D,
                                      SeparableConv2D)
+from tensorflow_addons.activations import mish
 from .SpectralNormalization import SpectralNormalization
 
 
@@ -113,7 +114,7 @@ def hw_flatten(x) :
 # Residual-blocks
 ##################################################################################
 def up_resblock(x_init, filters, use_bias=True, sn=False, scope='resblock',
-                separable=False):
+                separable=False, activation='lrelu'):
     """Residual block with upsampling.
 
     Args:
@@ -125,15 +126,25 @@ def up_resblock(x_init, filters, use_bias=True, sn=False, scope='resblock',
         sn: whether to use spectral normalization. Default is False.
         scope: name scope in which to create blocks. Default is 'resblock'.
         separable: whether to use separable convolution. Default is False.
+        activation: string specifying activation function to use. 'lrelu' for
+            LeakyReLU, 'mish' for mish.Default is 'lrelu'.
 
     Returns:
         Residual block output layer.
     """
 
+    # Define the activation function to be used.
+    if activation == 'lrelu':
+        activation_fcn = lambda x: LeakyReLU()(x)
+    elif activation == 'mish':
+        activation_fcn = lambda x: mish(x)
+    else:
+        raise ValueError("activation must be 'lrelu' or 'mish'")
+
     with tf.name_scope(scope):
         with tf.name_scope('res1'):
             x = BatchNormalization()(x_init)
-            x = LeakyReLU()(x)
+            x = activation_fcn(x)
             x = UpSampling2D(size=(2, 2), interpolation='nearest')(x)
             x = conv(x,
                      filters,
@@ -146,7 +157,7 @@ def up_resblock(x_init, filters, use_bias=True, sn=False, scope='resblock',
 
         with tf.name_scope('res2'):
             x = BatchNormalization()(x)
-            x = LeakyReLU()(x)
+            x = activation_fcn(x)
             x = conv(x,
                      filters,
                      kernel_size=(3, 3),
@@ -169,7 +180,7 @@ def up_resblock(x_init, filters, use_bias=True, sn=False, scope='resblock',
         return x + x_init
 
 def down_resblock(x_init, filters, to_down=True, use_bias=True, sn=False,
-                  scope='resblock', separable=False):
+                  scope='resblock', separable=False, activation='lrelu'):
     """Residual block without average pooling.
 
     Args:
@@ -181,15 +192,26 @@ def down_resblock(x_init, filters, to_down=True, use_bias=True, sn=False,
         sn: whether to use spectral normalization. Default is False.
         scope: name scope in which to create blocks. Default is 'resblock'.
         separable: whether to use separable convolution. Default is False.
+        activation: string specifying activation function to use. 'lrelu' for
+            LeakyReLU, 'mish' for mish.Default is 'lrelu'.
 
     Returns:
         Residual block output layer.
     """
+    
+    # Define the activation function to be used.
+    if activation == 'lrelu':
+        activation_fcn = lambda x: LeakyReLU()(x)
+    elif activation == 'mish':
+        activation_fcn = lambda x: mish(x)
+    else:
+        raise ValueError("activation must be 'lrelu' or 'mish'")
+
     with tf.name_scope(scope):
         init_channel = x_init.shape.as_list()[-1]
         with tf.name_scope('res1'):
             x = BatchNormalization()(x_init)
-            x = LeakyReLU()(x)
+            x = activation_fcn(x)
             x = conv(x,
                      filters,
                      kernel_size=(3, 3),
@@ -201,7 +223,7 @@ def down_resblock(x_init, filters, to_down=True, use_bias=True, sn=False,
 
         with tf.name_scope('res2'):
             x = BatchNormalization()(x)
-            x = LeakyReLU()(x)
+            x = activation_fcn(x)
             x = conv(x,
                      filters,
                      kernel_size=(3, 3),
@@ -229,7 +251,8 @@ def down_resblock(x_init, filters, to_down=True, use_bias=True, sn=False,
 
         return x + x_init
 
-def init_down_resblock(x_init, filters, use_bias=True, sn=False, scope='resblock'):
+def init_down_resblock(x_init, filters, use_bias=True, sn=False,
+                       scope='resblock', activation='lrelu'):
     """Initial residual block with average pooling.
 
     Args:
@@ -240,10 +263,20 @@ def init_down_resblock(x_init, filters, use_bias=True, sn=False, scope='resblock
         use_bias: whether to use bias in res blocks. Default is True.
         sn: whether to use spectral normalization. Default is False.
         scope: name scope in which to create blocks. Default is 'resblock'.
+        activation: string specifying activation function to use. 'lrelu' for
+            LeakyReLU, 'mish' for mish.Default is 'lrelu'.
 
     Returns:
         Residual block output layer.
     """
+
+    # Define the activation function to be used.
+    if activation == 'lrelu':
+        activation_fcn = lambda x: LeakyReLU()(x)
+    elif activation == 'mish':
+        activation_fcn = lambda x: mish(x)
+    else:
+        raise ValueError("activation must be 'lrelu' or 'mish'")
 
     with tf.name_scope(scope):
         with tf.name_scope('res1'):
@@ -254,7 +287,7 @@ def init_down_resblock(x_init, filters, use_bias=True, sn=False, scope='resblock
                      padding='same',
                      use_bias=use_bias,
                      sn=sn)
-            x = LeakyReLU()(x)
+            x = activation_fcn(x)
 
         with tf.name_scope('res2'):
             x = conv(x_init,

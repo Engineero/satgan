@@ -21,6 +21,7 @@ from tensorflow.keras.utils import plot_model
 from tensorflow.keras.optimizers import Adam, SGD
 from tensorflow.keras.metrics import Mean
 from yolo_v3 import build_yolo_model, load_yolo_model_weights
+from tensorflow_addons.activations import mish
 
 
 def preprocess(image, add_noise=False):
@@ -252,6 +253,14 @@ def create_generator(a, input_shape, generator_outputs_channels):
         Generator network model.
     """
 
+    # Define the activation function to be used.
+    if a.activation == 'lrelu':
+        activation_fcn = lambda x: LeakyReLU()(x)
+    elif a.activation == 'mish':
+        activation_fcn = lambda x: mish(x)
+    else:
+        raise ValueError("activation must be 'lrelu' or 'mish'")
+
     x_in = Input(shape=input_shape)
     num_filters = a.ngf
     # encoder_1: [batch, 256, 256, in_channels] => [batch, 128, 128, ngf]
@@ -259,11 +268,13 @@ def create_generator(a, input_shape, generator_outputs_channels):
         if a.use_sagan:
             skip_layers = []
             x = ops.down_resblock(x_in, filters=num_filters, sn=a.spec_norm,
-                                  scope='front_down_resblock_0')
+                                  scope='front_down_resblock_0',
+                                  activation=a.activation)
             for i in range(a.n_blocks_gen // 2):
                 num_filters = num_filters * 2
                 x = ops.down_resblock(x, filters=num_filters, sn=a.spec_norm,
-                                      scope=f'mid_down_resblock_{i}')
+                                      scope=f'mid_down_resblock_{i}',
+                                      activation=a.activation)
                 skip_layers.append(x)
 
             x = google_attention(x, filters=num_filters, scope='self_attention')
@@ -273,11 +284,12 @@ def create_generator(a, input_shape, generator_outputs_channels):
                 x = ops.up_resblock(Concatenate()([x, skip_layers.pop()]),
                                     filters=num_filters,
                                     sn=a.spec_norm,
-                                    scope=f'back_up_resblock_{i}')
+                                    scope=f'back_up_resblock_{i}',
+                                    activation=a.activation)
                 num_filters = num_filters // 2
 
             x = BatchNormalization()(x)
-            x = LeakyReLU()(x)
+            x = activation_fcn(x)
             x = ops.deconv(x, filters=generator_outputs_channels, padding='same',
                            scope='g_logit')
             x = tanh(x)
@@ -309,7 +321,7 @@ def create_generator(a, input_shape, generator_outputs_channels):
                 else:
                     with tf.name_scope(f'encoder_{len(layers) + 1}'):
                         x = BatchNormalization()(layers[-1])
-                        x = LeakyReLU()(x)
+                        x = activation_fcn(x)
                         x = gen_conv(x, out_channels)
                 layers.append(x)
 
@@ -335,7 +347,7 @@ def create_generator(a, input_shape, generator_outputs_channels):
                     else:
                         x = Concatenate(axis=3)([layers[-1], layers[skip_layer]])
                     x = BatchNormalization()(x)
-                    x = LeakyReLU()(x)
+                    x = activation_fcn(x)
                     x = gen_deconv(x, out_channels)
                     if rate > 0.0:
                         x = Dropout(rate)(x)
@@ -344,7 +356,7 @@ def create_generator(a, input_shape, generator_outputs_channels):
             with tf.name_scope('decoder_1'):
                 x = Concatenate(axis=3)([layers[-1], layers[0]])
                 x = BatchNormalization()(x)
-                x = LeakyReLU()(x)
+                x = activation_fcn(x)
                 x = gen_deconv(x, generator_outputs_channels)
                 x = tanh(x)
 
@@ -368,7 +380,8 @@ def create_discriminator(a, target_shape):
     if a.use_sagan:
         # layer_1: [batch, h, w, in_channels * 2] => [batch, h//2, w//2, ndf]
         x = ops.down_resblock(x_in, filters=a.ndf,
-                              sn=a.spec_norm, scope='layer_1')
+                              sn=a.spec_norm, scope='layer_1',
+                              activation=a.activation)
 
         # layer_2: [batch, h//2, w//2, ndf] => [batch, h//4, w//4, ndf * 2]
         # layer_3: [batch, h//4, w//4, ndf * 2] => [batch, h//8, w//8, ndf * 4]
@@ -376,7 +389,8 @@ def create_discriminator(a, target_shape):
         for i in range(a.n_layer_dsc):
             out_channels = a.ndf * min(2**(i+1), 8)
             x = ops.down_resblock(x, filters=out_channels, sn=a.spec_norm,
-                                  scope=f'layer_{i+1}')
+                                  scope=f'layer_{i+1}',
+                                  activation=a.activation)
 
         # Add self attention layer before final down resblock.
         x = google_attention(x, out_channels, sn=a.spec_norm,
@@ -384,26 +398,36 @@ def create_discriminator(a, target_shape):
 
         # layer_5: [batch, h//16, w//16, ndf * 8] => [batch, h//16-1, w//16-1, 2]
         x = ops.down_resblock(x, filters=2, to_down=False, sn=a.spec_norm,
-                              scope=f'layer_{a.n_layer_dsc + 1}')
+                              scope=f'layer_{a.n_layer_dsc + 1}',
+                              activation=a.activation)
         x = tf.nn.softmax(x, name='discriminator')
     else:
         n_layers = 3
         discrim_conv = lambda x, n, s: ops.conv(x, n, kernel_size=(4, 4),
                                                 strides=(s, s), padding='same')
+
+        # Define the activation function to be used.
+        if a.activation == 'lrelu':
+            activation_fcn = lambda x: LeakyReLU()(x)
+        elif a.activation == 'mish':
+            activation_fcn = lambda x: mish(x)
+        else:
+            raise ValueError("activation must be 'lrelu' or 'mish'")
+
         with tf.name_scope('layer_1'):
             x = BatchNormalization()(x_in)
-            x = LeakyReLU()(x)
+            x = activation_fcn(x)
             x = discrim_conv(x, a.ndf, 2)
         for i in range(n_layers):
             out_channels = a.ndf * min(2**(i+1), 8)
             stride = 1 if i == n_layers - 1 else 2  # last layer stride = 2
             with tf.name_scope(f'layer_{i+2}'):
                 x = BatchNormalization()(x)
-                x = LeakyReLU()(x)
+                x = activation_fcn(x)
                 x = discrim_conv(x, out_channels, stride)
         with tf.name_scope('output_layer'):
             x = BatchNormalization()(x)
-            x = LeakyReLU()(x)
+            x = activation_fcn(x)
             x = discrim_conv(x, 2, 1)
             x = tf.nn.softmax(x, name='discriminator')
 
@@ -1432,6 +1456,8 @@ if __name__ == '__main__':
                              'variant of the model')
     parser.add_argument('--devices', nargs='+', type=int,   
                         help='List of physical devices for TensorFlow to use.')
+    parser.add_argument('--activation', type=str, default='lrelu',
+                        help='lrelu for leaky relu, mish for mish')
 
     # export options
     parser.add_argument("--output_filetype", default="png",
