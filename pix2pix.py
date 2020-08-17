@@ -1261,7 +1261,7 @@ def main(a):
                       f'to {a.output_dir}.')
                 model.save(output_path / 'full_model')
                 generator.save(output_path / 'generator')
-                task_net.save(output_path / 'task_net')
+                # task_net.save(output_path / 'task_net')
                 epochs_without_improvement = 0
             else:
                 epochs_without_improvement += 1
