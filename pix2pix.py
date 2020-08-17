@@ -402,7 +402,6 @@ def create_discriminator(a, target_shape):
                               activation=a.activation)
         x = tf.nn.softmax(x, name='discriminator')
     else:
-        n_layers = 3
         discrim_conv = lambda x, n, s: ops.conv(x, n, kernel_size=(4, 4),
                                                 strides=(s, s), padding='same')
 
@@ -418,9 +417,9 @@ def create_discriminator(a, target_shape):
             x = BatchNormalization()(x_in)
             x = activation_fcn(x)
             x = discrim_conv(x, a.ndf, 2)
-        for i in range(n_layers):
+        for i in range(a.n_layer_dsc):
             out_channels = a.ndf * min(2**(i+1), 8)
-            stride = 1 if i == n_layers - 1 else 2  # last layer stride = 2
+            stride = 1 if i == a.n_layer_dsc - 1 else 2  # last layer stride = 2
             with tf.name_scope(f'layer_{i+2}'):
                 x = BatchNormalization()(x)
                 x = activation_fcn(x)
