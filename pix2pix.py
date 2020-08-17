@@ -567,6 +567,7 @@ def create_model(a, train_data):
                 )
                 task_net = load_yolo_model_weights(task_net,
                                                    a.checkpoint_load_path)
+                task_net._set_inputs(targets)
             else:
                 task_net = create_task_net(a, input_shape)
             pred_task = task_net(targets)
