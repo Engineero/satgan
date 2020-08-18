@@ -270,6 +270,7 @@ def create_generator(a, input_shape, generator_outputs_channels):
             x = ops.down_resblock(x_in, filters=num_filters, sn=a.spec_norm,
                                   scope='front_down_resblock_0',
                                   activation=a.activation)
+            skip_layers.append(x)
             for i in range(a.n_blocks_gen // 2):
                 num_filters = num_filters * 2
                 x = ops.down_resblock(x, filters=num_filters, sn=a.spec_norm,
@@ -288,6 +289,7 @@ def create_generator(a, input_shape, generator_outputs_channels):
                                     activation=a.activation)
                 num_filters = num_filters // 2
 
+            x = Concatenate()([x, skip_layers.pop()])
             x = BatchNormalization()(x)
             x = activation_fcn(x)
             x = ops.deconv(x, filters=generator_outputs_channels, padding='same',
@@ -419,7 +421,7 @@ def create_discriminator(a, target_shape):
             x = discrim_conv(x, a.ndf, 2)
         for i in range(a.n_layer_dsc):
             out_channels = a.ndf * min(2**(i+1), 8)
-            stride = 1 if i == a.n_layer_dsc - 1 else 2  # last layer stride = 2
+            stride = 1 if i == a.n_layer_dsc - 1 else 2  # last layer stride = 1
             with tf.name_scope(f'layer_{i+2}'):
                 x = BatchNormalization()(x)
                 x = activation_fcn(x)
