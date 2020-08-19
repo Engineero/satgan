@@ -282,14 +282,14 @@ def create_generator(a, input_shape, generator_outputs_channels):
 
             # Build the back end of the generator with skip connections.
             for i in range(a.n_blocks_gen // 2, a.n_blocks_gen):
-                x = ops.up_resblock(Concatenate()([x, skip_layers.pop()]),
+                x = ops.up_resblock(Concatenate(axis=3)([x, skip_layers.pop()]),
                                     filters=num_filters,
                                     sn=a.spec_norm,
                                     scope=f'back_up_resblock_{i}',
                                     activation=a.activation)
                 num_filters = num_filters // 2
 
-            x = Concatenate()([x, skip_layers.pop()])
+            x = Concatenate(axis=3)([x, skip_layers.pop()])
             x = BatchNormalization()(x)
             x = activation_fcn(x)
             x = ops.deconv(x, filters=generator_outputs_channels, padding='same',
