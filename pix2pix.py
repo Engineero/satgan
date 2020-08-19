@@ -278,7 +278,7 @@ def create_generator(a, input_shape, generator_outputs_channels):
                                       activation=a.activation)
                 skip_layers.append(x)
 
-            x = google_attention(skip_layers.pop(x), filters=num_filters,
+            x = google_attention(skip_layers.pop(), filters=num_filters,
                                  scope='self_attention')
 
             # Build the back end of the generator with skip connections.
