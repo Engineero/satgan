@@ -278,11 +278,15 @@ def create_generator(a, input_shape, generator_outputs_channels):
                                       activation=a.activation)
                 skip_layers.append(x)
 
-            x = google_attention(x, filters=num_filters, scope='self_attention')
+            x = google_attention(skip_layers.pop(x), filters=num_filters,
+                                 scope='self_attention')
 
             # Build the back end of the generator with skip connections.
             for i in range(a.n_blocks_gen // 2, a.n_blocks_gen):
-                x = ops.up_resblock(Concatenate(axis=3)([x, skip_layers.pop()]),
+                if i > a.n_blocks_gen // 2:
+                    # No skip connection for first up resblock.
+                    x = Concatenate(axis=3)([x, skip_layers.pop()])
+                x = ops.up_resblock(x,
                                     filters=num_filters,
                                     sn=a.spec_norm,
                                     scope=f'back_up_resblock_{i}',
@@ -295,6 +299,7 @@ def create_generator(a, input_shape, generator_outputs_channels):
             x = ops.deconv(x, filters=generator_outputs_channels, padding='same',
                            scope='g_logit')
             x = tanh(x)
+
         else:
             layers = []
             gen_conv = lambda x, n: ops.conv(x, n, kernel_size=(4, 4),
