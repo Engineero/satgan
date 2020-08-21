@@ -598,6 +598,9 @@ def create_model(a, train_data):
                 task_net = load_yolo_model_weights(task_net,
                                                    a.checkpoint_load_path)
                 task_net._set_inputs(targets)
+                if a.freeze_task:
+                    for layer in task_net.get_layer('model_1').layers:
+                        layer.trainable = False
             else:
                 task_net = create_task_net(a, input_shape)
             pred_task = task_net(targets)
@@ -1464,6 +1467,10 @@ if __name__ == '__main__':
                         help='List of physical devices for TensorFlow to use.')
     parser.add_argument('--activation', type=str, default='lrelu',
                         help='lrelu for leaky relu, mish for mish')
+    parser.add_argument('--freeze_task', action='store_true',
+                        default=False,
+                        help='If specified, do not train task network, '
+                             'just use its loss.')
 
     # export options
     parser.add_argument("--output_filetype", default="png",
