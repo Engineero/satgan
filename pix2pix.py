@@ -968,12 +968,22 @@ def main(a):
                          a.obj_weight * a_obj_loss
 
                 # Calculate loss on generated noise.
-                n_class_loss = tf.math.reduce_sum(
+                n_obj_loss = tf.math.reduce_mean(
+                    categorical_crossentropy(
+                        n_target_classes,
+                        tf.stack([1. - task_outputs[2][..., 4],
+                                  task_outputs[2][..., 4]],
+                                 axis=-1),
+                        label_smoothing=0.1
+                    )
+                )
+                n_class_loss = tf.math.reduce_mean(
                     categorical_crossentropy(n_target_classes,
                                              n_output_class,
                                              label_smoothing=0.1)
                 )
-                n_loss = a.class_weight * n_class_loss
+                n_loss = a.class_weight * n_class_loss + \
+                         a.obj_weight * n_obj_loss
 
                 task_loss = a_loss + b_loss + n_loss
 
