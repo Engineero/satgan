@@ -600,6 +600,10 @@ def create_model(a, train_data):
                 task_net._set_inputs(targets)
                 if a.freeze_task:
                     for layer in task_net.get_layer('model_1').layers:
+                        print(f'Freezing task net model 1 layer {layer}.')
+                        layer.trainable = False
+                    for layer in task_net.get_layer('model_2').layers:
+                        print(f'Freezing task net model 2 layer {layer}.')
                         layer.trainable = False
             else:
                 task_net = create_task_net(a, input_shape)
