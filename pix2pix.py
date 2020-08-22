@@ -1302,7 +1302,7 @@ def main(a):
 
         # Test the best saved model or current model if not saving.
         if a.output_dir is not None:
-            model = load_model(a.output_dir)
+            model = load_model(output_path / 'full_model')
         for m in mean_list:
             m.reset_states()
         for batch in test_data:
