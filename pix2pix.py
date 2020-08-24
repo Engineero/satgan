@@ -122,6 +122,7 @@ from tensorflow.keras.utils import plot_model
 from tensorflow.keras.optimizers import Adam, SGD
 from tensorflow.keras.metrics import Mean
 from yolo_v3 import build_yolo_model, load_yolo_model_weights
+from tensorflow_addons.activations import mish
 
 
 def preprocess(image, add_noise=False):
@@ -432,12 +433,23 @@ def create_generator(a, input_shape, generator_outputs_channels):
     """
 
 <<<<<<< HEAD
+<<<<<<< HEAD
     return layers[-1]
 
 
 def create_model(inputs, objects, targets):
     def create_discriminator(discrim_inputs, discrim_targets):
 =======
+=======
+    # Define the activation function to be used.
+    if a.activation == 'lrelu':
+        activation_fcn = lambda x: LeakyReLU()(x)
+    elif a.activation == 'mish':
+        activation_fcn = lambda x: mish(x)
+    else:
+        raise ValueError("activation must be 'lrelu' or 'mish'")
+
+>>>>>>> release-1.1.0
     x_in = Input(shape=input_shape)
     num_filters = a.ngf
     # encoder_1: [batch, 256, 256, in_channels] => [batch, 128, 128, ngf]
@@ -445,28 +457,38 @@ def create_model(inputs, objects, targets):
         if a.use_sagan:
             skip_layers = []
             x = ops.down_resblock(x_in, filters=num_filters, sn=a.spec_norm,
-                                  scope='front_down_resblock_0')
+                                  scope='front_down_resblock_0',
+                                  activation=a.activation)
+            skip_layers.append(x)
             for i in range(a.n_blocks_gen // 2):
-                x = ops.down_resblock(x, filters=num_filters // 2, sn=a.spec_norm,
-                                      scope=f'mid_down_resblock_{i}')
-                num_filters = num_filters // 2
+                num_filters = num_filters * 2
+                x = ops.down_resblock(x, filters=num_filters, sn=a.spec_norm,
+                                      scope=f'mid_down_resblock_{i}',
+                                      activation=a.activation)
                 skip_layers.append(x)
 
-            x = google_attention(x, filters=num_filters, scope='self_attention')
+            x = google_attention(skip_layers.pop(), filters=num_filters,
+                                 scope='self_attention')
 
             # Build the back end of the generator with skip connections.
             for i in range(a.n_blocks_gen // 2, a.n_blocks_gen):
-                x = ops.up_resblock(Concatenate()([x, skip_layers.pop()]),
+                if i > a.n_blocks_gen // 2:
+                    # No skip connection for first up resblock.
+                    x = Concatenate(axis=3)([x, skip_layers.pop()])
+                x = ops.up_resblock(x,
                                     filters=num_filters,
                                     sn=a.spec_norm,
-                                    scope=f'back_up_resblock_{i}')
-                num_filters = num_filters * 2
+                                    scope=f'back_up_resblock_{i}',
+                                    activation=a.activation)
+                num_filters = num_filters // 2
 
+            x = Concatenate(axis=3)([x, skip_layers.pop()])
             x = BatchNormalization()(x)
-            x = LeakyReLU()(x)
+            x = activation_fcn(x)
             x = ops.deconv(x, filters=generator_outputs_channels, padding='same',
                            scope='g_logit')
             x = tanh(x)
+
         else:
             layers = []
             gen_conv = lambda x, n: ops.conv(x, n, kernel_size=(4, 4),
@@ -495,7 +517,7 @@ def create_model(inputs, objects, targets):
                 else:
                     with tf.name_scope(f'encoder_{len(layers) + 1}'):
                         x = BatchNormalization()(layers[-1])
-                        x = LeakyReLU()(x)
+                        x = activation_fcn(x)
                         x = gen_conv(x, out_channels)
                 layers.append(x)
 
@@ -521,7 +543,7 @@ def create_model(inputs, objects, targets):
                     else:
                         x = Concatenate(axis=3)([layers[-1], layers[skip_layer]])
                     x = BatchNormalization()(x)
-                    x = LeakyReLU()(x)
+                    x = activation_fcn(x)
                     x = gen_deconv(x, out_channels)
                     if rate > 0.0:
                         x = Dropout(rate)(x)
@@ -530,7 +552,7 @@ def create_model(inputs, objects, targets):
             with tf.name_scope('decoder_1'):
                 x = Concatenate(axis=3)([layers[-1], layers[0]])
                 x = BatchNormalization()(x)
-                x = LeakyReLU()(x)
+                x = activation_fcn(x)
                 x = gen_deconv(x, generator_outputs_channels)
                 x = tanh(x)
 
@@ -554,7 +576,8 @@ def create_discriminator(a, target_shape):
     if a.use_sagan:
         # layer_1: [batch, h, w, in_channels * 2] => [batch, h//2, w//2, ndf]
         x = ops.down_resblock(x_in, filters=a.ndf,
-                              sn=a.spec_norm, scope='layer_1')
+                              sn=a.spec_norm, scope='layer_1',
+                              activation=a.activation)
 
         # layer_2: [batch, h//2, w//2, ndf] => [batch, h//4, w//4, ndf * 2]
         # layer_3: [batch, h//4, w//4, ndf * 2] => [batch, h//8, w//8, ndf * 4]
@@ -562,7 +585,8 @@ def create_discriminator(a, target_shape):
         for i in range(a.n_layer_dsc):
             out_channels = a.ndf * min(2**(i+1), 8)
             x = ops.down_resblock(x, filters=out_channels, sn=a.spec_norm,
-                                  scope=f'layer_{i+1}')
+                                  scope=f'layer_{i+1}',
+                                  activation=a.activation)
 
         # Add self attention layer before final down resblock.
         x = google_attention(x, out_channels, sn=a.spec_norm,
@@ -570,17 +594,31 @@ def create_discriminator(a, target_shape):
 
         # layer_5: [batch, h//16, w//16, ndf * 8] => [batch, h//16-1, w//16-1, 2]
         x = ops.down_resblock(x, filters=2, to_down=False, sn=a.spec_norm,
-                              scope=f'layer_{a.n_layer_dsc + 1}')
+                              scope=f'layer_{a.n_layer_dsc + 1}',
+                              activation=a.activation)
         x = tf.nn.softmax(x, name='discriminator')
     else:
+<<<<<<< HEAD
 >>>>>>> release-1.0.0
         n_layers = 3
+=======
+>>>>>>> release-1.1.0
         discrim_conv = lambda x, n, s: ops.conv(x, n, kernel_size=(4, 4),
                                                 strides=(s, s), padding='same')
+
+        # Define the activation function to be used.
+        if a.activation == 'lrelu':
+            activation_fcn = lambda x: LeakyReLU()(x)
+        elif a.activation == 'mish':
+            activation_fcn = lambda x: mish(x)
+        else:
+            raise ValueError("activation must be 'lrelu' or 'mish'")
+
         with tf.name_scope('layer_1'):
             x = BatchNormalization()(x_in)
-            x = LeakyReLU()(x)
+            x = activation_fcn(x)
             x = discrim_conv(x, a.ndf, 2)
+<<<<<<< HEAD
         for i in range(n_layers):
 <<<<<<< HEAD
             with tf.variable_scope("layer_%d" % (len(layers) + 1)):
@@ -687,15 +725,18 @@ def append_index(filesets, step=False):
     if os.path.exists(index_path):
         index = open(index_path, "a")
 =======
+=======
+        for i in range(a.n_layer_dsc):
+>>>>>>> release-1.1.0
             out_channels = a.ndf * min(2**(i+1), 8)
-            stride = 1 if i == n_layers - 1 else 2  # last layer stride = 2
+            stride = 1 if i == a.n_layer_dsc - 1 else 2  # last layer stride = 1
             with tf.name_scope(f'layer_{i+2}'):
                 x = BatchNormalization()(x)
-                x = LeakyReLU()(x)
+                x = activation_fcn(x)
                 x = discrim_conv(x, out_channels, stride)
         with tf.name_scope('output_layer'):
             x = BatchNormalization()(x)
-            x = LeakyReLU()(x)
+            x = activation_fcn(x)
             x = discrim_conv(x, 2, 1)
             x = tf.nn.softmax(x, name='discriminator')
 
@@ -1111,6 +1152,14 @@ main()
 =======
                 task_net = load_yolo_model_weights(task_net,
                                                    a.checkpoint_load_path)
+                task_net._set_inputs(targets)
+                if a.freeze_task:
+                    for layer in task_net.get_layer('model_1').layers:
+                        print(f'Freezing task net model 1 layer {layer}.')
+                        layer.trainable = False
+                    for layer in task_net.get_layer('model_2').layers:
+                        print(f'Freezing task net model 2 layer {layer}.')
+                        layer.trainable = False
             else:
                 task_net = create_task_net(a, input_shape)
             pred_task = task_net(targets)
@@ -1133,7 +1182,7 @@ main()
 
     # Return the model. We'll define losses and a training loop back in the
     # main function.
-    return model
+    return model, generator, task_net
 
 
 def main(a):
@@ -1153,14 +1202,16 @@ def main(a):
 
     # Set up the summary writer.
     output_path = Path(a.output_dir).resolve()
+    tensorboard_path = Path(a.tensorboard_dir).resolve()
     output_path.mkdir(parents=True, exist_ok=True)
-    writer = tf.summary.create_file_writer(output_path.as_posix())
+    tensorboard_path.mkdir(parents=True, exist_ok=True)
+    writer = tf.summary.create_file_writer(tensorboard_path.as_posix())
 
     # Build data generators.
     train_data, val_data, test_data = load_examples(a)
 
     # Build the model.
-    model = create_model(a, train_data)
+    model, generator, _ = create_model(a, train_data)
     print(f'Overall model summary:\n{model.summary()}')
 
     # Define model losses and helpers for computing and applying gradients.
@@ -1472,12 +1523,22 @@ def main(a):
                          a.obj_weight * a_obj_loss
 
                 # Calculate loss on generated noise.
+                n_obj_loss = tf.math.reduce_sum(
+                    categorical_crossentropy(
+                        n_target_classes,
+                        tf.stack([1. - task_outputs[2][..., 4],
+                                  task_outputs[2][..., 4]],
+                                 axis=-1),
+                        label_smoothing=0.1
+                    )
+                )
                 n_class_loss = tf.math.reduce_sum(
                     categorical_crossentropy(n_target_classes,
                                              n_output_class,
                                              label_smoothing=0.1)
                 )
-                n_loss = a.class_weight * n_class_loss
+                n_loss = a.class_weight * n_class_loss + \
+                         a.obj_weight * n_obj_loss
 
                 task_loss = a_loss + b_loss + n_loss
 
@@ -1762,21 +1823,23 @@ def main(a):
                                        model_outputs,
                                        batches_seen,
                                        return_all=True)
-                if epoch == 0:
-                    min_loss = total_loss
-                    epochs_without_improvement = 0
                 for m, loss in zip(mean_list, [total_loss,
                                                discrim_loss,
                                                gen_loss,
                                                task_loss]):
                     m.update_state([loss])
+                if epoch == 0:
+                    min_loss = mean_list[0].result().numpy()
+                    epochs_without_improvement = 0
             print(f'Total validation loss: {mean_list[0].result().numpy()}')
             if mean_list[0].result().numpy() <= min_loss \
                 and a.output_dir is not None:
                 min_loss = mean_list[0].result().numpy()
                 print(f'Saving model with total loss {min_loss:.4f} ',
                       f'to {a.output_dir}.')
-                model.save(a.output_dir)
+                model.save(output_path / 'full_model')
+                generator.save(output_path / 'generator')
+                # task_net.save(output_path / 'task_net')
                 epochs_without_improvement = 0
             else:
                 epochs_without_improvement += 1
@@ -1794,7 +1857,7 @@ def main(a):
 
         # Test the best saved model or current model if not saving.
         if a.output_dir is not None:
-            model = load_model(a.output_dir)
+            model = load_model(output_path / 'full_model')
         for m in mean_list:
             m.reset_states()
         for batch in test_data:
@@ -1971,6 +2034,12 @@ if __name__ == '__main__':
                              'variant of the model')
     parser.add_argument('--devices', nargs='+', type=int,   
                         help='List of physical devices for TensorFlow to use.')
+    parser.add_argument('--activation', type=str, default='lrelu',
+                        help='lrelu for leaky relu, mish for mish')
+    parser.add_argument('--freeze_task', action='store_true',
+                        default=False,
+                        help='If specified, do not train task network, '
+                             'just use its loss.')
 
     # export options
     parser.add_argument("--output_filetype", default="png",
