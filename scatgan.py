@@ -359,7 +359,7 @@ def create_generator(a, input_shape, generator_outputs_channels):
                     if rate > 0.0:
                         x = Dropout(rate)(x)
                     layers.append(x)
-            
+
             with tf.name_scope('decoder_1'):
                 x = Concatenate(axis=3)([layers[-1], layers[0]])
                 x = BatchNormalization()(x)
@@ -1476,7 +1476,7 @@ if __name__ == '__main__':
                         default=False,
                         help='Should we use a recurrent (Convolutional LSTM) '
                              'variant of the model')
-    parser.add_argument('--devices', nargs='+', type=int,   
+    parser.add_argument('--devices', nargs='+', type=int,
                         help='List of physical devices for TensorFlow to use.')
     parser.add_argument('--activation', type=str, default='lrelu',
                         help='lrelu for leaky relu, mish for mish')
