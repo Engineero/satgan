@@ -548,7 +548,7 @@ def create_model(inputs, objects, targets):
                     if rate > 0.0:
                         x = Dropout(rate)(x)
                     layers.append(x)
-            
+
             with tf.name_scope('decoder_1'):
                 x = Concatenate(axis=3)([layers[-1], layers[0]])
                 x = BatchNormalization()(x)
@@ -1523,22 +1523,21 @@ def main(a):
                          a.obj_weight * a_obj_loss
 
                 # Calculate loss on generated noise.
-                n_obj_loss = tf.math.reduce_sum(
-                    categorical_crossentropy(
-                        n_target_classes,
-                        tf.stack([1. - task_outputs[2][..., 4],
-                                  task_outputs[2][..., 4]],
-                                 axis=-1),
-                        label_smoothing=0.1
-                    )
-                )
+                # n_obj_loss = tf.math.reduce_mean(
+                #     categorical_crossentropy(
+                #         n_target_classes,
+                #         tf.stack([1. - task_outputs[2][..., 4],
+                #                   task_outputs[2][..., 4]],
+                #                  axis=-1),
+                #         label_smoothing=0.1
+                #     )
+                # )
                 n_class_loss = tf.math.reduce_sum(
                     categorical_crossentropy(n_target_classes,
                                              n_output_class,
                                              label_smoothing=0.1)
                 )
-                n_loss = a.class_weight * n_class_loss + \
-                         a.obj_weight * n_obj_loss
+                n_loss = a.class_weight * n_class_loss
 
                 task_loss = a_loss + b_loss + n_loss
 
@@ -2032,7 +2031,7 @@ if __name__ == '__main__':
                         default=False,
                         help='Should we use a recurrent (Convolutional LSTM) '
                              'variant of the model')
-    parser.add_argument('--devices', nargs='+', type=int,   
+    parser.add_argument('--devices', nargs='+', type=int,
                         help='List of physical devices for TensorFlow to use.')
     parser.add_argument('--activation', type=str, default='lrelu',
                         help='lrelu for leaky relu, mish for mish')
