@@ -6,107 +6,6 @@ import time
 import tensorflow as tf
 import numpy as np
 import argparse
-<<<<<<< HEAD
-import os
-import json
-import glob
-import random
-import collections
-import math
-import time
-from ops import conv, max_pooling, hw_flatten
-
-parser = argparse.ArgumentParser()
-parser.add_argument("--input_dir", help="path to folder containing images")
-parser.add_argument("--mode", required=True,
-                    choices=["train", "test", "export"])
-parser.add_argument("--output_dir", required=True,
-                    help="where to put output files")
-parser.add_argument("--seed", type=int)
-parser.add_argument(
-    "--checkpoint",
-    default=None,
-    help="directory with checkpoint to resume training from or use for testing"
-)
-parser.add_argument("--max_steps", type=int,
-                    help="number of training steps (0 to disable)")
-parser.add_argument("--max_epochs", type=int,
-                    help="number of training epochs")
-parser.add_argument("--summary_freq", type=int, default=100,
-                    help="update summaries every summary_freq steps")
-parser.add_argument("--progress_freq", type=int, default=50,
-                    help="display progress every progress_freq steps")
-parser.add_argument("--trace_freq", type=int, default=0,
-                    help="trace execution every trace_freq steps")
-parser.add_argument("--display_freq", type=int, default=0,
-                    help="write current training images every display_freq steps")
-parser.add_argument("--save_freq", type=int, default=5000,
-                    help="save model every save_freq steps, 0 to disable")
-parser.add_argument("--separable_conv", action="store_true",
-                    help="use separable convolutions in the generator")
-parser.add_argument("--aspect_ratio", type=float, default=1.0,
-                    help="aspect ratio of output images (width/height)")
-parser.add_argument("--lab_colorization", action="store_true",
-                    help="split input image into brightness (A) and color (B)")
-parser.add_argument("--batch_size", type=int, default=1,
-                    help="number of images in batch")
-parser.add_argument("--which_direction", type=str, default="AtoB",
-                    choices=["AtoB", "BtoA"])
-parser.add_argument("--ngf", type=int, default=64,
-                    help="number of generator filters in first conv layer")
-parser.add_argument("--ndf", type=int, default=64,
-                    help="number of discriminator filters in first conv layer")
-parser.add_argument("--scale_size", type=int, default=286,
-                    help="scale images to this size before cropping to 256x256")
-parser.add_argument("--flip", dest="flip", action="store_true", default=False,
-                    help="flip images horizontally")
-parser.add_argument("--lr_gen", type=float, default=4e-4,
-                    help="initial learning rate for generator adam")
-parser.add_argument("--lr_dsc", type=float, default=1e-4,
-                    help="initial learning rate for discriminator adam")
-parser.add_argument("--beta1_gen", type=float, default=0.5,
-                    help="momentum term of generator adam")
-parser.add_argument("--beta1_dsc", type=float, default=0.5,
-                    help="momentum term of discriminator adam")
-parser.add_argument("--l1_weight", type=float, default=100.0,
-                    help="weight on L1 term for generator gradient")
-parser.add_argument("--gan_weight", type=float, default=1.0,
-                    help="weight on GAN term for generator gradient")
-parser.add_argument("--n_channels", type=int, default=3,
-                    help="Number of channels in image.")
-parser.add_argument("--transform", action="store_true", default=False,
-                    help="Whether to apply image transformations.")
-parser.add_argument("--crop_size", type=int, default=256,
-                    help="Size of cropped image chunks.")
-
-# export options
-parser.add_argument("--output_filetype", default="png",
-                    choices=["png", "jpeg"])
-a = parser.parse_args()
-
-EPS = 1e-12
-
-Examples = collections.namedtuple(
-    "Examples",
-    "paths, inputs, objects, targets, count, steps_per_epoch"
-)
-Model = collections.namedtuple(
-    "Model",
-    "outputs, combined_outputs, predict_real, predict_fake, discrim_loss, discrim_grads_and_vars, gen_loss_GAN, gen_loss_L1, gen_grads_and_vars, train"
-)
-
-
-def preprocess(image, add_noise=False):
-    with tf.name_scope("preprocess"):
-        # [0, 1] => [-1, 1]
-        # return image * 2 - 1
-        if add_noise:
-            noise = tf.random_normal(shape=tf.shape(image), mean=0.0,
-                                     stddev=1., dtype=tf.float32)
-            return (tf.image.per_image_standardization(image), noise)
-        else:
-            return tf.image.per_image_standardization(image)
-=======
 from pathlib import Path
 from utils import ops
 from utils.darknet import build_darknet_model
@@ -286,82 +185,6 @@ def load_examples(a):
         test_data = tf.data.TFRecordDataset(
             filenames=[p.as_posix() for p in test_paths]
         )
-<<<<<<< HEAD
-        reader = tf.WholeFileReader()
-        paths, contents = reader.read(path_queue)
-        raw_input = decode(contents)
-        raw_input = tf.image.convert_image_dtype(raw_input, dtype=tf.float32)
-        assertion = tf.assert_equal(tf.shape(raw_input)[2], 3,
-                                    message="image does not have 3 channels")
-        with tf.control_dependencies([assertion]):
-            raw_input = tf.identity(raw_input)
-
-        raw_input.set_shape([None, None, a.n_channels])
-
-        if a.lab_colorization:
-            # load color and brightness from image, no B image exists here
-            lab = rgb_to_lab(raw_input)
-            L_chan, a_chan, b_chan = preprocess_lab(lab)
-            a_images = tf.expand_dims(L_chan, axis=2)
-            b_images = tf.stack([a_chan, b_chan], axis=2)
-        else:
-            # break apart image pair and move to range [-1, 1]
-            width = tf.shape(raw_input)[1] # [height, width, channels]
-            a_images, gen_inputs = preprocess(raw_input[:, :width//2, :], add_noise=True)
-            b_images = preprocess(raw_input[:, width//2:, :])
-    if a.which_direction == "AtoB":
-        inputs, objects, targets = [gen_inputs, a_images, b_images]
-    elif a.which_direction == "BtoA":
-        inputs, objects, targets = [gen_inputs, b_images, a_images]
-    else:
-        raise Exception("invalid direction")
-
-    # synchronize seed for image operations so that we do the same operations
-    # to both input and output images
-    seed = random.randint(0, 2**31 - 1)
-    def transform(image):
-        r = image
-        if a.flip:
-            r = tf.image.random_flip_left_right(r, seed=seed)
-        # area produces a nice downscaling, but does nearest neighbor for
-        # upscaling assume we're going to be doing downscaling here
-        r = tf.image.resize_images(r, [a.scale_size, a.scale_size],
-                                   method=tf.image.ResizeMethod.AREA)
-        offset = tf.cast(tf.floor(
-            tf.random_uniform(
-                [2],
-                0,
-                a.scale_size - a.crop_size + 1,
-                seed=seed)
-            ),
-            dtype=tf.int32
-        )
-        if a.scale_size > a.crop_size:
-            r = tf.image.crop_to_bounding_box(r, offset[0], offset[1],
-                                              a.crop_size, a.crop_size)
-        elif a.scale_size < a.crop_size:
-            raise Exception("scale size cannot be less than crop size")
-        return r
-
-    with tf.name_scope("input_images"):
-        input_images = transform(inputs)
-    with tf.name_scope('object_images'):
-        object_images = transform(objects)
-    with tf.name_scope("target_images"):
-        target_images = transform(targets)
-    paths_batch, inputs_batch, objects_batch, targets_batch = tf.train.batch(
-        [paths, input_images, object_images, target_images],
-        batch_size=a.batch_size
-    )
-    steps_per_epoch = int(math.ceil(len(input_paths) / a.batch_size))
-    return Examples(
-        paths=paths_batch,
-        inputs=inputs_batch,
-        objects=objects_batch,
-        targets=targets_batch,
-        count=len(input_paths),
-        steps_per_epoch=steps_per_epoch,
-=======
     else:
         test_data = None
 
@@ -370,7 +193,6 @@ def load_examples(a):
     train_data = train_data.batch(a.batch_size, drop_remainder=True)
     train_data = train_data.map(
         lambda x: _parse_example(x, a)
->>>>>>> release-1.0.0
     )
 
     valid_data = valid_data.batch(a.batch_size, drop_remainder=True)
