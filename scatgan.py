@@ -1360,7 +1360,7 @@ if __name__ == '__main__':
     )
     parser.add_argument("--max_steps", type=int, default=0,
                         help="number of training steps (0 to disable)")
-    parser.add_argument("--max_epochs", type=int, defalut=100,
+    parser.add_argument("--max_epochs", type=int, default=100,
                         help="number of training epochs")
     parser.add_argument("--summary_freq", type=int, default=100,
                         help="Update summaries every summary_freq steps")
