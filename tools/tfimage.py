@@ -97,7 +97,7 @@ to_float32 = create_op(
 def load(path):
     with open(path, "rb") as f:
         contents = f.read()
-        
+
     _, ext = os.path.splitext(path.lower())
 
     if ext == ".jpg":
