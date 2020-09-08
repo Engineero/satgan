@@ -524,13 +524,9 @@ def create_task_net(a, input_shape):
                                              a.num_classes))
         pred_class = tf.nn.softmax(pred_class)
 
-        # Shift predicted xy by half width and height.
-        pred_xy_min = pred_xy - pred_wh / 2.
-        pred_xy_max = pred_xy + pred_wh / 2.
-
         # Build prediction.
         prediction = tf.concat(
-            [pred_xy_min, pred_xy_max, pred_conf, pred_class],
+            [pred_xy, pred_wh, pred_conf, pred_class],
             axis=-1
         )
         pred_list.append(prediction)
@@ -863,21 +859,10 @@ def main(a):
                 n_target_classes = tf.stack([targets_ones, targets_zeros],
                                             axis=-1)
 
-                # Handle YOLO's class output only being a scalar.
-                if a.use_yolo:
-                    b_output_class = tf.stack([1. - task_outputs[0][..., -1],
-                                               task_outputs[0][..., -1]],
-                                              axis=-1)
-                    a_output_class = tf.stack([1. - task_outputs[1][..., -1],
-                                               task_outputs[1][..., -1]],
-                                              axis=-1)
-                    n_output_class = tf.stack([1. - task_outputs[2][..., -1],
-                                               task_outputs[2][..., -1]],
-                                              axis=-1)
-                else:
-                    b_output_class = task_outputs[0][..., 5:]
-                    a_output_class = task_outputs[1][..., 5:]
-                    n_output_class = task_outputs[2][..., 5:]
+                # Grab class outputs.
+                b_output_class = task_outputs[0][..., -a.num_classes:]
+                a_output_class = task_outputs[1][..., -a.num_classes:]
+                n_output_class = task_outputs[2][..., -a.num_classes:]
                 a_bool_mask = (a_task_targets[..., -1] != 0)
                 b_bool_mask = (b_task_targets[..., -1] != 0)
                 a_object_target = tf.cast(tf.stack([a_bool_mask,
@@ -894,10 +879,10 @@ def main(a):
                 a_task_xy = a_task_targets[..., :2] + a_task_wh / 2.
                 b_task_wh = b_task_targets[..., 2:4] - b_task_targets[..., :2]
                 b_task_xy = b_task_targets[..., :2] + b_task_wh / 2.
-                a_real_wh = task_outputs[1][..., 2:4] - task_outputs[1][..., :2]
-                a_real_xy = task_outputs[1][..., :2] + a_real_wh / 2.
-                b_real_wh = task_outputs[0][..., 2:4] - task_outputs[0][..., :2]
-                b_real_xy = task_outputs[0][..., :2] + a_real_wh / 2.
+                a_real_wh = task_outputs[1][..., 2:4]
+                a_real_xy = task_outputs[1][..., :2]
+                b_real_wh = task_outputs[0][..., 2:4]
+                b_real_xy = task_outputs[0][..., :2]
                 a_iou_outputs = task_outputs[1]
                 b_iou_outputs = task_outputs[0]
 
