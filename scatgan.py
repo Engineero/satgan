@@ -602,9 +602,6 @@ def create_model(a, train_data):
                     for layer in task_net.get_layer('functional_5').layers:
                         print(f'Freezing task net functional 5 layer {layer}.')
                         layer.trainable = False
-                    for layer in task_net.get_layer('functional_7').layers:
-                        print(f'Freezing task net functional 7 layer {layer}.')
-                        layer.trainable = False
             else:
                 task_net = create_task_net(a, input_shape)
             pred_task = task_net(targets)
