@@ -1171,6 +1171,7 @@ def main(a):
                     # a_fake_bboxes = a_detects[..., :4]
                     # b_fake_bboxes = b_detects[..., :4]
                     # n_fake_bboxes = n_detects[..., :4]
+                    print(f'\na detects: {a_detects}\n')
                     a_fake_min = a_detects[..., :2] - a_detects[..., 2:4] / 2.
                     a_fake_max = a_detects[..., :2] + a_detects[..., 2:4] / 2.
                     b_fake_min = b_detects[..., :2] - b_detects[..., 2:4] / 2.
