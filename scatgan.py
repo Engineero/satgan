@@ -1140,17 +1140,17 @@ def main(a):
                     a_detects = task_outputs[1]
                     n_detects = task_outputs[2]
                     b_mask = tf.tile(
-                        tf.expand_dims(b_detects[..., -1] > a.obj_threshold,
+                        tf.expand_dims(b_detects[..., 4] > a.obj_threshold,
                                        axis=-1),
                         [1, 1, b_detects.shape[-1]]
                     )
                     a_mask = tf.tile(
-                        tf.expand_dims(a_detects[..., -1] > a.obj_threshold,
+                        tf.expand_dims(a_detects[..., 4] > a.obj_threshold,
                                        axis=-1),
                         [1, 1, a_detects.shape[-1]]
                     )
                     n_mask = tf.tile(
-                        tf.expand_dims(n_detects[..., -1] > a.obj_threshold,
+                        tf.expand_dims(n_detects[..., 4] > a.obj_threshold,
                                        axis=-1),
                         [1, 1, n_detects.shape[-1]]
                     )
@@ -1171,12 +1171,12 @@ def main(a):
                     # a_fake_bboxes = a_detects[..., :4]
                     # b_fake_bboxes = b_detects[..., :4]
                     # n_fake_bboxes = n_detects[..., :4]
-                    a_fake_min = a_detects[..., :2] - a_detects[..., 2:4] / 2
-                    a_fake_max = a_detects[..., :2] + a_detects[..., 2:4] / 2
-                    b_fake_min = b_detects[..., :2] - b_detects[..., 2:4] / 2
-                    b_fake_max = b_detects[..., :2] + b_detects[..., 2:4] / 2
-                    n_fake_min = n_detects[..., :2] - n_detects[..., 2:4] / 2
-                    n_fake_max = n_detects[..., :2] + n_detects[..., 2:4] / 2
+                    a_fake_min = a_detects[..., :2] - a_detects[..., 2:4] / 2.
+                    a_fake_max = a_detects[..., :2] + a_detects[..., 2:4] / 2.
+                    b_fake_min = b_detects[..., :2] - b_detects[..., 2:4] / 2.
+                    b_fake_max = b_detects[..., :2] + b_detects[..., 2:4] / 2.
+                    n_fake_min = n_detects[..., :2] - n_detects[..., 2:4] / 2.
+                    n_fake_max = n_detects[..., :2] + n_detects[..., 2:4] / 2.
                     a_fake_bboxes = tf.concat([a_fake_min, a_fake_max], axis=-1)
                     b_fake_bboxes = tf.concat([b_fake_min, b_fake_max], axis=-1)
                     n_fake_bboxes = tf.concat([n_fake_min, n_fake_max], axis=-1)
