@@ -893,11 +893,6 @@ def main(a):
                 a_iou_outputs = task_outputs[1]
                 b_iou_outputs = task_outputs[0]
 
-                print(f'\nb target xy: {b_task_xy.numpy()}')
-                print(f'b predicted xy: {b_real_xy.numpy()}')
-                print(f'b target wh: {b_task_wh.numpy()}')
-                print(f'b predicted wh: {b_real_wh.numpy()}\n')
-
                 # Calculate loss on real images.
                 b_xy_loss = tf.reduce_sum(tf.where(
                     b_bool_mask,
@@ -1188,6 +1183,9 @@ def main(a):
                     a_fake_bboxes = tf.concat([a_fake_min, a_fake_max], axis=-1)
                     b_fake_bboxes = tf.concat([b_fake_min, b_fake_max], axis=-1)
                     n_fake_bboxes = tf.concat([n_fake_min, n_fake_max], axis=-1)
+
+                    print(f'\nb target boxes: {b_true_bboxes}')
+                    print(f'b predicted boxes: {b_fake_bboxes}')
 
                     # Add bounding boxes to sample images.
                     target_bboxes = tf.image.draw_bounding_boxes(
