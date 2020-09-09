@@ -879,10 +879,10 @@ def main(a):
                                           dtype=tf.int32)
 
                 # Grab/calculate yolo/custom network outputs.
-                a_task_wh = a_task_targets[..., 2:4] - a_task_targets[..., :2]
-                a_task_xy = a_task_targets[..., :2] + a_task_wh / 2.
-                b_task_wh = b_task_targets[..., 2:4] - b_task_targets[..., :2]
-                b_task_xy = b_task_targets[..., :2] + b_task_wh / 2.
+                a_task_wh = a_task_targets[..., 2:4]
+                a_task_xy = a_task_targets[..., :2]
+                b_task_wh = b_task_targets[..., 2:4]
+                b_task_xy = b_task_targets[..., :2]
                 a_real_wh = task_outputs[1][..., 2:4]
                 a_real_xy = task_outputs[1][..., :2]
                 b_real_wh = task_outputs[0][..., 2:4]
@@ -1166,21 +1166,30 @@ def main(a):
 
                     # Bounding boxes are [ymin, xmin, ymax, xmax]. Need to
                     # calculate that from YOLO.
-                    a_true_min = a_task_targets[:2] - a_task_targets[2:4]
-                    a_true_max = a_task_targets[:2] + a_task_targets[2:4]
-                    b_true_min = b_task_targets[:2] - b_task_targets[2:4]
-                    b_true_max = b_task_targets[:2] + b_task_targets[2:4]
-                    a_fake_min = a_detects[:2] - a_detects[2:4]
-                    a_fake_max = a_detects[:2] + a_detects[2:4]
-                    b_fake_min = b_detects[:2] - b_detects[2:4]
-                    b_fake_max = b_detects[:2] + b_detects[2:4]
-                    n_fake_min = n_detects[:2] - n_detects[2:4]
-                    n_fake_max = n_detects[:2] + n_detects[2:4]
-                    a_true_bboxes = np.concatenate([a_true_min, a_true_max])
-                    b_true_bboxes = np.concatenate([b_true_min, b_true_max])
-                    a_fake_bboxes = np.concatenate([a_fake_min, a_fake_max])
-                    b_fake_bboxes = np.concatenate([b_fake_min, b_fake_max])
-                    n_fake_bboxes = np.concatenate([n_fake_min, n_fake_max])
+                    a_true_min = a_task_targets[..., :2] - \
+                                 a_task_targets[..., 2:4] / 2
+                    a_true_max = a_task_targets[..., :2] + \
+                                 a_task_targets[..., 2:4] / 2
+                    b_true_min = b_task_targets[..., :2] - \
+                                 b_task_targets[..., 2:4] / 2
+                    b_true_max = b_task_targets[..., :2] + \
+                                 b_task_targets[..., 2:4] / 2
+                    a_fake_min = a_detects[..., :2] - a_detects[..., 2:4] / 2
+                    a_fake_max = a_detects[..., :2] + a_detects[..., 2:4] / 2
+                    b_fake_min = b_detects[..., :2] - b_detects[..., 2:4] / 2
+                    b_fake_max = b_detects[..., :2] + b_detects[..., 2:4] / 2
+                    n_fake_min = n_detects[..., :2] - n_detects[..., 2:4] / 2
+                    n_fake_max = n_detects[..., :2] + n_detects[..., 2:4] / 2
+                    a_true_bboxes = np.concatenate([a_true_min, a_true_max],
+                                                   axis=-1)
+                    b_true_bboxes = np.concatenate([b_true_min, b_true_max],
+                                                   axis=-1)
+                    a_fake_bboxes = np.concatenate([a_fake_min, a_fake_max],
+                                                   axis=-1)
+                    b_fake_bboxes = np.concatenate([b_fake_min, b_fake_max],
+                                                   axis=-1)
+                    n_fake_bboxes = np.concatenate([n_fake_min, n_fake_max],
+                                                   axis=-1)
 
                     # Add bounding boxes to sample images.
                     target_bboxes = tf.image.draw_bounding_boxes(
