@@ -893,10 +893,10 @@ def main(a):
                 a_iou_outputs = task_outputs[1]
                 b_iou_outputs = task_outputs[0]
 
-                print(f'\nb target xy: {b_task_xy}')
-                print(f'b predicted xy: {b_real_xy}')
-                print(f'b target wh: {b_task_wh}')
-                print(f'b predicted wh: {b_real_wh}\n')
+                print(f'\nb target xy: {b_task_xy.numpy()}')
+                print(f'b predicted xy: {b_real_xy.numpy()}')
+                print(f'b target wh: {b_task_wh.numpy()}')
+                print(f'b predicted wh: {b_real_wh.numpy()}\n')
 
                 # Calculate loss on real images.
                 b_xy_loss = tf.reduce_sum(tf.where(
