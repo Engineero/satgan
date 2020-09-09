@@ -24,6 +24,10 @@ from yolo_v3 import build_yolo_model, load_yolo_model_weights
 from tensorflow_addons.activations import mish
 
 
+# Enable eager execution.
+tf.compat.v1.enable_eager_execution()
+
+
 def preprocess(image, add_noise=False):
     """Performs image standardization, optinoally adds Gaussian noise.
 
