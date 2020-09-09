@@ -824,16 +824,18 @@ def main(a):
     with tf.device(f'/device:GPU:{a.devices[-1]}'):
         with tf.name_scope('task_loss'):
             def calc_iou(targets, outputs):
-                y_a = tf.maximum(targets[..., 0], outputs[..., 0])
-                x_a = tf.maximum(targets[..., 1], outputs[..., 1])
-                y_b = tf.minimum(targets[..., 2], outputs[..., 2])
-                x_b = tf.minimum(targets[..., 3], outputs[..., 3])
+                oxy_min = outputs[..., :2] - outputs[..., 2:4]/2.
+                oxy_max = outputs[..., :2] + outputs[..., 2:4]/2.
+                y_a = tf.maximum(targets[..., 0], oxy_min[..., 0])
+                x_a = tf.maximum(targets[..., 1], oxy_min[..., 1])
+                y_b = tf.minimum(targets[..., 2], oxy_max[..., 0])
+                x_b = tf.minimum(targets[..., 3], oxy_max[..., 1])
                 intersection = tf.maximum(x_b - x_a + 1., 0.) * \
                                tf.maximum(y_b - y_a + 1., 0.)
                 target_area = (targets[..., 2] - targets[..., 0] + 1.) * \
                               (targets[..., 3] - targets[..., 1] + 1.)
-                output_area = (outputs[..., 2] - outputs[..., 0] + 1.) * \
-                              (outputs[..., 3] - outputs[..., 1] + 1.)
+                output_area = (oxy_max[..., 0] - oxy_min[..., 0] + 1.) * \
+                              (oxy_max[..., 1] - oxy_min[..., 1] + 1.)
                 union = target_area + output_area - intersection
                 return 1. - intersection / union
 
