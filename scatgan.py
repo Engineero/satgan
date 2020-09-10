@@ -560,6 +560,9 @@ def create_model(a, train_data):
     b_task_targets = Input(b_task_targets_shape)
 
     if a.checkpoint is not None:
+        if a.activation == 'mish':
+            # Take care of lazy init for tf-addons class.
+            loss = mish(0.)
         checkpoint_path = Path(a.checkpoint).resolve()
         generator = load_model(checkpoint_path / 'generator')
         print(f'Generator model summary:\n{generator.summary()}')
