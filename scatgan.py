@@ -545,6 +545,7 @@ def create_task_net(a, input_shape):
 
 
 def create_model(a, train_data):
+        
     (inputs, noise, targets), (_, a_task_targets, b_task_targets) = \
         next(iter(train_data))
     input_shape = inputs.shape.as_list()[1:]  # don't give Input the batch dim
@@ -558,69 +559,77 @@ def create_model(a, train_data):
     a_task_targets = Input(a_task_targets_shape)
     b_task_targets = Input(b_task_targets_shape)
 
-    with tf.device(f'/device:GPU:{a.devices[0]}'):
-        # Create the generator.
-        with tf.name_scope("generator"):
-            out_channels = target_shape[-1]
-            generator = create_generator(a, input_shape, out_channels)
-            print(f'Generator model summary:\n{generator.summary()}')
-            gen_noise = generator(noise)
-            fake_img = gen_noise + inputs
-            gen_outputs = tf.stack([fake_img, gen_noise], axis=0,
-                                   name='generator')
+    if a.checkpoint is not None:
+        checkpoint_path = Path(a.checkpoint).resolve()
+        generator = load_model(checkpoint_path / 'generator')
+        print(f'Generator model summary:\n{generator.summary()}')
+        model = load_model(checkpoint_path / 'full_model')
+        task_net = None
 
-        # Create two copies of discriminator, one for real pairs and one for
-        # fake pairs they share the same underlying variables.
-        with tf.name_scope("discriminator"):
-            # TODO (NLT): figure out discriminator loss, interaction with Keras changes.
-            discriminator = create_discriminator(a, target_shape)
-            print(f'Discriminator model summary\n:{discriminator.summary()}')
-            predict_real = discriminator(targets)  # should -> [0, 1]
-            predict_fake = discriminator(fake_img)  # should -> [1, 0]
-            discrim_outputs = tf.stack([predict_real, predict_fake], axis=0,
-                                       name='discriminator')
+    else:
+        with tf.device(f'/device:GPU:{a.devices[0]}'):
+            # Create the generator.
+            with tf.name_scope("generator"):
+                out_channels = target_shape[-1]
+                generator = create_generator(a, input_shape, out_channels)
+                print(f'Generator model summary:\n{generator.summary()}')
+                gen_noise = generator(noise)
+                fake_img = gen_noise + inputs
+                gen_outputs = tf.stack([fake_img, gen_noise], axis=0,
+                                       name='generator')
 
-    # Create two copies of the task network, one for real images (targets
-    # input to this method) and one for generated images (outputs from
-    # generator). The task targets (detected objects) should be the same for
-    # both.
-    with tf.device(f'/device:GPU:{a.devices[-1]}'):
-        with tf.name_scope('task_net'):
-            if a.use_yolo:
-                task_net, _, _ = build_yolo_model(
-                    base_model_name=a.base_model_name,
-                    is_recurrent=a.is_recurrent,
-                    num_predictor_heads=a.num_pred_layers,
-                    max_inferences_per_image=a.max_inferences,
-                    max_bbox_overlap=a.max_bbox_overlap,
-                    confidence_threshold=a.confidence_threshold,
-                )
-                task_net = load_yolo_model_weights(task_net,
-                                                   a.checkpoint_load_path)
-                task_net._set_inputs(targets)
-                if a.freeze_task:
-                    for layer in task_net.get_layer('functional_5').layers:
-                        print(f'Freezing task net functional 5 layer {layer}.')
-                        layer.trainable = False
-            else:
-                task_net = create_task_net(a, input_shape)
-            pred_task = task_net(targets)
-            pred_task_fake = task_net(fake_img)
-            pred_task_noise = task_net(gen_noise)
-        print(f'Task Net model summary:\n{task_net.summary()}')
-        task_outputs = tf.stack([pred_task, pred_task_fake, pred_task_noise],
-                                axis=0,
-                                name='task_net')
+            # Create two copies of discriminator, one for real pairs and one for
+            # fake pairs they share the same underlying variables.
+            with tf.name_scope("discriminator"):
+                # TODO (NLT): figure out discriminator loss, interaction with Keras changes.
+                discriminator = create_discriminator(a, target_shape)
+                print(f'Discriminator model summary\n:{discriminator.summary()}')
+                predict_real = discriminator(targets)  # should -> [0, 1]
+                predict_fake = discriminator(fake_img)  # should -> [1, 0]
+                discrim_outputs = tf.stack([predict_real, predict_fake], axis=0,
+                                           name='discriminator')
 
-    model = Model(inputs=[inputs, noise, targets],
+        # Create two copies of the task network, one for real images (targets
+        # input to this method) and one for generated images (outputs from
+        # generator). The task targets (detected objects) should be the same for
+        # both.
+        with tf.device(f'/device:GPU:{a.devices[-1]}'):
+            with tf.name_scope('task_net'):
+                if a.use_yolo:
+                    task_net, _, _ = build_yolo_model(
+                        base_model_name=a.base_model_name,
+                        is_recurrent=a.is_recurrent,
+                        num_predictor_heads=a.num_pred_layers,
+                        max_inferences_per_image=a.max_inferences,
+                        max_bbox_overlap=a.max_bbox_overlap,
+                        confidence_threshold=a.confidence_threshold,
+                    )
+                    task_net = load_yolo_model_weights(task_net,
+                                                       a.checkpoint_load_path)
+                    task_net._set_inputs(targets)
+                    if a.freeze_task:
+                        for layer in task_net.get_layer('functional_5').layers:
+                            print(f'Freezing task net functional 5 layer {layer}.')
+                            layer.trainable = False
+                else:
+                    task_net = create_task_net(a, input_shape)
+                pred_task = task_net(targets)
+                pred_task_fake = task_net(fake_img)
+                pred_task_noise = task_net(gen_noise)
+            print(f'Task Net model summary:\n{task_net.summary()}')
+            task_outputs = tf.stack([pred_task, pred_task_fake, pred_task_noise],
+                                    axis=0,
+                                    name='task_net')
+
+        model = Model(inputs=[inputs, noise, targets],
                   outputs=[gen_outputs, discrim_outputs, task_outputs])
 
-    # Plot the sub-models and overall model.
-    if a.plot_models:
-        plot_model(generator, to_file='plots/generator.svg')
-        plot_model(task_net, to_file='plots/task_net.svg')
-        plot_model(discriminator, to_file='plots/discriminator.svg')
-        plot_model(model, to_file='plots/full_model.svg')
+        # Plot the sub-models and overall model.
+        if a.plot_models:
+            plot_model(generator, to_file='plots/generator.svg')
+            plot_model(task_net, to_file='plots/task_net.svg')
+            plot_model(discriminator, to_file='plots/discriminator.svg')
+            plot_model(model, to_file='plots/full_model.svg')
 
     # Return the model. We'll define losses and a training loop back in the
     # main function.
@@ -1171,18 +1180,18 @@ def main(a):
                     # calculate that from YOLO.
                     a_true_bboxes = a_task_targets[..., :4]
                     b_true_bboxes = b_task_targets[..., :4]
-                    a_fake_bboxes = a_detects[..., :4]
-                    b_fake_bboxes = b_detects[..., :4]
-                    n_fake_bboxes = n_detects[..., :4]
-                    # a_fake_min = a_detects[..., :2] - a_detects[..., 2:4] / 2.
-                    # a_fake_max = a_detects[..., :2] + a_detects[..., 2:4] / 2.
-                    # b_fake_min = b_detects[..., :2] - b_detects[..., 2:4] / 2.
-                    # b_fake_max = b_detects[..., :2] + b_detects[..., 2:4] / 2.
-                    # n_fake_min = n_detects[..., :2] - n_detects[..., 2:4] / 2.
-                    # n_fake_max = n_detects[..., :2] + n_detects[..., 2:4] / 2.
-                    # a_fake_bboxes = tf.concat([a_fake_min, a_fake_max], axis=-1)
-                    # b_fake_bboxes = tf.concat([b_fake_min, b_fake_max], axis=-1)
-                    # n_fake_bboxes = tf.concat([n_fake_min, n_fake_max], axis=-1)
+                    # a_fake_bboxes = a_detects[..., :4]
+                    # b_fake_bboxes = b_detects[..., :4]
+                    # n_fake_bboxes = n_detects[..., :4]
+                    a_fake_min = a_detects[..., :2] - a_detects[..., 2:4] / 2.
+                    a_fake_max = a_detects[..., :2] + a_detects[..., 2:4] / 2.
+                    b_fake_min = b_detects[..., :2] - b_detects[..., 2:4] / 2.
+                    b_fake_max = b_detects[..., :2] + b_detects[..., 2:4] / 2.
+                    n_fake_min = n_detects[..., :2] - n_detects[..., 2:4] / 2.
+                    n_fake_max = n_detects[..., :2] + n_detects[..., 2:4] / 2.
+                    a_fake_bboxes = tf.concat([a_fake_min, a_fake_max], axis=-1)
+                    b_fake_bboxes = tf.concat([b_fake_min, b_fake_max], axis=-1)
+                    n_fake_bboxes = tf.concat([n_fake_min, n_fake_max], axis=-1)
 
                     print(f'\nb target boxes: {b_true_bboxes}')
                     print(f'b predicted boxes: {b_fake_bboxes}')
