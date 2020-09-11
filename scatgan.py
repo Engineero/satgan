@@ -878,8 +878,8 @@ def main(a):
                 b_output_class = task_outputs[0][..., -a.num_classes:]
                 a_output_class = task_outputs[1][..., -a.num_classes:]
                 n_output_class = task_outputs[2][..., -a.num_classes:]
-                a_bool_mask = (a_task_targets[..., -1] != 0)
-                b_bool_mask = (b_task_targets[..., -1] != 0)
+                a_bool_mask = (a_task_targets[..., -1] == 0)  # True = no object
+                b_bool_mask = (b_task_targets[..., -1] == 0)
                 a_object_target = tf.cast(tf.stack([a_bool_mask,
                                                     tf.logical_not(a_bool_mask)],
                                                    axis=-1),
