@@ -545,7 +545,7 @@ def create_task_net(a, input_shape):
 
 
 def create_model(a, train_data):
-        
+
     (inputs, noise, targets), (_, a_task_targets, b_task_targets) = \
         next(iter(train_data))
     input_shape = inputs.shape.as_list()[1:]  # don't give Input the batch dim
@@ -1193,8 +1193,8 @@ def main(a):
                     b_fake_bboxes = tf.concat([b_fake_min, b_fake_max], axis=-1)
                     n_fake_bboxes = tf.concat([n_fake_min, n_fake_max], axis=-1)
 
-                    print(f'\nb target boxes: {b_true_bboxes}')
-                    print(f'b predicted boxes: {b_fake_bboxes}')
+                    # print(f'\nb target boxes: {b_true_bboxes}')
+                    # print(f'b predicted boxes: {b_fake_bboxes}')
 
                     # Add bounding boxes to sample images.
                     target_bboxes = tf.image.draw_bounding_boxes(
