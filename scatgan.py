@@ -609,7 +609,7 @@ def create_model(a, train_data):
                     )
                     task_net = load_yolo_model_weights(task_net,
                                                        a.checkpoint_load_path)
-                    task_net._set_inputs(targets)
+                    # task_net._set_inputs(targets)
                     if a.freeze_task:
                         for layer in task_net.get_layer('functional_5').layers:
                             print(f'Freezing task net functional 5 layer {layer}.')
