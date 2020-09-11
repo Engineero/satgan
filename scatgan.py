@@ -875,9 +875,15 @@ def main(a):
                                             axis=-1)
 
                 # Grab class outputs.
-                b_output_class = task_outputs[0][..., -a.num_classes:]
-                a_output_class = task_outputs[1][..., -a.num_classes:]
-                n_output_class = task_outputs[2][..., -a.num_classes:]
+                b_output_class = tf.stack([1. - task_outputs[0][..., -1],
+                                           task_outputs[0][..., -1]],
+                                           axis=-1)
+                a_output_class = tf.stack([1. - task_outputs[1][..., -1],
+                                           task_outputs[1][..., -1]],
+                                           axis=-1)
+                n_output_class = tf.stack([1. - task_outputs[2][..., -1],
+                                           task_outputs[2][..., -1]],
+                                           axis=-1)
                 a_bool_mask = (a_task_targets[..., -1] == 0)  # True = no object
                 b_bool_mask = (b_task_targets[..., -1] == 0)
                 a_object_target = tf.cast(tf.stack([a_bool_mask,
@@ -894,14 +900,14 @@ def main(a):
                 a_task_xy = a_task_targets[..., :2] + a_task_wh/2.
                 b_task_wh = b_task_targets[..., 2:4] - b_task_targets[..., :2]
                 b_task_xy = b_task_targets[..., :2] + b_task_wh/2.
-                # a_real_wh = task_outputs[1][..., 2:4] - task_outputs[1][..., :2]
-                # a_real_xy = task_outputs[1][..., :2] + a_real_wh/2.
-                # b_real_wh = task_outputs[0][..., 2:4] - task_outputs[0][..., :2]
-                # b_real_xy = task_outputs[0][..., :2] + b_real_wh/2.
-                a_real_wh = task_outputs[1][..., 2:4]
-                a_real_xy = task_outputs[1][..., :2]
-                b_real_wh = task_outputs[0][..., 2:4]
-                b_real_xy = task_outputs[0][..., :2]
+                a_real_wh = task_outputs[1][..., 2:4] - task_outputs[1][..., :2]
+                a_real_xy = task_outputs[1][..., :2] + a_real_wh/2.
+                b_real_wh = task_outputs[0][..., 2:4] - task_outputs[0][..., :2]
+                b_real_xy = task_outputs[0][..., :2] + b_real_wh/2.
+                # a_real_wh = task_outputs[1][..., 2:4]
+                # a_real_xy = task_outputs[1][..., :2]
+                # b_real_wh = task_outputs[0][..., 2:4]
+                # b_real_xy = task_outputs[0][..., :2]
                 a_iou_outputs = task_outputs[1]
                 b_iou_outputs = task_outputs[0]
 
@@ -1154,19 +1160,18 @@ def main(a):
                     b_detects = task_outputs[0]
                     a_detects = task_outputs[1]
                     n_detects = task_outputs[2]
-                    print(f'\nB detects: {b_detects}\n')
                     b_mask = tf.tile(
-                        tf.expand_dims(b_detects[..., -a.num_classes-2] > a.obj_threshold,
+                        tf.expand_dims(b_detects[..., -2] > a.obj_threshold,
                                        axis=-1),
                         [1, 1, b_detects.shape[-1]]
                     )
                     a_mask = tf.tile(
-                        tf.expand_dims(a_detects[..., -a.num_classes-2] > a.obj_threshold,
+                        tf.expand_dims(a_detects[..., -2] > a.obj_threshold,
                                        axis=-1),
                         [1, 1, a_detects.shape[-1]]
                     )
                     n_mask = tf.tile(
-                        tf.expand_dims(n_detects[..., -a.num_classes-2] > a.obj_threshold,
+                        tf.expand_dims(n_detects[..., -2] > a.obj_threshold,
                                        axis=-1),
                         [1, 1, n_detects.shape[-1]]
                     )
@@ -1184,21 +1189,18 @@ def main(a):
                     # calculate that from YOLO.
                     a_true_bboxes = a_task_targets[..., :4]
                     b_true_bboxes = b_task_targets[..., :4]
-                    # a_fake_bboxes = a_detects[..., :4]
-                    # b_fake_bboxes = b_detects[..., :4]
-                    # n_fake_bboxes = n_detects[..., :4]
-                    a_fake_min = a_detects[..., :2] - a_detects[..., 2:4] / 2.
-                    a_fake_max = a_detects[..., :2] + a_detects[..., 2:4] / 2.
-                    b_fake_min = b_detects[..., :2] - b_detects[..., 2:4] / 2.
-                    b_fake_max = b_detects[..., :2] + b_detects[..., 2:4] / 2.
-                    n_fake_min = n_detects[..., :2] - n_detects[..., 2:4] / 2.
-                    n_fake_max = n_detects[..., :2] + n_detects[..., 2:4] / 2.
-                    a_fake_bboxes = tf.concat([a_fake_min, a_fake_max], axis=-1)
-                    b_fake_bboxes = tf.concat([b_fake_min, b_fake_max], axis=-1)
-                    n_fake_bboxes = tf.concat([n_fake_min, n_fake_max], axis=-1)
-
-                    # print(f'\nb target boxes: {b_true_bboxes}')
-                    # print(f'b predicted boxes: {b_fake_bboxes}')
+                    a_fake_bboxes = a_detects[..., :4]
+                    b_fake_bboxes = b_detects[..., :4]
+                    n_fake_bboxes = n_detects[..., :4]
+                    # a_fake_min = a_detects[..., :2] - a_detects[..., 2:4] / 2.
+                    # a_fake_max = a_detects[..., :2] + a_detects[..., 2:4] / 2.
+                    # b_fake_min = b_detects[..., :2] - b_detects[..., 2:4] / 2.
+                    # b_fake_max = b_detects[..., :2] + b_detects[..., 2:4] / 2.
+                    # n_fake_min = n_detects[..., :2] - n_detects[..., 2:4] / 2.
+                    # n_fake_max = n_detects[..., :2] + n_detects[..., 2:4] / 2.
+                    # a_fake_bboxes = tf.concat([a_fake_min, a_fake_max], axis=-1)
+                    # b_fake_bboxes = tf.concat([b_fake_min, b_fake_max], axis=-1)
+                    # n_fake_bboxes = tf.concat([n_fake_min, n_fake_max], axis=-1)
 
                     # Add bounding boxes to sample images.
                     target_bboxes = tf.image.draw_bounding_boxes(
