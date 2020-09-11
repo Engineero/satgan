@@ -838,16 +838,16 @@ def main(a):
             def calc_iou(targets, outputs):
                 oxy_min = outputs[..., :2] - outputs[..., 2:4]/2.
                 oxy_max = outputs[..., :2] + outputs[..., 2:4]/2.
-                y_a = tf.maximum(targets[..., 0], oxy_min[..., 0])
-                x_a = tf.maximum(targets[..., 1], oxy_min[..., 1])
-                y_b = tf.minimum(targets[..., 2], oxy_max[..., 0])
-                x_b = tf.minimum(targets[..., 3], oxy_max[..., 1])
+                y_a = tf.maximum(targets[..., 0], outputs[..., 0])
+                x_a = tf.maximum(targets[..., 1], outputs[..., 1])
+                y_b = tf.minimum(targets[..., 2], outputs[..., 2])
+                x_b = tf.minimum(targets[..., 3], outputs[..., 3])
                 intersection = tf.maximum(x_b - x_a + 1., 0.) * \
                                tf.maximum(y_b - y_a + 1., 0.)
                 target_area = (targets[..., 2] - targets[..., 0] + 1.) * \
                               (targets[..., 3] - targets[..., 1] + 1.)
-                output_area = (oxy_max[..., 0] - oxy_min[..., 0] + 1.) * \
-                              (oxy_max[..., 1] - oxy_min[..., 1] + 1.)
+                output_area = (outputs[..., 2] - outputs[..., 0] + 1.) * \
+                              (outputs[..., 3] - outputs[..., 1] + 1.)
                 union = target_area + output_area - intersection
                 return 1. - intersection / union
 
@@ -875,23 +875,17 @@ def main(a):
                                             axis=-1)
 
                 # Grab class outputs.
-                b_output_class = tf.stack([1. - task_outputs[0][..., -1],
-                                           task_outputs[0][..., -1]],
-                                           axis=-1)
-                a_output_class = tf.stack([1. - task_outputs[1][..., -1],
-                                           task_outputs[1][..., -1]],
-                                           axis=-1)
-                n_output_class = tf.stack([1. - task_outputs[2][..., -1],
-                                           task_outputs[2][..., -1]],
-                                           axis=-1)
-                a_bool_mask = (a_task_targets[..., -1] != 0)
+                b_output_class = task_outputs[0][..., -a.num_classes:]
+                a_output_class = task_outputs[1][..., -a.num_classes:]
+                n_output_class = task_outputs[2][..., -a.num_classes:]
+                a_bool_mask = (a_task_targets[..., -1] != 0)  # true objects
                 b_bool_mask = (b_task_targets[..., -1] != 0)
-                a_object_target = tf.cast(tf.stack([a_bool_mask,
-                                                    tf.logical_not(a_bool_mask)],
+                a_object_target = tf.cast(tf.stack([tf.logical_not(a_bool_mask),
+                                                    a_bool_mask],
                                                    axis=-1),
                                           dtype=tf.int32)
-                b_object_target = tf.cast(tf.stack([b_bool_mask,
-                                                    tf.logical_not(b_bool_mask)],
+                b_object_target = tf.cast(tf.stack([tf.logical_not(b_bool_mask),
+                                                    b_bool_mask],
                                                    axis=-1),
                                           dtype=tf.int32)
 
@@ -1161,17 +1155,17 @@ def main(a):
                     a_detects = task_outputs[1]
                     n_detects = task_outputs[2]
                     b_mask = tf.tile(
-                        tf.expand_dims(b_detects[..., 4] > a.obj_threshold,
+                        tf.expand_dims(b_detects[..., -1] > a.obj_threshold,
                                        axis=-1),
                         [1, 1, b_detects.shape[-1]]
                     )
                     a_mask = tf.tile(
-                        tf.expand_dims(a_detects[..., 4] > a.obj_threshold,
+                        tf.expand_dims(a_detects[..., -1] > a.obj_threshold,
                                        axis=-1),
                         [1, 1, a_detects.shape[-1]]
                     )
                     n_mask = tf.tile(
-                        tf.expand_dims(n_detects[..., 4] > a.obj_threshold,
+                        tf.expand_dims(n_detects[..., -1] > a.obj_threshold,
                                        axis=-1),
                         [1, 1, n_detects.shape[-1]]
                     )
