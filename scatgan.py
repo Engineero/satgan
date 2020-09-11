@@ -884,8 +884,8 @@ def main(a):
                 n_output_class = tf.stack([1. - task_outputs[2][..., -1],
                                            task_outputs[2][..., -1]],
                                            axis=-1)
-                a_bool_mask = (a_task_targets[..., -1] == 0)  # True = no object
-                b_bool_mask = (b_task_targets[..., -1] == 0)
+                a_bool_mask = (a_task_targets[..., -1] != 0)
+                b_bool_mask = (b_task_targets[..., -1] != 0)
                 a_object_target = tf.cast(tf.stack([a_bool_mask,
                                                     tf.logical_not(a_bool_mask)],
                                                    axis=-1),
@@ -1161,17 +1161,17 @@ def main(a):
                     a_detects = task_outputs[1]
                     n_detects = task_outputs[2]
                     b_mask = tf.tile(
-                        tf.expand_dims(b_detects[..., -2] > a.obj_threshold,
+                        tf.expand_dims(b_detects[..., 4] > a.obj_threshold,
                                        axis=-1),
                         [1, 1, b_detects.shape[-1]]
                     )
                     a_mask = tf.tile(
-                        tf.expand_dims(a_detects[..., -2] > a.obj_threshold,
+                        tf.expand_dims(a_detects[..., 4] > a.obj_threshold,
                                        axis=-1),
                         [1, 1, a_detects.shape[-1]]
                     )
                     n_mask = tf.tile(
-                        tf.expand_dims(n_detects[..., -2] > a.obj_threshold,
+                        tf.expand_dims(n_detects[..., 4] > a.obj_threshold,
                                        axis=-1),
                         [1, 1, n_detects.shape[-1]]
                     )
