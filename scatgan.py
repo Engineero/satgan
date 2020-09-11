@@ -1154,18 +1154,19 @@ def main(a):
                     b_detects = task_outputs[0]
                     a_detects = task_outputs[1]
                     n_detects = task_outputs[2]
+                    print(f'\nB detects: {b_detects}\n')
                     b_mask = tf.tile(
-                        tf.expand_dims(b_detects[..., -a.num_classes-1] > a.obj_threshold,
+                        tf.expand_dims(b_detects[..., -a.num_classes-2] > a.obj_threshold,
                                        axis=-1),
                         [1, 1, b_detects.shape[-1]]
                     )
                     a_mask = tf.tile(
-                        tf.expand_dims(a_detects[..., -a.num_classes-1] > a.obj_threshold,
+                        tf.expand_dims(a_detects[..., -a.num_classes-2] > a.obj_threshold,
                                        axis=-1),
                         [1, 1, a_detects.shape[-1]]
                     )
                     n_mask = tf.tile(
-                        tf.expand_dims(n_detects[..., -a.num_classes-1] > a.obj_threshold,
+                        tf.expand_dims(n_detects[..., -a.num_classes-2] > a.obj_threshold,
                                        axis=-1),
                         [1, 1, n_detects.shape[-1]]
                     )
