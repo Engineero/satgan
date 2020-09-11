@@ -114,10 +114,10 @@ def _parse_example(serialized_example, a):
     # Parse images and preprocess.
     a_image = tf.sparse.to_dense(example['a_raw'], default_value='')
     a_image = tf.io.decode_raw(a_image, tf.uint16)
-    a_image = tf.reshape(a_image, [-1, a_height[0], a_width[0], 1])
+    a_image = tf.reshape(a_image, [-1, a_height[0], a_width[0], a.n_channels])
     b_image = tf.sparse.to_dense(example['b_raw'], default_value='')
     b_image = tf.io.decode_raw(b_image, tf.uint16)
-    b_image = tf.reshape(b_image, [-1, b_height[0], b_width[0], 1])
+    b_image = tf.reshape(b_image, [-1, b_height[0], b_width[0], a.n_channels])
 
     # Package things up for output.
     a_objects = tf.stack([a_ymin, a_xmin, a_ymax, a_xmax, a_classes], axis=-1)
