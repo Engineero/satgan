@@ -560,6 +560,9 @@ def create_model(a, train_data):
     b_task_targets = Input(b_task_targets_shape)
 
     if a.checkpoint is not None:
+        if a.activation == 'mish':
+            # Take care of lazy init for tf-addons class.
+            loss = mish(0.)
         checkpoint_path = Path(a.checkpoint).resolve()
         generator = load_model(checkpoint_path / 'generator')
         print(f'Generator model summary:\n{generator.summary()}')
@@ -875,8 +878,8 @@ def main(a):
                 b_output_class = task_outputs[0][..., -a.num_classes:]
                 a_output_class = task_outputs[1][..., -a.num_classes:]
                 n_output_class = task_outputs[2][..., -a.num_classes:]
-                a_bool_mask = (a_task_targets[..., -1] != 0)
-                b_bool_mask = (b_task_targets[..., -1] != 0)
+                a_bool_mask = (a_task_targets[..., -1] == 0)  # True = no object
+                b_bool_mask = (b_task_targets[..., -1] == 0)
                 a_object_target = tf.cast(tf.stack([a_bool_mask,
                                                     tf.logical_not(a_bool_mask)],
                                                    axis=-1),
