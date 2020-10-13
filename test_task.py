@@ -45,7 +45,7 @@ def main(a):
 
     # Build the model.
     model, _, _ = create_model(a, train_data)
-    print(f'Overall model summary:\n{model.summary()}')
+    model.summary()
 
     # Train the model.
     batches_seen = tf.Variable(0, dtype=tf.int64)
