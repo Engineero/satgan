@@ -1,4 +1,4 @@
-from ..utils import ops
+from utils import ops
 
 import tensorflow as tf
 from tensorflow.keras.layers import MaxPooling2D

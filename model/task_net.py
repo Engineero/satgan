@@ -1,7 +1,7 @@
 """Defines the task network."""
 
 
-from ..utils.darknet import build_darknet_model
+from utils.darknet import build_darknet_model
 
 import tensorflow as tf
 from tensorflow.keras.layers import Conv2D, GlobalAveragePooling2D
