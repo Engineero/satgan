@@ -189,7 +189,7 @@ def calc_iou(targets, outputs):
         union = target_area + output_area - intersection
         return 1. - intersection / union
 
-@tf.function
+# @tf.function
 def calc_task_loss(a, model_inputs, model_outputs, step, val=False,
                    **kwargs):
     with tf.device(f'/device:GPU:{a.devices[-1]}'):
