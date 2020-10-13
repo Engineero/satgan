@@ -48,7 +48,7 @@ def main(a):
 
     # Build the model.
     model, generator, _ = create_model(a, train_data)
-    print(f'Overall model summary:\n{model.summary()}')
+    model.summary()
 
     # Define the optimizer, losses, and weights.
     if a.multi_optim:

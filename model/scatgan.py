@@ -95,7 +95,8 @@ def create_model(a, train_data):
                                     name='task_net')
 
         model = Model(inputs=[inputs, noise, targets],
-                      outputs=[gen_outputs, discrim_outputs, task_outputs])
+                      outputs=[gen_outputs, discrim_outputs, task_outputs],
+                      name='scatgan')
 
         # Plot the sub-models and overall model.
         if a.plot_models:
