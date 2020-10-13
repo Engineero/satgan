@@ -56,17 +56,13 @@ def main(a):
         print(f'Starting testing...')
         epoch_start = time.time()
 
-        for batch_num, batch in enumerate(train_data):
+        for _, batch in enumerate(train_data):
             # Save summary images, statistics.
             print(f'Writing outputs for test batch...')
             (inputs, noise, targets), (_, a_task_targets, b_task_targets) = batch
             gen_outputs, discrim_outputs, task_outputs = model(
                 [inputs, noise, targets]
             )
-            model_inputs = (inputs, targets, a_task_targets,
-                            b_task_targets, noise)
-            model_outputs = (gen_outputs, discrim_outputs,
-                             task_outputs)
 
             tf.summary.image(
                 name='Fake image',
