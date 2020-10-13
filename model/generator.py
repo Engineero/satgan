@@ -1,4 +1,4 @@
-from utils import ops
+from .utils import ops
 from .attention import google_attention
 
 import tensorflow as tf
