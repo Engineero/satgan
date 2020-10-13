@@ -7,10 +7,6 @@ from tensorflow.keras.models import Model
 from tensorflow_addons.activations import mish
 
 
-# Enable eager execution.
-tf.compat.v1.enable_eager_execution()
-
-
 def create_discriminator(a, target_shape):
     """Creates the discriminator network.
 

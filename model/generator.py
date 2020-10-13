@@ -9,10 +9,6 @@ from tensorflow.keras.models import Model
 from tensorflow_addons.activations import mish
 
 
-# Enable eager execution.
-tf.compat.v1.enable_eager_execution()
-
-
 def create_generator(a, input_shape, generator_outputs_channels):
     """Creates the generator network.
 

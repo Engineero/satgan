@@ -13,10 +13,6 @@ from tensorflow.keras.utils import plot_model
 from yolo_v3 import build_yolo_model, load_yolo_model_weights
 
 
-# Enable eager execution.
-tf.compat.v1.enable_eager_execution()
-
-
 def create_model(a, train_data):
 
     (inputs, noise, targets), (_, a_task_targets, b_task_targets) = \

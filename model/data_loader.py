@@ -6,10 +6,6 @@ from pathlib import Path
 import tensorflow as tf
 
 
-# Enable eager execution.
-tf.compat.v1.enable_eager_execution()
-
-
 def _preprocess(image, add_noise=False):
     """Performs image standardization, optinoally adds Gaussian noise.
 

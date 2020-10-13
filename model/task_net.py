@@ -9,10 +9,6 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.regularizers import l1_l2
 
 
-# Enable eager execution.
-tf.compat.v1.enable_eager_execution()
-
-
 def create_task_net(a, input_shape):
     """Creates the task network.
 

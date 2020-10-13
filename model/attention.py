@@ -4,10 +4,6 @@ import tensorflow as tf
 from tensorflow.keras.layers import MaxPooling2D
 
 
-# Enable eager execution.
-tf.compat.v1.enable_eager_execution()
-
-
 def google_attention(x, filters, sn=False, scope='attention'):
     with tf.name_scope(scope):
         _, height, width, num_channels = x.get_shape().as_list()
