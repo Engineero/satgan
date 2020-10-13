@@ -2,8 +2,7 @@ from .utils import ops
 from .attention import google_attention
 
 import tensorflow as tf
-from tensorflow.keras.layers import Input, BatchNormalization
-from tensorflow.keras.activations import LeakyReLU
+from tensorflow.keras.layers import Input, BatchNormalization, LeakyReLU
 from tensorflow.keras.models import Model
 from tensorflow_addons.activations import mish
 

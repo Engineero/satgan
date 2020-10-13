@@ -3,8 +3,8 @@ from .attention import google_attention
 
 import tensorflow as tf
 from tensorflow.keras.layers import (Input, Concatenate, BatchNormalization,
-                                     Dropout)
-from tensorflow.keras.activations import tanh, LeakyReLU
+                                     Dropout, LeakyReLU)
+from tensorflow.keras.activations import tanh
 from tensorflow.keras.models import Model
 from tensorflow_addons.activations import mish
 
