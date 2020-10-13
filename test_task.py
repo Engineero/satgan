@@ -63,7 +63,8 @@ def main(a):
             gen_outputs, discrim_outputs, task_outputs = model(
                 [inputs, noise, targets]
             )
-            print(f'Discriminator outputs:\n{discrim_outputs}')
+
+            # Print raw task outputs.
             print(f'Task net outputs:\n{task_outputs}')
 
             tf.summary.image(
