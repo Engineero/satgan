@@ -8,7 +8,8 @@ from .task_net import create_task_net
 from pathlib import Path
 import tensorflow as tf
 from tensorflow.keras.layers import Input
-from tensorflow.keras.models import Model, plot_model, load_model
+from tensorflow.keras.models import Model, load_model
+from tensorflow.keras.utils import plot_model
 from yolo_v3 import build_yolo_model, load_yolo_model_weights
 
 
