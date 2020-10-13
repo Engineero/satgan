@@ -20,6 +20,7 @@ def _preprocess(image, add_noise=False):
         Image shifted to zero mean and unit standard deviation with optional
             Gaussian noise added.
     """
+
     with tf.name_scope("preprocess"):
         image = tf.cast(image, tf.float32)
         result = tf.image.per_image_standardization(image)
@@ -32,6 +33,7 @@ def _preprocess(image, add_noise=False):
 
 def _parse_example(serialized_example, a):
     """Parses a single TFRecord Example for the task network."""
+
     # Parse serialized example.
     example = tf.io.parse_example(
         serialized_example,
@@ -124,6 +126,8 @@ def _parse_example(serialized_example, a):
 
 
 def load_examples(a):
+    """Create dataset pipelines."""
+
     # Create data queue from training dataset.
     if a.train_dir is None or not Path(a.train_dir).resolve().is_dir():
         raise NotADirectoryError(
