@@ -186,19 +186,6 @@ def main(a):
                 step=batches_seen,
             )
 
-            # Compute batch losses.
-            total_loss, discrim_loss, gen_loss, task_loss = \
-                compute_total_loss(a,
-                                   model_inputs,
-                                   model_outputs,
-                                   batches_seen,
-                                   return_all=True)
-            print(f'Batch {batch_num} performance\n',
-                  f'total loss: {total_loss:.4f}\t',
-                  f'discriminator loss: {discrim_loss:.4f}\t',
-                  f'generator loss: {gen_loss:.4f}\t',
-                  f'task loss: {task_loss:.4f}\t')
-
             batches_seen.assign_add(1)
             writer.flush()
             break
@@ -224,30 +211,17 @@ if __name__ == '__main__':
         default=None,
         help="Path to folder containing TFRecords testing files."
     )
-    parser.add_argument("--mode", required=True,
-                        choices=["train", "test", "export"])
     parser.add_argument("--output_dir", required=True,
                         help="where to put output files")
     parser.add_argument("--tensorboard_dir", default=None,
                         help="Directory where tensorboard files are written.")
-    parser.add_argument("--seed", type=int)
     parser.add_argument(
         "--checkpoint",
         default=None,
         help="directory with checkpoint to resume training from or use for testing"
     )
-    parser.add_argument("--max_steps", type=int, default=0,
-                        help="number of training steps (0 to disable)")
-    parser.add_argument("--max_epochs", type=int, default=100,
-                        help="number of training epochs")
-    parser.add_argument("--summary_freq", type=int, default=100,
-                        help="Update summaries every summary_freq steps")
     parser.add_argument("--separable_conv", action="store_true",
                         help="use separable convolutions in the generator")
-    parser.add_argument("--aspect_ratio", type=float, default=1.0,
-                        help="aspect ratio of output images (width/height)")
-    parser.add_argument("--lab_colorization", action="store_true",
-                        help="split input image into brightness (A) and color (B)")
     parser.add_argument("--batch_size", type=int, default=1,
                         help="number of images in batch")
     parser.add_argument("--which_direction", type=str, default="AtoB",
