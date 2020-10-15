@@ -15,18 +15,14 @@ from yolo_v3 import build_yolo_model, load_yolo_model_weights
 
 def create_model(a, train_data):
 
-    (inputs, noise, targets), (_, a_task_targets, b_task_targets) = \
+    (inputs, noise, targets), (_, _, _) = \
         next(iter(train_data))
     input_shape = inputs.shape.as_list()[1:]  # don't give Input the batch dim
     noise_shape = noise.shape.as_list()[1:]
     target_shape = targets.shape.as_list()[1:]
-    a_task_targets_shape = a_task_targets.shape.as_list()[1:]
-    b_task_targets_shape = b_task_targets.shape.as_list()[1:]
     inputs = Input(input_shape)
     noise = Input(noise_shape)
     targets = Input(target_shape)
-    a_task_targets = Input(a_task_targets_shape)
-    b_task_targets = Input(b_task_targets_shape)
 
     if a.checkpoint is not None:
         if a.activation == 'mish':
