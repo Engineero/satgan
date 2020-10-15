@@ -218,16 +218,16 @@ def calc_task_loss(a, model_inputs, model_outputs, step, val=False,
             b_output_class = task_outputs[0][..., -a.num_classes:]
             a_output_class = task_outputs[1][..., -a.num_classes:]
             n_output_class = task_outputs[2][..., -a.num_classes:]
-            a_bool_mask = (a_task_targets[..., -1] != 0)  # true objects
-            b_bool_mask = (b_task_targets[..., -1] != 0)
-            a_object_target = tf.cast(tf.stack([tf.logical_not(a_bool_mask),
-                                                a_bool_mask],
-                                               axis=-1),
-                                      dtype=tf.int32)
-            b_object_target = tf.cast(tf.stack([tf.logical_not(b_bool_mask),
-                                                b_bool_mask],
-                                               axis=-1),
-                                      dtype=tf.int32)
+            a_bool_mask = (a_task_targets[..., -1] > 0.)  # true objects
+            b_bool_mask = (b_task_targets[..., -1] > 0.)
+            # a_object_target = tf.cast(tf.stack([tf.logical_not(a_bool_mask),
+            #                                     a_bool_mask],
+            #                                    axis=-1),
+            #                           dtype=tf.int32)
+            # b_object_target = tf.cast(tf.stack([tf.logical_not(b_bool_mask),
+            #                                     b_bool_mask],
+            #                                    axis=-1),
+            #                           dtype=tf.int32)
 
             # Grab/calculate yolo/custom network outputs.
             a_task_wh = a_task_targets[..., 2:4] - a_task_targets[..., :2]
