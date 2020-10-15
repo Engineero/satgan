@@ -2,6 +2,7 @@
 
 
 import tensorflow as tf
+import numpy as np
 
 
 def plot_summaries(a, model_inputs, model_outputs, batches_seen):
