@@ -202,16 +202,16 @@ def calc_task_loss(a, model_inputs, model_outputs, step, val=False,
             a_task_targets = model_inputs[2]  # input's objects
             b_task_targets = model_inputs[3]  # target's objects
             task_outputs = model_outputs[2]
-            a_target_classes = tf.one_hot(tf.cast(a_task_targets[..., -1],
+            a_target_classes = tf.one_hot(tf.cast(1 - a_task_targets[..., -1],
                                                   tf.int32),
                                           a.num_classes)
-            b_target_classes = tf.one_hot(tf.cast(b_task_targets[..., -1],
+            b_target_classes = tf.one_hot(tf.cast(1 - b_task_targets[..., -1],
                                                   tf.int32),
                                           a.num_classes)
             # Create noise target classes (should be no objects).
             targets_ones = tf.ones_like(a_task_targets[..., -1])
             targets_zeros = tf.zeros_like(a_task_targets[..., -1])
-            n_target_classes = tf.stack([targets_ones, targets_zeros],
+            n_target_classes = tf.stack([targets_zeros, targets_ones],
                                         axis=-1)
 
             # Grab class outputs.
