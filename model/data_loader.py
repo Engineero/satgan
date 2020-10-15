@@ -86,18 +86,18 @@ def _parse_example(serialized_example, a):
     b_classes = tf.cast(tf.sparse.to_dense(example['b_classes']), tf.float32)
 
     # Calculate bounding boxes for A images (SatSim makes really tight boxes).
-    a_xmin = a_xcenter - (10. / tf.cast(a_width[0], tf.float32))
-    a_xmax = a_xcenter + (10. / tf.cast(a_width[0], tf.float32))
-    a_ymin = a_ycenter - (10. / tf.cast(a_height[0], tf.float32))
-    a_ymax = a_ycenter + (10. / tf.cast(a_height[0], tf.float32))
+    a_xmin = a_xcenter - (10. / tf.cast(a_width, tf.float32))
+    a_xmax = a_xcenter + (10. / tf.cast(a_width, tf.float32))
+    a_ymin = a_ycenter - (10. / tf.cast(a_height, tf.float32))
+    a_ymax = a_ycenter + (10. / tf.cast(a_height, tf.float32))
 
     # Parse images and preprocess.
     a_image = tf.sparse.to_dense(example['a_raw'], default_value='')
     a_image = tf.io.decode_raw(a_image, tf.uint16)
-    a_image = tf.reshape(a_image, [a_height[0], a_width[0], a.n_channels])
+    a_image = tf.reshape(a_image, [a_height, a_width, a.n_channels])
     b_image = tf.sparse.to_dense(example['b_raw'], default_value='')
     b_image = tf.io.decode_raw(b_image, tf.uint16)
-    b_image = tf.reshape(b_image, [b_height[0], b_width[0], a.n_channels])
+    b_image = tf.reshape(b_image, [b_height, b_width, a.n_channels])
 
     # Package things up for output.
     a_objects = tf.stack([a_ymin, a_xmin, a_ymax, a_xmax, a_classes], axis=-1)
@@ -108,11 +108,11 @@ def _parse_example(serialized_example, a):
     a_paddings = tf.constant([[0, a.max_inferences], [0, 0]])
     a_paddings = a_paddings - (tf.constant([[0, 1], [0, 0]]) * tf.shape(a_objects)[0])
     a_objects = tf.pad(tensor=a_objects, paddings=a_paddings, constant_values=0.)
-    a_objects = tf.tile(a_objects, [1, a.num_pred_layers, 1])
+    a_objects = tf.tile(a_objects, [a.num_pred_layers, 1])
     b_paddings = tf.constant([[0, a.max_inferences], [0, 0]])
     b_paddings = b_paddings - (tf.constant([[0, 1], [0, 0]]) * tf.shape(b_objects)[0])
     b_objects = tf.pad(tensor=b_objects, paddings=b_paddings, constant_values=0.)
-    b_objects = tf.tile(b_objects, [1, a.num_pred_layers, 1])
+    b_objects = tf.tile(b_objects, [a.num_pred_layers, 1])
 
     # task_targets = (objects, width, height)
     if a.which_direction == 'AtoB':
