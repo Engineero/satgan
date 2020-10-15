@@ -15,6 +15,7 @@ from model.scatgan import create_model
 from model.losses import (compute_total_loss, compute_apply_gradients,
                           calc_discriminator_loss, calc_generator_loss,
                           calc_task_loss)
+from model.utils.plot_summaries import plot_summaries
 
 
 # Enable eager execution.
@@ -90,133 +91,9 @@ def main(a):
                     model_outputs = (gen_outputs, discrim_outputs,
                                      task_outputs)
 
-                    tf.summary.image(
-                        name='Fake image',
-                        data=gen_outputs[0],
-                        step=batches_seen,
-                    )
-                    tf.summary.image(
-                        name='Generated noise',
-                        data=gen_outputs[1],
-                        step=batches_seen,
-                    )
-                    tf.summary.image(
-                        name='A image',
-                        data=inputs,
-                        step=batches_seen,
-                    )
-                    tf.summary.image(
-                        name='Input noise',
-                        data=noise,
-                        step=batches_seen,
-                    )
-                    tf.summary.image(
-                        name='B image',
-                        data=targets,
-                        step=batches_seen,
-                    )
-                    tf.summary.image(
-                        name='Predict real map',
-                        data=tf.expand_dims(discrim_outputs[0][..., 1],
-                                            axis=-1),
-                        step=batches_seen,
-                    )
-                    tf.summary.image(
-                        name='Predict fake map',
-                        data=tf.expand_dims(discrim_outputs[1][..., 0],
-                                            axis=-1),
-                        step=batches_seen,
-                    )
-
-                    # Create object bboxes and summarize task outputs, targets.
-                    b_detects = task_outputs[0]
-                    a_detects = task_outputs[1]
-                    n_detects = task_outputs[2]
-                    b_mask = tf.tile(
-                        tf.expand_dims(b_detects[..., -1] > a.obj_threshold,
-                                       axis=-1),
-                        [1, 1, b_detects.shape[-1]]
-                    )
-                    a_mask = tf.tile(
-                        tf.expand_dims(a_detects[..., -1] > a.obj_threshold,
-                                       axis=-1),
-                        [1, 1, a_detects.shape[-1]]
-                    )
-                    n_mask = tf.tile(
-                        tf.expand_dims(n_detects[..., -1] > a.obj_threshold,
-                                       axis=-1),
-                        [1, 1, n_detects.shape[-1]]
-                    )
-                    b_detects = tf.where(b_mask,
-                                         b_detects,
-                                         tf.zeros_like(b_detects))
-                    a_detects = tf.where(a_mask,
-                                         a_detects,
-                                         tf.zeros_like(a_detects))
-                    n_detects = tf.where(n_mask,
-                                         n_detects,
-                                         tf.zeros_like(n_detects))
-
-                    # Bounding boxes are [ymin, xmin, ymax, xmax]. Need to
-                    # calculate that from YOLO.
-                    a_true_bboxes = a_task_targets[..., :4]
-                    b_true_bboxes = b_task_targets[..., :4]
-                    a_fake_bboxes = a_detects[..., :4]
-                    b_fake_bboxes = b_detects[..., :4]
-                    n_fake_bboxes = n_detects[..., :4]
-                    # a_fake_min = a_detects[..., :2] - a_detects[..., 2:4] / 2.
-                    # a_fake_max = a_detects[..., :2] + a_detects[..., 2:4] / 2.
-                    # b_fake_min = b_detects[..., :2] - b_detects[..., 2:4] / 2.
-                    # b_fake_max = b_detects[..., :2] + b_detects[..., 2:4] / 2.
-                    # n_fake_min = n_detects[..., :2] - n_detects[..., 2:4] / 2.
-                    # n_fake_max = n_detects[..., :2] + n_detects[..., 2:4] / 2.
-                    # a_fake_bboxes = tf.concat([a_fake_min, a_fake_max], axis=-1)
-                    # b_fake_bboxes = tf.concat([b_fake_min, b_fake_max], axis=-1)
-                    # n_fake_bboxes = tf.concat([n_fake_min, n_fake_max], axis=-1)
-
-                    # Add bounding boxes to sample images.
-                    target_bboxes = tf.image.draw_bounding_boxes(
-                        images=tf.image.grayscale_to_rgb(targets),
-                        boxes=b_true_bboxes,
-                        colors=np.array([[1., 0., 0.]])
-                    )
-                    target_bboxes = tf.image.draw_bounding_boxes(
-                        images=target_bboxes,
-                        boxes=b_fake_bboxes,
-                        colors=np.array([[0., 1., 0.]])
-                    )
-                    generated_bboxes = tf.image.draw_bounding_boxes(
-                        images=tf.image.grayscale_to_rgb(gen_outputs[0]),
-                        boxes=a_true_bboxes,
-                        colors=np.array([[1., 0., 0.]])
-                    )
-                    generated_bboxes = tf.image.draw_bounding_boxes(
-                        images=generated_bboxes,
-                        boxes=a_fake_bboxes,
-                        colors=np.array([[0., 1., 0.]])
-                    )
-                    noise_bboxes = tf.image.draw_bounding_boxes(
-                        images=tf.image.grayscale_to_rgb(gen_outputs[1]),
-                        boxes=n_fake_bboxes,
-                        colors=np.array([[0., 1., 0.]])
-                    )
-
-                    # Save task outputs.
-                    tf.summary.image(
-                        name='Task output on A domain',
-                        data=generated_bboxes,
-                        step=batches_seen,
-                    )
-                    tf.summary.image(
-                        name='Task output on B domain',
-                        data=target_bboxes,
-                        step=batches_seen,
-                    )
-                    tf.summary.image(
-                        name='Task output on gen noise',
-                        data=noise_bboxes,
-                        step=batches_seen,
-                    )
+                    # Plot all of the summary images.
+                    plot_summaries(a, model_inputs, model_outputs,
+                                   batches_seen)
 
                     # Compute batch losses.
                     total_loss, discrim_loss, gen_loss, task_loss = \
