@@ -66,6 +66,10 @@ def main(a):
 
             # Print raw task outputs.
             print(f'Task net outputs:\n{task_outputs}')
+            print(f'\nA target classes:\n{a_task_targets[..., -1]}')
+            print(f'\nA predicted classes:\n{task_outputs[1, ..., -1]}')
+            print(f'\nB target classes:\n{a_task_targets[..., -1]}')
+            print(f'\nB predicted classes:\n{task_outputs[0, ..., -1]}')
 
             tf.summary.image(
                 name='Fake image',
