@@ -86,10 +86,10 @@ def _parse_example(serialized_example, a):
     b_classes = tf.cast(tf.sparse.to_dense(example['b_classes']), tf.float32)
 
     # Calculate bounding boxes for A images (SatSim makes really tight boxes).
-    a_xmin = a_xcenter - 10. / tf.cast(a_width[0], tf.float32)
-    a_xmax = a_xcenter + 10. / tf.cast(a_width[0], tf.float32)
-    a_ymin = a_ycenter - 10. / tf.cast(a_height[0], tf.float32)
-    a_ymax = a_ycenter + 10. / tf.cast(a_height[0], tf.float32)
+    a_xmin = a_xcenter - (10. / tf.cast(a_width[0], tf.float32))
+    a_xmax = a_xcenter + (10. / tf.cast(a_width[0], tf.float32))
+    a_ymin = a_ycenter - (10. / tf.cast(a_height[0], tf.float32))
+    a_ymax = a_ycenter + (10. / tf.cast(a_height[0], tf.float32))
 
     # Parse images and preprocess.
     a_image = tf.sparse.to_dense(example['a_raw'], default_value='')
