@@ -35,7 +35,7 @@ def _parse_example(serialized_example, a):
     """Parses a single TFRecord Example for the task network."""
 
     # Parse serialized example.
-    example = tf.io.parse_example(
+    example = tf.io.parse_single_example(
         serialized_example,
         {
             'a_raw': tf.io.VarLenFeature(dtype=tf.string),
@@ -94,10 +94,10 @@ def _parse_example(serialized_example, a):
     # Parse images and preprocess.
     a_image = tf.sparse.to_dense(example['a_raw'], default_value='')
     a_image = tf.io.decode_raw(a_image, tf.uint16)
-    a_image = tf.reshape(a_image, [-1, a_height[0], a_width[0], a.n_channels])
+    a_image = tf.reshape(a_image, [a_height[0], a_width[0], a.n_channels])
     b_image = tf.sparse.to_dense(example['b_raw'], default_value='')
     b_image = tf.io.decode_raw(b_image, tf.uint16)
-    b_image = tf.reshape(b_image, [-1, b_height[0], b_width[0], a.n_channels])
+    b_image = tf.reshape(b_image, [b_height[0], b_width[0], a.n_channels])
 
     # Package things up for output.
     a_objects = tf.stack([a_ymin, a_xmin, a_ymax, a_xmax, a_classes], axis=-1)
@@ -105,12 +105,12 @@ def _parse_example(serialized_example, a):
 
     # Need to pad objects to max inferences (not all images will have same
     # number of objects).
-    a_paddings = tf.constant([[0, 0], [0, a.max_inferences], [0, 0]])
-    a_paddings = a_paddings - (tf.constant([[0, 0], [0, 1], [0, 0]]) * tf.shape(a_objects)[1])
+    a_paddings = tf.constant([[0, a.max_inferences], [0, 0]])
+    a_paddings = a_paddings - (tf.constant([[0, 1], [0, 0]]) * tf.shape(a_objects)[0])
     a_objects = tf.pad(tensor=a_objects, paddings=a_paddings, constant_values=0.)
     a_objects = tf.tile(a_objects, [1, a.num_pred_layers, 1])
-    b_paddings = tf.constant([[0, 0], [0, a.max_inferences], [0, 0]])
-    b_paddings = b_paddings - (tf.constant([[0, 0], [0, 1], [0, 0]]) * tf.shape(b_objects)[1])
+    b_paddings = tf.constant([[0, a.max_inferences], [0, 0]])
+    b_paddings = b_paddings - (tf.constant([[0, 1], [0, 0]]) * tf.shape(b_objects)[0])
     b_objects = tf.pad(tensor=b_objects, paddings=b_paddings, constant_values=0.)
     b_objects = tf.tile(b_objects, [1, a.num_pred_layers, 1])
 
@@ -175,19 +175,19 @@ def load_examples(a):
 
     # Specify transformations on datasets.
     train_data = train_data.shuffle(a.buffer_size)
-    train_data = train_data.batch(a.batch_size, drop_remainder=True)
     train_data = train_data.map(
         lambda x: _parse_example(x, a)
     )
+    train_data = train_data.batch(a.batch_size, drop_remainder=True)
 
-    valid_data = valid_data.batch(a.batch_size, drop_remainder=True)
     valid_data = valid_data.map(
         lambda x: _parse_example(x, a)
     )
+    valid_data = valid_data.batch(a.batch_size, drop_remainder=True)
 
     if a.test_dir is not None:
-        test_data = test_data.batch(a.batch_size, drop_remainder=True)
         test_data = test_data.map(
             lambda x: _parse_example(x, a)
         )
+        test_data = test_data.batch(a.batch_size, drop_remainder=True)
     return train_data, valid_data, test_data
