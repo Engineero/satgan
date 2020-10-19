@@ -79,7 +79,7 @@ def _check_args(args):
         output_dir.mkdir(parents=True)
     path_list = [a_dir, b_dir, a_annotation_dir, b_annotation_dir]
     for path in path_list:
-        if not path.glob('*'):
+        if path is not None and not path.glob('*'):
             raise ValueError(f'Path {path} is empty!')
 
 
@@ -166,7 +166,7 @@ def _partition_examples(examples, splits_dict):
 
 def _parse_annotations(annotations, pad_amount=0., skip_empty=False):
     """Parses annotation file data into features.
-    
+
     Args:
         annotations: annotation file contents.
 
@@ -202,10 +202,10 @@ def _parse_annotations(annotations, pad_amount=0., skip_empty=False):
 
 def _serialize_example(example, pad_for_satsim=False, skip_empty=False):
     """Builds a TFRecords Example object from the example data.
-    
+
     Args:
         example: example structure with (a_path, b_path, annotation_path).
-        
+
     Keyword Args:
         pad_for_satsim: whether to pad images for satsim. Default is False.
         skip_empty: whether to skip frames with no object. Default is False.
@@ -233,7 +233,7 @@ def _serialize_example(example, pad_for_satsim=False, skip_empty=False):
     # Load raw image data.
     a_data = _read_fits(a_path)
     b_data = _read_fits(b_path)
-    
+
     # Create the features for this example
     features = {
         'a_raw': _bytes_feature([a_data.tostring()]),
@@ -299,7 +299,7 @@ def make_tf_records(args):
     for name, examples in partitions.items():
         print(f'Writing partition "{name}" with {len(examples)} examples...')
         partition_dir = output_dir / name
-        partition_dir.mkdir()
+        partition_dir.mkdir(parents=True)
         groups, num_groups = _group_list(examples, args.group_size)
         for i, example_group in tqdm(enumerate(groups), total=num_groups):
             tfrecords_name = f'{args.output_name}_{name}_{i}.tfrecords'
@@ -309,7 +309,7 @@ def make_tf_records(args):
                     # Make sure it's not empty.
                     if example:
                         tf_example = _serialize_example(
-                            example, 
+                            example,
                             skip_empty=args.skip_empty
                         )
                         if tf_example is not None:
@@ -320,10 +320,10 @@ def make_tf_records(args):
 def _serialize_example_one_domain(example, pad_for_satsim=False,
                                   skip_empty=False, generator=None):
     """Builds a TFRecords Example object from the example data.
-    
+
     Args:
         example: example structure with (a_path, b_path, annotation_path).
-        
+
     Keyword Args:
         pad_for_satsim: whether to pad images for satsim. Default is False.
         skip_empty: whether to skip frames with no object. Default is False.
@@ -350,12 +350,15 @@ def _serialize_example_one_domain(example, pad_for_satsim=False,
     a_filtered = a_data
     if generator is not None:
         image = tf.cast(a_data, dtype=tf.float32)
+        image = tf.expand_dims(image, axis=-1)
         image = tf.image.per_image_standardization(image)
-        noise = tf.random.normal(shape=tf.shape(a_data), mean=0.0,
-                                 stddev=1.0, dtype=tf.float32)
-        a_filtered = image + generator(noise)
+        noise = tf.random.normal(shape=tf.shape(image), mean=0.0, stddev=1.0,
+                                 dtype=tf.float32)
+        gen_noise = generator(tf.expand_dims(noise, axis=0))
+        a_filtered = image + tf.squeeze(gen_noise, axis=0)
+        a_filtered = a_filtered.numpy()
         # a_filtered = tf.cast(a_filtered, dtype=tf.uin16)
-    
+
     # Create the features for this example
     features = {
         'images_original': _bytes_feature([a_data.tostring()]),
@@ -378,12 +381,12 @@ def _serialize_example_one_domain(example, pad_for_satsim=False,
 
 def make_filtered_tf_records(args):
     """Make TFRecords files from images and annotations.
-    
+
     Args:
         dataset: DataSet object representing source data.
         generator: generator model used to filter source data.
         output_dir: directory to which to save
-        
+
     """
     a_dir = Path(args.a_dir).resolve()
     a_annotation_dir = Path(args.a_annotation_dir).resolve()
@@ -402,7 +405,7 @@ def make_filtered_tf_records(args):
     for name, examples in partitions.items():
         print(f'Writing partition "{name}" with {len(examples)} examples...')
         partition_dir = output_dir / name
-        partition_dir.mkdir()
+        partition_dir.mkdir(parents=True)
         groups, num_groups = _group_list(examples, args.group_size)
         for i, example_group in tqdm(enumerate(groups), total=num_groups):
             tfrecords_name = f'{args.output_name}_{name}_{i}.tfrecords'
@@ -412,7 +415,7 @@ def make_filtered_tf_records(args):
                     # Make sure it's not empty.
                     if example:
                         tf_example = _serialize_example_one_domain(
-                            example, 
+                            example,
                             skip_empty=args.skip_empty,
                             generator=generator,
                         )
@@ -445,4 +448,7 @@ if __name__ == '__main__':
                         help='Path to generator for use in creating images.')
     args = parser.parse_args()
     _check_args(args)
-    make_tf_records(args)
+    if args.generator_path is not None:
+        make_filtered_tf_records(args)
+    else:
+        make_tf_records(args)
