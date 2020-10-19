@@ -6,6 +6,8 @@ Author: Nathan L. Toner
 
 
 import tensorflow as tf
+from tensorflow.keras.models import load_model
+from tensorflow_addons.activations import mish
 import numpy as np
 import argparse
 import json
@@ -26,7 +28,18 @@ def _check_args(args):
         ValueError if any other directory *is* empty.
     """
     a_dir = Path(args.a_dir).resolve()
-    b_dir = Path(args.b_dir).resolve()
+    if args.b_dir is not None:
+        b_dir = Path(args.b_dir).resolve()
+    elif args.generator_path is None:
+        raise ValueError(
+            'Either B domain data or generator must be provided!'
+        )
+    else:
+        b_dir = None
+    if args.generator_path is not None:
+        generator_path = Path(args.generator_path).resolve()
+    else:
+        generator_path = None
     if args.a_annotation_dir is not None:
         a_annotation_dir = Path(args.a_annotation_dir).resolve()
     else:
@@ -38,7 +51,7 @@ def _check_args(args):
     output_dir = Path(args.output_dir).resolve()
     if not a_dir.is_dir():
         raise NotADirectoryError(f'Path A {args.a_dir} is not a directory!')
-    if not b_dir.is_dir():
+    if b_dir is not None and not b_dir.is_dir():
         raise NotADirectoryError(f'Path B {args.b_dir} is not a directory!')
     if a_annotation_dir is None and b_annotation_dir is None:
         raise ValueError(
@@ -51,6 +64,10 @@ def _check_args(args):
     if b_annotation_dir is not None and not b_annotation_dir.is_dir():
         raise NotADirectoryError(
             f'Annotation path A {args.b_annotation_dir} is not a directory!'
+        )
+    if generator_path is not None and not generator_path.is_dir():
+        raise NotADirectoryError(
+            f'Generator path {args.generator_path} is not a directory!'
         )
     if output_dir.is_dir():
         try:
@@ -332,10 +349,12 @@ def _serialize_example_one_domain(example, pad_for_satsim=False,
     a_data = _read_fits(a_path)
     a_filtered = a_data
     if generator is not None:
+        image = tf.cast(a_data, dtype=tf.float32)
+        image = tf.image.per_image_standardization(image)
         noise = tf.random.normal(shape=tf.shape(a_data), mean=0.0,
                                  stddev=1.0, dtype=tf.float32)
-        a_filtered = tf.cast(a_data, dtype=tf.float32) + generator(noise)
-        a_filtered = tf.cast(a_filtered, dtype=tf.uin16)
+        a_filtered = image + generator(noise)
+        # a_filtered = tf.cast(a_filtered, dtype=tf.uin16)
     
     # Create the features for this example
     features = {
@@ -357,7 +376,7 @@ def _serialize_example_one_domain(example, pad_for_satsim=False,
     return tf.train.Example(features=tf.train.Features(feature=features))
 
 
-def make_filtered_tf_records(dataset, generator, output_dir):
+def make_filtered_tf_records(args):
     """Make TFRecords files from images and annotations.
     
     Args:
@@ -366,7 +385,14 @@ def make_filtered_tf_records(dataset, generator, output_dir):
         output_dir: directory to which to save
         
     """
-    output_dir = Path(output_dir).resolve()
+    a_dir = Path(args.a_dir).resolve()
+    a_annotation_dir = Path(args.a_annotation_dir).resolve()
+    output_dir = Path(args.output_dir).resolve()
+    generator_path = Path(args.generator_path).resolve()
+    _ = mish(0.)  # take care of lazy mish init.
+    generator = load_model(generator_path)
+    a_paths = sorted(a_dir.glob('**/*.fits'))
+    a_annotation_paths = sorted(a_annotation_dir.glob('**/Annotations/*.json'))
     examples = []
     for a_path, a_annotation in zip(a_paths, a_annotation_paths):
         examples.append((a_path, a_annotation))
@@ -415,6 +441,8 @@ if __name__ == '__main__':
                         help='Name prepended to output TFRecords files.')
     parser.add_argument('--skip_empty', default=False, action='store_true',
                         help='Whether to skip empty frames in dataset.')
+    parser.add_argument('--generator_path', type=str, default=None,
+                        help='Path to generator for use in creating images.')
     args = parser.parse_args()
     _check_args(args)
     make_tf_records(args)
