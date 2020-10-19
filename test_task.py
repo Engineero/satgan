@@ -6,7 +6,6 @@ import tensorflow as tf
 import numpy as np
 import argparse
 from pathlib import Path
-from tensorflow.keras.models import load_model
 from model.data_loader import load_examples
 from model.scatgan import create_model
 from model.losses import (compute_total_loss, compute_apply_gradients,
