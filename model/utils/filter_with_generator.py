@@ -5,8 +5,6 @@ Author: Nathan L. Toner
 """
 
 
-import tensorflow as tf
-from tensorflow.keras.models import load_model
 import numpy as np
 import argparse
 import json
@@ -14,6 +12,9 @@ from pathlib import Path
 from astropy.io import fits
 from itertools import zip_longest
 from tqdm import tqdm
+import tensorflow as tf
+from tensorflow.keras.models import load_model
+from tensorflow_addons.activations import mish
 
 
 def _check_args(args):
@@ -228,6 +229,7 @@ def make_tf_records(args):
     a_dir = Path(args.data_dir).resolve()
     a_annotation_dir = Path(args.annotation_dir).resolve()
     output_dir = Path(args.output_dir).resolve()
+    _ = mish(0.)  # take care of lazy mish init.
     generator = load_model(Path(args.generator_path))
     a_paths = sorted(a_dir.glob('**/*.fits'))
     a_annotation_paths = sorted(a_annotation_dir.glob('**/Annotations/*.json'))
