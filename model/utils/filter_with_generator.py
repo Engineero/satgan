@@ -202,7 +202,10 @@ def _serialize_example(example, pad_for_satsim=False, skip_empty=False,
 
     # Load raw image data.
     a_data = _read_fits(a_path)
-    a_filtered = generator(a_data)
+    noise = tf.random.normal(shape=tf.shape(a_data), mean=0.0,
+                             stddev=1.0, dtype=tf.float32)
+    a_filtered = tf.cast(a_data, dtype=tf.float32) + generator(noise)
+    a_filtered = tf.cast(a_filtered, dtype=tf.uin16)
     
     # Create the features for this example
     features = {
