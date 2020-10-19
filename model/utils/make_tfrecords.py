@@ -300,6 +300,101 @@ def make_tf_records(args):
     print('Done!')
 
 
+def _serialize_example_one_domain(example, pad_for_satsim=False,
+                                  skip_empty=False, generator=None):
+    """Builds a TFRecords Example object from the example data.
+    
+    Args:
+        example: example structure with (a_path, b_path, annotation_path).
+        
+    Keyword Args:
+        pad_for_satsim: whether to pad images for satsim. Default is False.
+        skip_empty: whether to skip frames with no object. Default is False.
+        generator: generator model used to filter inputs.
+    """
+
+    # Handle satsim offsets.
+    if pad_for_satsim:
+        pad_amount = 0.02
+    else:
+        pad_amount = 0.00
+
+    # Load annotation data.
+    (a_path, a_annotation) = example
+    with open(a_annotation, 'r') as fp:
+        a_annotations = json.load(fp)['data']
+
+    # Parse annotation data.
+    (a_class_id, a_y_min, a_y_max, a_y_center, a_x_min, a_x_max, a_x_center, a_magnitude,
+     a_path_name) = _parse_annotations(a_annotations, pad_amount, skip_empty)
+
+    # Load raw image data.
+    a_data = _read_fits(a_path)
+    a_filtered = a_data
+    if generator is not None:
+        noise = tf.random.normal(shape=tf.shape(a_data), mean=0.0,
+                                 stddev=1.0, dtype=tf.float32)
+        a_filtered = tf.cast(a_data, dtype=tf.float32) + generator(noise)
+        a_filtered = tf.cast(a_filtered, dtype=tf.uin16)
+    
+    # Create the features for this example
+    features = {
+        'images_original': _bytes_feature([a_data.tostring()]),
+        'images_raw': _bytes_feature([a_filtered.tostring()]),
+        'filename': _bytes_feature([a_path_name.encode()]),
+        'height': _int64_feature([a_annotations['sensor']['height']]),
+        'width': _int64_feature([a_annotations['sensor']['width']]),
+        'classes': _int64_feature(a_class_id),
+        'ymin': _float_feature(a_y_min),
+        'ymax': _float_feature(a_y_max),
+        'ycenter': _float_feature(a_y_center),
+        'xmin': _float_feature(a_x_min),
+        'xmax': _float_feature(a_x_max),
+        'xcenter': _float_feature(a_x_center),
+        'magnitude': _float_feature(a_magnitude),
+    }
+    # Create an example protocol buffer
+    return tf.train.Example(features=tf.train.Features(feature=features))
+
+
+def make_filtered_tf_records(dataset, generator, output_dir):
+    """Make TFRecords files from images and annotations.
+    
+    Args:
+        dataset: DataSet object representing source data.
+        generator: generator model used to filter source data.
+        output_dir: directory to which to save
+        
+    """
+    output_dir = Path(output_dir).resolve()
+    examples = []
+    for a_path, a_annotation in zip(a_paths, a_annotation_paths):
+        examples.append((a_path, a_annotation))
+    splits_dict = {'train': 0.8, 'valid': 0.1, 'test': 0.1}
+    partitions = _partition_examples(examples, splits_dict)
+    # Make TFRecords from partitions.
+    for name, examples in partitions.items():
+        print(f'Writing partition "{name}" with {len(examples)} examples...')
+        partition_dir = output_dir / name
+        partition_dir.mkdir()
+        groups, num_groups = _group_list(examples, args.group_size)
+        for i, example_group in tqdm(enumerate(groups), total=num_groups):
+            tfrecords_name = f'{args.output_name}_{name}_{i}.tfrecords'
+            output_path = partition_dir / tfrecords_name
+            with tf.io.TFRecordWriter(output_path.as_posix()) as writer:
+                for example in example_group:
+                    # Make sure it's not empty.
+                    if example:
+                        tf_example = _serialize_example_one_domain(
+                            example, 
+                            skip_empty=args.skip_empty,
+                            generator=generator,
+                        )
+                        if tf_example is not None:
+                            writer.write(tf_example.SerializeToString())
+    print('Done!')
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Generate TFRecords files from FITS images.'
