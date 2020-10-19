@@ -388,6 +388,21 @@ def make_filtered_tf_records(args):
         output_dir: directory to which to save
 
     """
+
+    # Set the visible devices to those specified:
+    physical_devices = tf.config.list_physical_devices('GPU')
+    used_devices = [physical_devices[i] for i in args.devices]
+    try:
+        # Specify enabled GPUs.
+        tf.config.set_visible_devices(used_devices, 'GPU')
+        logical_devices = tf.config.list_logical_devices('GPU')
+        print(f'{len(physical_devices)} physical GPUs,',
+              f'{len(logical_devices)} logical GPUs.')
+    except:
+        # Invalid device or cannot modify virtual devices once initialized.
+        print(f'{len(physical_devices)} physical GPUs.',
+              'Could not set visible devices!')
+
     a_dir = Path(args.a_dir).resolve()
     a_annotation_dir = Path(args.a_annotation_dir).resolve()
     output_dir = Path(args.output_dir).resolve()
@@ -446,6 +461,8 @@ if __name__ == '__main__':
                         help='Whether to skip empty frames in dataset.')
     parser.add_argument('--generator_path', type=str, default=None,
                         help='Path to generator for use in creating images.')
+    parser.add_argument('--devices', nargs='+', type=int,
+                        help='List of physical devices for TensorFlow to use.')
     args = parser.parse_args()
     _check_args(args)
     if args.generator_path is not None:
