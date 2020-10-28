@@ -49,7 +49,7 @@ def main(a):
                                                           a.a_train_dir,
                                                           a.a_valid_dir,
                                                           a.a_test_dir,
-                                                          pad_bboxes=True,
+                                                          # pad_bboxes=True,
                                                           add_noise=True)
 
     # Build data generators for target domain.
