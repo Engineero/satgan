@@ -21,8 +21,9 @@ def _preprocess(image, add_noise=False):
     """
 
     with tf.name_scope("preprocess"):
-        result = tf.cast(image, tf.float32)
+        result = tf.cast(image, tf.uint16)
         result = tf.image.per_image_standardization(result)
+        result = tf.cast(result, tf.float32)
         noise = None
         if add_noise:
             noise = tf.random.normal(shape=tf.shape(image), mean=0.0,
