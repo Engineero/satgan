@@ -178,14 +178,16 @@ def load_examples(a, train_dir, valid_dir, test_dir=None,
     train_data = train_data.map(
         lambda x: _parse_single_domain_example(x, a,
                                                pad_bboxes=pad_bboxes,
-                                               add_noise=add_noise)
+                                               add_noise=add_noise),
+        num_parallel_calls=a.num_parallel_calls
     )
     train_data = train_data.batch(a.batch_size, drop_remainder=True)
 
     valid_data = valid_data.map(
         lambda x: _parse_single_domain_example(x, a,
                                                pad_bboxes=pad_bboxes,
-                                               add_noise=add_noise)
+                                               add_noise=add_noise),
+        num_parallel_calls=a.num_parallel_calls
     )
     valid_data = valid_data.batch(a.batch_size, drop_remainder=True)
 
@@ -193,7 +195,8 @@ def load_examples(a, train_dir, valid_dir, test_dir=None,
         test_data = test_data.map(
             lambda x: _parse_single_domain_example(x, a,
                                                    pad_bboxes=pad_bboxes,
-                                                   add_noise=add_noise)
+                                                   add_noise=add_noise),
+            num_parallel_calls=a.num_parallel_calls
         )
         test_data = test_data.batch(a.batch_size, drop_remainder=True)
 
