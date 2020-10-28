@@ -16,9 +16,8 @@ def _preprocess(image):
     """
 
     with tf.name_scope("preprocess"):
-        result = tf.cast(image, tf.uint16)
-        result = tf.image.per_image_standardization(result)
-        result = tf.cast(result, tf.float32)
+        result = tf.image.per_image_standardization(image)
+        result = tf.image.convert_image_dtype(result, tf.float32)
         return result
 
 
