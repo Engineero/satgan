@@ -45,14 +45,16 @@ def main(a):
     writer = tf.summary.create_file_writer(tensorboard_path.as_posix())
 
     # Build data generators for source domain.
-    a_train_data, a_val_data, a_test_data = load_examples(a.a_train_dir,
+    a_train_data, a_val_data, a_test_data = load_examples(a,
+                                                          a.a_train_dir,
                                                           a.a_valid_dir,
                                                           a.a_test_dir,
                                                           pad_bboxes=True,
                                                           add_noise=True)
 
     # Build data generators for target domain.
-    b_train_data, b_val_data, b_test_data = load_examples(a.b_train_dir,
+    b_train_data, b_val_data, b_test_data = load_examples(a,
+                                                          a.b_train_dir,
                                                           a.b_valid_dir,
                                                           a.b_test_dir)
 
