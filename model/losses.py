@@ -29,7 +29,7 @@ def compute_total_loss(a, model_inputs, model_outputs, step,
         else:
             return total_loss
 
-def compute_apply_gradients(a, model, data, optimizer_list,
+def compute_apply_gradients(a, model, a_batch, b_batch, optimizer_list,
                             loss_function_list, step):
     """Computes and applies gradients with optional lists of
     optimizers and corresponding loss functions.
@@ -37,7 +37,8 @@ def compute_apply_gradients(a, model, data, optimizer_list,
     Args:
         a: arguments passed from training script call.
         model: the TF model to optimize.
-        data: data on which to train the model.
+        a_batch: source domain data on which to train the model.
+        b_batch: target domain data on which to train the model.
         optimizer_list: list of optimizers or single optimizer for
             full model.
         loss_function_list: list of loss functions or single loss
@@ -52,8 +53,8 @@ def compute_apply_gradients(a, model, data, optimizer_list,
         if not isinstance(loss_function_list, list):
             loss_function_list = [loss_function_list]
         # Parse out the batch data.
-        (inputs, noise, targets), (_, a_task_targets, b_task_targets) = \
-            data
+        (inputs, noise), a_task_targets = a_batch
+        (targets, _), b_task_targets = b_batch
         # Compute and apply gradients.
         for optimizer, loss_function in zip(optimizer_list,
                                             loss_function_list):

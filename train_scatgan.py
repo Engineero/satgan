@@ -44,11 +44,20 @@ def main(a):
     tensorboard_path.mkdir(parents=True, exist_ok=True)
     writer = tf.summary.create_file_writer(tensorboard_path.as_posix())
 
-    # Build data generators.
-    train_data, val_data, test_data = load_examples(a)
+    # Build data generators for source domain.
+    a_train_data, a_val_data, a_test_data = load_examples(a.a_train_data,
+                                                          a.a_valid_data,
+                                                          a.a_test_data,
+                                                          pad_bboxes=True,
+                                                          add_noise=True)
+
+    # Build data generators for target domain.
+    b_train_data, b_val_data, b_test_data = load_examples(a.b_train_data,
+                                                          a.b_valid_data,
+                                                          a.b_test_data)
 
     # Build the model.
-    model, generator, _ = create_model(a, train_data)
+    model, generator, _ = create_model(a, a_train_data, b_train_data)
     model.summary()
 
     # Define the optimizer, losses, and weights.
@@ -78,11 +87,13 @@ def main(a):
             print(f'Training epoch {epoch+1} of {a.max_epochs}...')
             epoch_start = time.time()
 
-            for batch_num, batch in enumerate(train_data):
+            for batch_num, a_batch, b_batch in enumerate(zip(a_train_data,
+                                                             b_train_data)):
                 # Save summary images, statistics.
                 if batch_num % a.summary_freq == 0:
                     print(f'Writing outputs for epoch {epoch+1}, batch {batch_num}.')
-                    (inputs, noise, targets), (_, a_task_targets, b_task_targets) = batch
+                    (inputs, noise), a_task_targets = a_batch
+                    (targets, _), b_task_targets = b_batch
                     gen_outputs, discrim_outputs, task_outputs = model(
                         [inputs, noise, targets]
                     )
@@ -111,7 +122,8 @@ def main(a):
                 # Update the model.
                 compute_apply_gradients(a,
                                         model,
-                                        batch,
+                                        a_batch,
+                                        b_batch,
                                         optimizer_list,
                                         loss_list,
                                         batches_seen)
@@ -124,8 +136,9 @@ def main(a):
             # Eval on validation data, save best model, early stopping...
             for m in mean_list:
                 m.reset_states()
-            for batch in val_data:
-                (inputs, noise, targets), (_, a_task_targets, b_task_targets) = batch
+            for a_batch, b_batch in zip(a_val_data, b_val_data):
+                (inputs, noise), a_task_targets = a_batch
+                (targets, _), b_task_targets = b_batch
                 gen_outputs, discrim_outputs, task_outputs = model([inputs,
                                                                     noise,
                                                                     targets])
@@ -175,8 +188,9 @@ def main(a):
             model = load_model(output_path / 'full_model')
         for m in mean_list:
             m.reset_states()
-        for batch in test_data:
-            (inputs, noise, targets), (_, a_task_targets, b_task_targets) = batch
+        for a_batch, b_batch in zip(a_test_data, b_test_data):
+            (inputs, noise), a_task_targets = a_batch
+            (targets, _), b_task_targets = b_batch
             gen_outputs, discrim_outputs, task_outputs = model([inputs,
                                                                 noise,
                                                                 targets])
@@ -204,19 +218,34 @@ def main(a):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--train_dir",
+        "--a_train_dir",
         default=None,
-        help="Path to folder containing TFRecords training files."
+        help="Path to folder containing source TFRecords training files."
     )
     parser.add_argument(
-        "--valid_dir",
+        "--a_valid_dir",
         default=None,
-        help="Path to folder containing TFRecords validation files."
+        help="Path to folder containing source TFRecords validation files."
     )
     parser.add_argument(
-        "--test_dir",
+        "--a_test_dir",
         default=None,
-        help="Path to folder containing TFRecords testing files."
+        help="Path to folder containing source TFRecords testing files."
+    )
+    parser.add_argument(
+        "--b_train_dir",
+        default=None,
+        help="Path to folder containing target TFRecords training files."
+    )
+    parser.add_argument(
+        "--b_valid_dir",
+        default=None,
+        help="Path to folder containing target TFRecords validation files."
+    )
+    parser.add_argument(
+        "--b_test_dir",
+        default=None,
+        help="Path to folder containing target TFRecords testing files."
     )
     parser.add_argument("--mode", required=True,
                         choices=["train", "test", "export"])
@@ -244,8 +273,6 @@ if __name__ == '__main__':
                         help="split input image into brightness (A) and color (B)")
     parser.add_argument("--batch_size", type=int, default=1,
                         help="number of images in batch")
-    parser.add_argument("--which_direction", type=str, default="AtoB",
-                        choices=["AtoB", "BtoA"])
     parser.add_argument("--n_blocks_gen", type=int, default=8,
                         help="Number of ResNet blocks in generator. Must be even.")
     parser.add_argument("--n_layer_dsc", type=int, default=3,
