@@ -89,8 +89,8 @@ def main(a):
             print(f'Training epoch {epoch+1} of {a.max_epochs}...')
             epoch_start = time.time()
 
-            for batch_num, a_batch, b_batch in enumerate(zip(a_train_data,
-                                                             b_train_data)):
+            for batch_num, (a_batch, b_batch) in enumerate(zip(a_train_data,
+                                                               b_train_data)):
                 # Save summary images, statistics.
                 if batch_num % a.summary_freq == 0:
                     print(f'Writing outputs for epoch {epoch+1}, batch {batch_num}.')
