@@ -32,7 +32,22 @@ def _preprocess(image, add_noise=False):
 
 def _parse_single_domain_example(serialized_example, a, pad_bboxes=False,
                                  add_noise=False):
-    """Parses a single TFRecord Example for one domain of the task network."""
+    """Parses a single TFRecord Example for one domain of the task network.
+    
+    Args:
+        serialized_example: TFRecord example to load/interpret.
+        a: argparse object from training script.
+
+    Keyword Args:
+        pad_bboxes: if True, pads truth bboxes with +/-10 pix.
+        add_noise: if True, generates Gaussian noise the same size as images
+            for input to generator.
+
+    Returns:
+        Images, optional noise or None, and true bounding boxes with
+        classifications (objects) as:
+            (image, noise), objects
+    """
 
     # Parse serialized example.
     example = tf.io.parse_single_example(
@@ -88,13 +103,30 @@ def _parse_single_domain_example(serialized_example, a, pad_bboxes=False,
     objects = tf.pad(tensor=objects, paddings=paddings, constant_values=0.)
     objects = tf.tile(objects, [a.num_pred_layers, 1])
 
-    image, gen_input = _preprocess(image, add_noise=add_noise)
-    return (image, gen_input), objects
+    image, noise = _preprocess(image, add_noise=add_noise)
+    return (image, noise), objects
 
 
-def load_examples(a, train_dir, valid_dir, test_dir=None, single_domain=False,
+def load_examples(a, train_dir, valid_dir, test_dir=None,
                   pad_bboxes=False, add_noise=False):
-    """Create dataset pipelines."""
+    """Create dataset pipelines.
+    
+    Args:
+        a: argparse object from training script.
+        train_dir: path to training data.
+        valid_dir: path to validation data.
+
+    Keyword Args:
+        test_dir: path to testing data. Default is None.
+        pad_bboxes: if True, pads truth bboxes with +/-10 pix.
+        add_noise: if True, generates Gaussian noise the same size as images
+            for use as generator input.
+
+    Returns:
+        train_data: TFRecordDataset of training data.
+        valid_data: TFRecordDataset of validation data.
+        test_data: TFRecordDataset of testing data.
+    """
 
     # Create data queue from training dataset.
     if train_dir is None or not Path(train_dir).resolve().is_dir():
