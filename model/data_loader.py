@@ -5,30 +5,21 @@ from pathlib import Path
 import tensorflow as tf
 
 
-def _preprocess(image, add_noise=False):
+def _preprocess(image):
     """Performs image standardization, optinoally adds Gaussian noise.
 
     Args:
         image: the image to transform
 
-    Keyword Args:
-        add_noise: whether to add Gaussian noise to the image. Default is
-            False.
-
     Returns:
-        Image shifted to zero mean and unit standard deviation with optional
-            Gaussian noise added.
+        Image shifted to zero mean and unit standard deviation.
     """
 
     with tf.name_scope("preprocess"):
         result = tf.cast(image, tf.uint16)
         result = tf.image.per_image_standardization(result)
         result = tf.cast(result, tf.float32)
-        noise = None
-        if add_noise:
-            noise = tf.random.normal(shape=tf.shape(image), mean=0.0,
-                                     stddev=1.0, dtype=tf.float32)
-        return result, noise
+        return result
 
 
 def _parse_single_domain_example(serialized_example, a, pad_bboxes=False,
@@ -104,8 +95,8 @@ def _parse_single_domain_example(serialized_example, a, pad_bboxes=False,
     objects = tf.pad(tensor=objects, paddings=paddings, constant_values=0.)
     objects = tf.tile(objects, [a.num_pred_layers, 1])
 
-    image, noise = _preprocess(image, add_noise=add_noise)
-    return (image, noise), objects
+    image = _preprocess(image)
+    return image, objects
 
 
 def load_examples(a, train_dir, valid_dir, test_dir=None,
