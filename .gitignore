@@ -9,3 +9,4 @@ logfiles/
 .vscode/
 outputs/
 .ipynb_checkpoints/
+nohup.out
