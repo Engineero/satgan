@@ -128,6 +128,7 @@ def main(a):
                                         model,
                                         a_batch,
                                         b_batch,
+                                        noise,
                                         optimizer_list,
                                         loss_list,
                                         batches_seen)
