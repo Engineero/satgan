@@ -65,7 +65,7 @@ def main(a):
         batch_size=a.batch_size,
         num_threads=a.num_parallel_calls,
         buffer=a.buffer_size,
-        encoding_function=encoder.encode_for_yolo,
+        # encoding_function=encoder.encode_for_yolo,
     )
     a_val_data = DatasetGenerator(
         a.a_valid_dir,
@@ -75,7 +75,7 @@ def main(a):
         batch_size=a.batch_size,
         num_threads=a.num_parallel_calls,
         buffer=a.buffer_size,
-        encoding_function=encoder.encode_for_yolo,
+        # encoding_function=encoder.encode_for_yolo,
     )
     if a.a_test_dir is not None:
         a_test_data = DatasetGenerator(
@@ -86,7 +86,7 @@ def main(a):
             batch_size=a.batch_size,
             num_threads=a.num_parallel_calls,
             buffer=a.buffer_size,
-            encoding_function=encoder.encode_for_yolo,
+            # encoding_function=encoder.encode_for_yolo,
         )
 
     # a_train_data = load_examples(a, a.a_train_dir, shuffle=True,
@@ -104,7 +104,7 @@ def main(a):
         batch_size=a.batch_size,
         num_threads=a.num_parallel_calls,
         buffer=a.buffer_size,
-        encoding_function=encoder.encode_for_yolo,
+        # encoding_function=encoder.encode_for_yolo,
     )
     b_val_data = DatasetGenerator(
         a.b_valid_dir,
@@ -114,7 +114,7 @@ def main(a):
         batch_size=a.batch_size,
         num_threads=a.num_parallel_calls,
         buffer=a.buffer_size,
-        encoding_function=encoder.encode_for_yolo,
+        # encoding_function=encoder.encode_for_yolo,
     )
     if a.b_test_dir is not None:
         b_test_data = DatasetGenerator(
@@ -125,7 +125,7 @@ def main(a):
             batch_size=a.batch_size,
             num_threads=a.num_parallel_calls,
             buffer=a.buffer_size,
-            encoding_function=encoder.encode_for_yolo,
+            # encoding_function=encoder.encode_for_yolo,
         )
 
     # b_train_data = load_examples(a, a.b_train_dir, shuffle=True,
