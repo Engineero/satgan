@@ -112,9 +112,9 @@ def _parse_example(serialized_example, a, pad_bboxes=False):
     return image, objects
 
 
-def load_examples(a, data_dir, shuffle=False, pad_bboxes=False, econder=None):
+def load_examples(a, data_dir, shuffle=False, pad_bboxes=False, encoder=None):
     """Create dataset pipeline.
-    
+
     Args:
         a: argparse object from training script.
         data_dir: path to data TFRecords.
@@ -151,8 +151,10 @@ def load_examples(a, data_dir, shuffle=False, pad_bboxes=False, econder=None):
             buffer=a.buffer_size,
             # encoding_function=encoder.encode_for_yolo,
         )
-        data = data.map(_convert_batches,
-                        num_parallel_calls=a.num_parallel_calls)
+        data.dataset = data.dataset.map(
+            lambda im, box, fname:_convert_batches((im, box, fname)),
+            num_parallel_calls=a.num_parallel_calls
+        )
     else:
         data = tf.data.TFRecordDataset(
             filenames=[p.as_posix() for p in data_paths]

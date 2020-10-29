@@ -117,8 +117,6 @@ def main(a):
                     print(f'Writing outputs for epoch {epoch+1}, batch {batch_num}.')
                     inputs, a_task_targets = a_batch
                     targets, b_task_targets = b_batch
-                    inputs = tf.image.convert_image_dtype(inputs, tf.float32)
-                    targets = tf.image.convert_image_dtype(targets, tf.float32)
                     gen_outputs, discrim_outputs, task_outputs = model(
                         [inputs, noise, targets]
                     )
