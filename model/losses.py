@@ -54,8 +54,8 @@ def compute_apply_gradients(a, model, a_batch, b_batch, noise, optimizer_list,
         if not isinstance(loss_function_list, list):
             loss_function_list = [loss_function_list]
         # Parse out the batch data.
-        inputs, a_task_targets, _ = a_batch
-        targets, b_task_targets, _ = b_batch
+        inputs, a_task_targets = a_batch
+        targets, b_task_targets = b_batch
         # Compute and apply gradients.
         for optimizer, loss_function in zip(optimizer_list,
                                             loss_function_list):
