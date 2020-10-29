@@ -111,11 +111,13 @@ def main(a):
 
                     # Compute batch losses.
                     total_loss, discrim_loss, gen_loss, task_loss = \
-                        compute_total_loss(a,
-                                           model_inputs,
-                                           model_outputs,
-                                           batches_seen,
-                                           return_all=True)
+                        compute_total_loss(
+                            a,
+                            model_inputs,
+                            model_outputs,
+                            batches_seen,
+                            return_all=True
+                        )
                     print(f'Batch {batch_num} performance\n',
                           f'total loss: {total_loss:.4f}\t',
                           f'discriminator loss: {discrim_loss:.4f}\t',
@@ -123,14 +125,16 @@ def main(a):
                           f'task loss: {task_loss:.4f}\t')
 
                 # Update the model.
-                compute_apply_gradients(a,
-                                        model,
-                                        a_batch,
-                                        b_batch,
-                                        noise,
-                                        optimizer_list,
-                                        loss_list,
-                                        batches_seen)
+                compute_apply_gradients(
+                    a,
+                    model,
+                    a_batch,
+                    b_batch,
+                    noise,
+                    optimizer_list,
+                    loss_list,
+                    batches_seen
+                )
                 batches_seen.assign_add(1)
                 writer.flush()
 
@@ -152,11 +156,13 @@ def main(a):
                 model_outputs = (gen_outputs, discrim_outputs, task_outputs)
 
                 total_loss, discrim_loss, gen_loss, task_loss = \
-                    compute_total_loss(a,
-                                       model_inputs,
-                                       model_outputs,
-                                       batches_seen,
-                                       return_all=True)
+                    compute_total_loss(
+                        a,
+                        model_inputs,
+                        model_outputs,
+                        batches_seen,
+                        return_all=True
+                    )
                 for m, loss in zip(mean_list, [total_loss,
                                                discrim_loss,
                                                gen_loss,
@@ -208,11 +214,13 @@ def main(a):
                 model_outputs = (gen_outputs, discrim_outputs, task_outputs)
 
                 total_loss, discrim_loss, gen_loss, task_loss = \
-                    compute_total_loss(a,
-                                       model_inputs,
-                                       model_outputs,
-                                       batches_seen,
-                                       return_all=True)
+                    compute_total_loss(
+                        a,
+                        model_inputs,
+                        model_outputs,
+                        batches_seen,
+                        return_all=True
+                    )
                 for m, loss in zip(mean_list, [total_loss,
                                                discrim_loss,
                                                gen_loss,
