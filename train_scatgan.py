@@ -4,8 +4,7 @@ from __future__ import print_function
 
 import time
 import tensorflow as tf
-import numpy as np
-import argparse
+import numpy as np import argparse
 from pathlib import Path
 from tensorflow.keras.models import load_model
 from tensorflow.keras.optimizers import Adam
@@ -16,6 +15,8 @@ from model.losses import (compute_total_loss, compute_apply_gradients,
                           calc_discriminator_loss, calc_generator_loss,
                           calc_task_loss)
 from model.utils.plot_summaries import plot_summaries
+from miss_data_generator import DatasetGenerator
+from yolo_v3 import build_yolo_model
 
 
 # Enable eager execution.
@@ -44,22 +45,97 @@ def main(a):
     tensorboard_path.mkdir(parents=True, exist_ok=True)
     writer = tf.summary.create_file_writer(tensorboard_path.as_posix())
 
+    # Create YOLO encoder to be used in making generator.
+    _, _, encoder = build_yolo_model(
+        base_model_name=a.base_model_name,
+        is_recurrent=a.is_recurrent,
+        num_predictor_heads=a.num_pred_layers,
+        max_inferences_per_image=a.max_inferences,
+        max_bbox_overlap=a.max_bbox_overlap,
+        confidence_threshold=a.confidence_threshold,
+    )
+
     # Build data generators for source domain.
-    a_train_data = load_examples(a, a.a_train_dir, shuffle=True,
-                                 pad_bboxes=a.pad_bboxes_a)
-    a_val_data = load_examples(a, a.a_valid_dir, pad_bboxes=a.pad_bboxes_a)
+    a_train_data = DatasetGenerator(
+        a.a_train_dir,
+        parse_function=encoder.parse_data,
+        augment=False,
+        shuffle=True,
+        batch_size=a.batch_size,
+        num_threads=a.num_parallel_calls,
+        buffer=a.buffer_size,
+        encoding_function=encoder.encode_for_yolo,
+    )
+    a_val_data = DatasetGenerator(
+        a.a_valid_dir,
+        parse_function=encoder.parse_data,
+        augment=False,
+        shuffle=False,
+        batch_size=a.batch_size,
+        num_threads=a.num_parallel_calls,
+        buffer=a.buffer_size,
+        encoding_function=encoder.encode_for_yolo,
+    )
     if a.a_test_dir is not None:
-        a_test_data = load_examples(a, a.a_test_dir, pad_bboxes=a.pad_bboxes_a)
+        a_test_data = DatasetGenerator(
+            a.a_test_dir,
+            parse_function=encoder.parse_data,
+            augment=False,
+            shuffle=False,
+            batch_size=a.batch_size,
+            num_threads=a.num_parallel_calls,
+            buffer=a.buffer_size,
+            encoding_function=encoder.encode_for_yolo,
+        )
+
+    # a_train_data = load_examples(a, a.a_train_dir, shuffle=True,
+    #                              pad_bboxes=a.pad_bboxes_a)
+    # a_val_data = load_examples(a, a.a_valid_dir, pad_bboxes=a.pad_bboxes_a)
+    # if a.a_test_dir is not None:
+    #     a_test_data = load_examples(a, a.a_test_dir, pad_bboxes=a.pad_bboxes_a)
 
     # Build data generators for target domain.
-    b_train_data = load_examples(a, a.b_train_dir, shuffle=True,
-                                 pad_bboxes=a.pad_bboxes_b)
-    b_val_data = load_examples(a, a.b_valid_dir, pad_bboxes=a.pad_bboxes_b)
+    b_train_data = DatasetGenerator(
+        a.b_train_dir,
+        parse_function=encoder.parse_data,
+        augment=False,
+        shuffle=True,
+        batch_size=a.batch_size,
+        num_threads=a.num_parallel_calls,
+        buffer=a.buffer_size,
+        encoding_function=encoder.encode_for_yolo,
+    )
+    b_val_data = DatasetGenerator(
+        a.b_valid_dir,
+        parse_function=encoder.parse_data,
+        augment=False,
+        shuffle=False,
+        batch_size=a.batch_size,
+        num_threads=a.num_parallel_calls,
+        buffer=a.buffer_size,
+        encoding_function=encoder.encode_for_yolo,
+    )
     if a.b_test_dir is not None:
-        b_test_data = load_examples(a, a.b_test_dir, pad_bboxes=a.pad_bboxes_b)
+        b_test_data = DatasetGenerator(
+            a.b_test_dir,
+            parse_function=encoder.parse_data,
+            augment=False,
+            shuffle=False,
+            batch_size=a.batch_size,
+            num_threads=a.num_parallel_calls,
+            buffer=a.buffer_size,
+            encoding_function=encoder.encode_for_yolo,
+        )
+
+    # b_train_data = load_examples(a, a.b_train_dir, shuffle=True,
+    #                              pad_bboxes=a.pad_bboxes_b)
+    # b_val_data = load_examples(a, a.b_valid_dir, pad_bboxes=a.pad_bboxes_b)
+    # if a.b_test_dir is not None:
+    #     b_test_data = load_examples(a, a.b_test_dir, pad_bboxes=a.pad_bboxes_b)
 
     # Build the model.
-    model, generator, _ = create_model(a, a_train_data, b_train_data)
+    model, generator, _ = create_model(a, a_train_data.dataset,
+                                       b_train_data.dataset)
     model.summary()
 
     # Define the optimizer, losses, and weights.
@@ -89,8 +165,8 @@ def main(a):
             print(f'Training epoch {epoch+1} of {a.max_epochs}...')
             epoch_start = time.time()
 
-            for batch_num, (a_batch, b_batch) in enumerate(zip(a_train_data,
-                                                               b_train_data)):
+            for batch_num, (a_batch, b_batch) in enumerate(zip(a_train_data.dataset,
+                                                               b_train_data.dataset)):
 
                 # Generate noise batch for this step.
                 inputs, _ = a_batch
@@ -149,7 +225,7 @@ def main(a):
             # Eval on validation data, save best model, early stopping...
             for m in mean_list:
                 m.reset_states()
-            for a_batch, b_batch in zip(a_val_data, b_val_data):
+            for a_batch, b_batch in zip(a_val_data.dataset, b_val_data.dataset):
                 inputs, a_task_targets = a_batch
                 targets, b_task_targets = b_batch
                 noise = tf.random.normal(shape=tf.shape(inputs), mean=0.0,
@@ -206,7 +282,7 @@ def main(a):
         for m in mean_list:
             m.reset_states()
         if a.a_test_dir is not None and a.b_test_dir is not None:
-            for a_batch, b_batch in zip(a_test_data, b_test_data):
+            for a_batch, b_batch in zip(a_test_data.dataset, b_test_data.dataset):
                 inputs, a_task_targets = a_batch
                 targets, b_task_targets = b_batch
                 noise = tf.random.normal(shape=tf.shape(inputs), mean=0.0,
