@@ -65,10 +65,10 @@ def _parse_example(serialized_example, a, pad_bboxes=False):
         # Pad bounding boxes. SatSim makes really tight bboxes...
         xcenter = tf.cast(tf.sparse.to_dense(example['xcenter']), tf.float32)
         ycenter = tf.cast(tf.sparse.to_dense(example['ycenter']), tf.float32)
-        xmin = tf.cast(xcenter - 10. / tf.cast(width, tf.float32), tf.float32)
-        xmax = tf.cast(xcenter + 10. / tf.cast(width, tf.float32), tf.float32)
-        ymin = tf.cast(ycenter - 10. / tf.cast(height, tf.float32), tf.float32)
-        ymax = tf.cast(ycenter + 10. / tf.cast(height, tf.float32), tf.float32)
+        xmin = xcenter - 10. / tf.cast(width, tf.float32)
+        xmax = xcenter + 10. / tf.cast(width, tf.float32)
+        ymin = ycenter - 10. / tf.cast(height, tf.float32)
+        ymax = ycenter + 10. / tf.cast(height, tf.float32)
     else:
         # Grab bboxes directly from data.
         xmin = tf.cast(tf.sparse.to_dense(example['xmin']), tf.float32)

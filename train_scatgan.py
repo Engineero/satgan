@@ -46,16 +46,17 @@ def main(a):
 
     # Build data generators for source domain.
     a_train_data = load_examples(a, a.a_train_dir, shuffle=True,
-                                 pad_bboxes=True)
-    a_val_data = load_examples(a, a.a_valid_dir, pad_bboxes=True)
+                                 pad_bboxes=a.pad_bboxes_a)
+    a_val_data = load_examples(a, a.a_valid_dir, pad_bboxes=a.pad_bboxes_a)
     if a.a_test_dir is not None:
-        a_test_data = load_examples(a, a.a_test_dir, pad_bboxes=True)
+        a_test_data = load_examples(a, a.a_test_dir, pad_bboxes=a.pad_bboxes_a)
 
     # Build data generators for target domain.
-    b_train_data = load_examples(a, a.b_train_dir, shuffle=True)
-    b_val_data = load_examples(a, a.b_valid_dir)
+    b_train_data = load_examples(a, a.b_train_dir, shuffle=True,
+                                 pad_bboxes=a.pad_bboxes_b)
+    b_val_data = load_examples(a, a.b_valid_dir, pad_bboxes=a.pad_bboxes_b)
     if a.b_test_dir is not None:
-        b_test_data = load_examples(a, a.b_test_dir)
+        b_test_data = load_examples(a, a.b_test_dir, pad_bboxes=a.pad_bboxes_b)
 
     # Build the model.
     model, generator, _ = create_model(a, a_train_data, b_train_data)
@@ -408,6 +409,10 @@ if __name__ == '__main__':
                              'just use its loss.')
     parser.add_argument('--num_parallel_calls', default=None, type=int,
                         help='Number of parallel jobs for data mapping.')
+    parser.add_argument('--pad_bboxes_a', action='store_true', default=False,
+                        help='If specified, pads A-domain bboxes.')
+    parser.add_argument('--pad_bboxes_b', action='store_true', default=False,
+                        help='If specified, pads B-domain bboxes.')
 
     # export options
     parser.add_argument("--output_filetype", default="png",
