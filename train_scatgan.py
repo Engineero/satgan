@@ -90,13 +90,17 @@ def main(a):
 
             for batch_num, (a_batch, b_batch) in enumerate(zip(a_train_data,
                                                                b_train_data)):
+
+                # Generate noise batch for this step.
+                inputs, _ = a_batch
+                noise = tf.random.normal(shape=tf.shape(inputs), mean=0.0,
+                                         stddev=1.0, dtype=tf.float32)
+
                 # Save summary images, statistics.
                 if batch_num % a.summary_freq == 0:
                     print(f'Writing outputs for epoch {epoch+1}, batch {batch_num}.')
                     inputs, a_task_targets = a_batch
                     targets, b_task_targets = b_batch
-                    noise = tf.random.normal(shape=tf.shape(inputs), mean=0.0,
-                                             stddev=1.0, dtype=tf.float32)
                     gen_outputs, discrim_outputs, task_outputs = model(
                         [inputs, noise, targets]
                     )
