@@ -15,8 +15,8 @@ from yolo_v3 import build_yolo_model, load_yolo_model_weights
 
 def create_model(a, a_train_data, b_train_data):
 
-    inputs, _ = next(iter(a_train_data))
-    targets, _ = next(iter(b_train_data))
+    inputs, _, _ = next(iter(a_train_data))
+    targets, _, _ = next(iter(b_train_data))
     input_shape = inputs.shape.as_list()[1:]  # don't give Input the batch dim
     target_shape = targets.shape.as_list()[1:]
     inputs = Input(input_shape)

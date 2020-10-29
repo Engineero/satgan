@@ -170,15 +170,15 @@ def main(a):
                                                                b_train_data.dataset)):
 
                 # Generate noise batch for this step.
-                inputs, _ = a_batch
+                inputs, _, _ = a_batch
                 noise = tf.random.normal(shape=tf.shape(inputs), mean=0.0,
                                          stddev=1.0, dtype=tf.float32)
 
                 # Save summary images, statistics.
                 if batch_num % a.summary_freq == 0:
                     print(f'Writing outputs for epoch {epoch+1}, batch {batch_num}.')
-                    inputs, a_task_targets = a_batch
-                    targets, b_task_targets = b_batch
+                    inputs, a_task_targets, _ = a_batch
+                    targets, b_task_targets, _ = b_batch
                     gen_outputs, discrim_outputs, task_outputs = model(
                         [inputs, noise, targets]
                     )
@@ -227,8 +227,8 @@ def main(a):
             for m in mean_list:
                 m.reset_states()
             for a_batch, b_batch in zip(a_val_data.dataset, b_val_data.dataset):
-                inputs, a_task_targets = a_batch
-                targets, b_task_targets = b_batch
+                inputs, a_task_targets, _ = a_batch
+                targets, b_task_targets, _ = b_batch
                 noise = tf.random.normal(shape=tf.shape(inputs), mean=0.0,
                                          stddev=1.0, dtype=tf.float32)
                 gen_outputs, discrim_outputs, task_outputs = model([inputs,
@@ -284,8 +284,8 @@ def main(a):
             m.reset_states()
         if a.a_test_dir is not None and a.b_test_dir is not None:
             for a_batch, b_batch in zip(a_test_data.dataset, b_test_data.dataset):
-                inputs, a_task_targets = a_batch
-                targets, b_task_targets = b_batch
+                inputs, a_task_targets, _ = a_batch
+                targets, b_task_targets, _ = b_batch
                 noise = tf.random.normal(shape=tf.shape(inputs), mean=0.0,
                                          stddev=1.0, dtype=tf.float32)
                 gen_outputs, discrim_outputs, task_outputs = model([inputs,
