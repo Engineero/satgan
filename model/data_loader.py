@@ -21,7 +21,7 @@ def _preprocess(image):
         return result
 
 
-def _parse_single_domain_example(serialized_example, a, pad_bboxes=False):
+def _parse_example(serialized_example, a, pad_bboxes=False):
     """Parses a single TFRecord Example for one domain of the task network.
     
     Args:
@@ -62,8 +62,7 @@ def _parse_single_domain_example(serialized_example, a, pad_bboxes=False):
     classes = tf.cast(tf.sparse.to_dense(example['classes']), tf.float32)
 
     if pad_bboxes:
-        # Calculate bounding boxes for A images (SatSim makes really tight
-        # boxes).
+        # Pad bounding boxes. SatSim makes really tight bboxes...
         xcenter = tf.cast(tf.sparse.to_dense(example['xcenter']), tf.float32)
         ycenter = tf.cast(tf.sparse.to_dense(example['ycenter']), tf.float32)
         xmin = xcenter - (10. / tf.cast(width, tf.float32))
@@ -71,6 +70,7 @@ def _parse_single_domain_example(serialized_example, a, pad_bboxes=False):
         ymin = ycenter - (10. / tf.cast(height, tf.float32))
         ymax = ycenter + (10. / tf.cast(height, tf.float32))
     else:
+        # Grab bboxes directly from data.
         xmin = tf.cast(tf.sparse.to_dense(example['xmin']), tf.float32)
         xmax = tf.cast(tf.sparse.to_dense(example['xmax']), tf.float32)
         ymin = tf.cast(tf.sparse.to_dense(example['ymin']), tf.float32)
@@ -91,6 +91,7 @@ def _parse_single_domain_example(serialized_example, a, pad_bboxes=False):
     objects = tf.pad(tensor=objects, paddings=paddings, constant_values=0.)
     objects = tf.tile(objects, [a.num_pred_layers, 1])
 
+    # Normalize and convert the image, then return (inputs, targets) tuple.
     image = _preprocess(image)
     return image, objects
 
@@ -128,8 +129,7 @@ def load_examples(a, data_dir, shuffle=False, pad_bboxes=False):
     if shuffle:
         data = data.shuffle(a.buffer_size)
     data = data.map(
-        lambda x: _parse_single_domain_example(x, a,
-                                               pad_bboxes=pad_bboxes),
+        lambda x: _parse_example(x, a, pad_bboxes=pad_bboxes),
         num_parallel_calls=a.num_parallel_calls
     )
     data = data.batch(a.batch_size, drop_remainder=True)
