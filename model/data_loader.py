@@ -17,7 +17,8 @@ def _preprocess(image):
     """
 
     with tf.name_scope("preprocess"):
-        image = tf.image.convert_image_dtype(image, tf.float32)
+        # image = tf.image.convert_image_dtype(image, tf.float32)
+        image = tf.cast(image, tf.float32)
         image = tf.image.per_image_standardization(image)
         return image
 
@@ -33,7 +34,8 @@ def _convert_batches(batch):
     """
 
     image, bboxes, _ = batch
-    image = tf.image.convert_image_dtype(image, tf.float32)
+    image = tf.cast(image, tf.float32)
+    # image = tf.image.convert_image_dtype(image, tf.float32)
     return image, bboxes
 
 
