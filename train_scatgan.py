@@ -48,12 +48,14 @@ def main(a):
     a_train_data = load_examples(a, a.a_train_dir, shuffle=True,
                                  pad_bboxes=True)
     a_val_data = load_examples(a, a.a_valid_dir, pad_bboxes=True)
-    a_test_data = load_examples(a, a.a_test_dir, pad_bboxes=True)
+    if a.a_test_dir is not None:
+        a_test_data = load_examples(a, a.a_test_dir, pad_bboxes=True)
 
     # Build data generators for target domain.
     b_train_data = load_examples(a, a.b_train_dir, shuffle=True)
     b_val_data = load_examples(a, a.b_valid_dir)
-    b_test_data = load_examples(a, a.b_test_dir)
+    if a.b_test_dir is not None:
+        b_test_data = load_examples(a, a.b_test_dir)
 
     # Build the model.
     model, generator, _ = create_model(a, a_train_data, b_train_data)
@@ -192,33 +194,35 @@ def main(a):
             model = load_model(output_path / 'full_model')
         for m in mean_list:
             m.reset_states()
-        for a_batch, b_batch in zip(a_test_data, b_test_data):
-            inputs, a_task_targets = a_batch
-            targets, b_task_targets = b_batch
-            noise = tf.random.normal(shape=tf.shape(inputs), mean=0.0,
-                                     stddev=1.0, dtype=tf.float32)
-            gen_outputs, discrim_outputs, task_outputs = model([inputs,
-                                                                noise,
-                                                                targets])
-            model_inputs = (inputs, targets, a_task_targets, b_task_targets)
-            model_outputs = (gen_outputs, discrim_outputs, task_outputs)
+        if a.a_test_dir is not None and a.b_test_dir is not None:
+            for a_batch, b_batch in zip(a_test_data, b_test_data):
+                inputs, a_task_targets = a_batch
+                targets, b_task_targets = b_batch
+                noise = tf.random.normal(shape=tf.shape(inputs), mean=0.0,
+                                         stddev=1.0, dtype=tf.float32)
+                gen_outputs, discrim_outputs, task_outputs = model([inputs,
+                                                                    noise,
+                                                                    targets])
+                model_inputs = (inputs, targets, a_task_targets,
+                                b_task_targets)
+                model_outputs = (gen_outputs, discrim_outputs, task_outputs)
 
-            total_loss, discrim_loss, gen_loss, task_loss = \
-                compute_total_loss(a,
-                                   model_inputs,
-                                   model_outputs,
-                                   batches_seen,
-                                   return_all=True)
-            for m, loss in zip(mean_list, [total_loss,
-                                           discrim_loss,
-                                           gen_loss,
-                                           task_loss]):
-                m.update_state([loss])
-        print(f'Test performance\n',
-              f'total loss: {mean_list[0].result().numpy():.4f}\t',
-              f'discriminator loss: {mean_list[1].result().numpy():.4f}\t',
-              f'generator loss: {mean_list[2].result().numpy():.4f}\t',
-              f'task loss: {mean_list[3].result().numpy():.4f}\t')
+                total_loss, discrim_loss, gen_loss, task_loss = \
+                    compute_total_loss(a,
+                                       model_inputs,
+                                       model_outputs,
+                                       batches_seen,
+                                       return_all=True)
+                for m, loss in zip(mean_list, [total_loss,
+                                               discrim_loss,
+                                               gen_loss,
+                                               task_loss]):
+                    m.update_state([loss])
+            print(f'Test performance\n',
+                  f'total loss: {mean_list[0].result().numpy():.4f}\t',
+                  f'discriminator loss: {mean_list[1].result().numpy():.4f}\t',
+                  f'generator loss: {mean_list[2].result().numpy():.4f}\t',
+                  f'task loss: {mean_list[3].result().numpy():.4f}\t')
 
 
 if __name__ == '__main__':
