@@ -177,6 +177,8 @@ def main(a):
                 # Save summary images, statistics.
                 if batch_num % a.summary_freq == 0:
                     print(f'Writing outputs for epoch {epoch+1}, batch {batch_num}.')
+                    print(f'\nA batch:\n{a_batch}')
+                    print(f'\nB batch:\n{b_batch}')
                     inputs, a_task_targets = a_batch
                     targets, b_task_targets = b_batch
                     gen_outputs, discrim_outputs, task_outputs = model(
