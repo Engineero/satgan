@@ -4,7 +4,8 @@ from __future__ import print_function
 
 import time
 import tensorflow as tf
-import numpy as np import argparse
+import numpy as np
+import argparse
 from pathlib import Path
 from tensorflow.keras.models import load_model
 from tensorflow.keras.optimizers import Adam
@@ -169,15 +170,15 @@ def main(a):
                                                                b_train_data.dataset)):
 
                 # Generate noise batch for this step.
-                inputs, _ = a_batch
+                inputs, _, _ = a_batch
                 noise = tf.random.normal(shape=tf.shape(inputs), mean=0.0,
                                          stddev=1.0, dtype=tf.float32)
 
                 # Save summary images, statistics.
                 if batch_num % a.summary_freq == 0:
                     print(f'Writing outputs for epoch {epoch+1}, batch {batch_num}.')
-                    inputs, a_task_targets = a_batch
-                    targets, b_task_targets = b_batch
+                    inputs, a_task_targets, _ = a_batch
+                    targets, b_task_targets, _ = b_batch
                     gen_outputs, discrim_outputs, task_outputs = model(
                         [inputs, noise, targets]
                     )
