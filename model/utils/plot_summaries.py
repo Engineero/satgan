@@ -89,6 +89,8 @@ def plot_summaries(a, model_inputs, model_outputs, batches_seen):
 
     # Bounding boxes are [ymin, xmin, ymax, xmax]. Need to
     # calculate that from YOLO.
+    print(f'\nA targets: {a_task_targets}')
+    print(f'\nB targets: {b_task_targets}')
     a_true_bboxes = a_task_targets[..., :4]
     b_true_bboxes = b_task_targets[..., :4]
     a_fake_bboxes = a_detects[..., :4]
