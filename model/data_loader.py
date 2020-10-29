@@ -12,7 +12,7 @@ def _preprocess(image):
         image: the image to transform
 
     Returns:
-        Image shifted to zero mean and unit standard deviation.
+        Image shifted to zero mean and unit standard deviation as tf.float32.
     """
 
     with tf.name_scope("preprocess"):
@@ -21,8 +21,7 @@ def _preprocess(image):
         return result
 
 
-def _parse_single_domain_example(serialized_example, a, pad_bboxes=False,
-                                 add_noise=False):
+def _parse_single_domain_example(serialized_example, a, pad_bboxes=False):
     """Parses a single TFRecord Example for one domain of the task network.
     
     Args:
@@ -31,8 +30,6 @@ def _parse_single_domain_example(serialized_example, a, pad_bboxes=False,
 
     Keyword Args:
         pad_bboxes: if True, pads truth bboxes with +/-10 pix.
-        add_noise: if True, generates Gaussian noise the same size as images
-            for input to generator.
 
     Returns:
         Images, optional noise or None, and true bounding boxes with
@@ -98,97 +95,44 @@ def _parse_single_domain_example(serialized_example, a, pad_bboxes=False,
     return image, objects
 
 
-def load_examples(a, train_dir, valid_dir, test_dir=None,
-                  pad_bboxes=False, add_noise=False):
-    """Create dataset pipelines.
+def load_examples(a, data_dir, shuffle=False, pad_bboxes=False):
+    """Create dataset pipeline.
     
     Args:
         a: argparse object from training script.
-        train_dir: path to training data.
-        valid_dir: path to validation data.
+        data_dir: path to data TFRecords.
 
     Keyword Args:
-        test_dir: path to testing data. Default is None.
+        shuffle: whether to shuffle the data.
         pad_bboxes: if True, pads truth bboxes with +/-10 pix.
-        add_noise: if True, generates Gaussian noise the same size as images
-            for use as generator input.
 
     Returns:
-        train_data: TFRecordDataset of training data.
-        valid_data: TFRecordDataset of validation data.
-        test_data: TFRecordDataset of testing data.
+        TFRecordDataset of data.
     """
 
     # Create data queue from training dataset.
-    if train_dir is None or not Path(train_dir).resolve().is_dir():
+    if data_dir is None or not Path(data_dir).resolve().is_dir():
         raise NotADirectoryError(
-            f"Training directory {train_dir} does not exist!"
+            f"Data directory {data_dir} does not exist!"
         )
-    train_paths = list(Path(train_dir).resolve().glob('**/*.tfrecords'))
-    if len(train_paths) == 0:
+    data_paths = list(Path(data_dir).resolve().glob('**/*.tfrecords'))
+    if len(data_paths) == 0:
         raise ValueError(
-            f"Training directory {train_dir} contains no TFRecords files!"
+            f"Data directory {data_dir} contains no TFRecords files!"
         )
-    train_data = tf.data.TFRecordDataset(
-        filenames=[p.as_posix() for p in train_paths]
+    data = tf.data.TFRecordDataset(
+        filenames=[p.as_posix() for p in data_paths]
     )
-
-    # Create data queue from validation dataset.
-    if valid_dir is None or not Path(valid_dir).resolve().is_dir():
-        raise NotADirectoryError(
-            f"Validation directory {valid_dir} does not exist!"
-        )
-    valid_paths = list(Path(valid_dir).resolve().glob('**/*.tfrecords'))
-    if len(valid_paths) == 0:
-        raise ValueError(
-            f"Validation directory {valid_dir} contains no TFRecords files!"
-        )
-    valid_data = tf.data.TFRecordDataset(
-        filenames=[p.as_posix() for p in valid_paths]
-    )
-
-    # Create data queue from testing dataset, if given.
-    if test_dir is not None:
-        if not Path(test_dir).resolve().is_dir():
-            raise NotADirectoryError(
-                f"Testing directory {test_dir} does not exist!"
-            )
-        test_paths = list(Path(test_dir).resolve().glob('**/*.tfrecords'))
-        if len(test_paths) == 0:
-            raise ValueError(
-                f"Testing directory {test_dir} contains no TFRecords files!"
-            )
-        test_data = tf.data.TFRecordDataset(
-            filenames=[p.as_posix() for p in test_paths]
-        )
-    else:
-        test_data = None
 
     # Specify transformations on datasets.
-    train_data = train_data.shuffle(a.buffer_size)
-    train_data = train_data.map(
+    if shuffle:
+        data = data.shuffle(a.buffer_size)
+    data = data.map(
         lambda x: _parse_single_domain_example(x, a,
-                                               pad_bboxes=pad_bboxes,
-                                               add_noise=add_noise),
+                                               pad_bboxes=pad_bboxes),
         num_parallel_calls=a.num_parallel_calls
     )
-    train_data = train_data.batch(a.batch_size, drop_remainder=True)
+    data = data.batch(a.batch_size, drop_remainder=True)
+    data = data.prefetch(buffer_size=a.buffer_size)
 
-    valid_data = valid_data.map(
-        lambda x: _parse_single_domain_example(x, a,
-                                               pad_bboxes=pad_bboxes,
-                                               add_noise=add_noise),
-        num_parallel_calls=a.num_parallel_calls
-    )
-    valid_data = valid_data.batch(a.batch_size, drop_remainder=True)
-
-    if test_dir is not None:
-        test_data = test_data.map(
-            lambda x: _parse_single_domain_example(x, a,
-                                                   pad_bboxes=pad_bboxes,
-                                                   add_noise=add_noise),
-            num_parallel_calls=a.num_parallel_calls
-        )
-        test_data = test_data.batch(a.batch_size, drop_remainder=True)
-
-    return train_data, valid_data, test_data
+    return data
