@@ -3,6 +3,7 @@
 
 from pathlib import Path
 import tensorflow as tf
+from miss_data_generator import DatasetGenerator
 
 
 def _preprocess(image):
@@ -19,6 +20,21 @@ def _preprocess(image):
         image = tf.image.convert_image_dtype(image, tf.float32)
         image = tf.image.per_image_standardization(image)
         return image
+
+
+def _convert_batches(batch):
+    """Converts dtype of batches from MISS DatasetGenerator object.
+
+    Args:
+        batch: a batch from the DatasetGenerator.
+
+    Returns:
+        (image, bboxes) with image converted to tf.float32.
+    """
+
+    image, bboxes, _ = batch
+    image = tf.image.convert_image_dtype(image, tf.float32)
+    return image, bboxes
 
 
 def _parse_example(serialized_example, a, pad_bboxes=False):
@@ -96,7 +112,7 @@ def _parse_example(serialized_example, a, pad_bboxes=False):
     return image, objects
 
 
-def load_examples(a, data_dir, shuffle=False, pad_bboxes=False):
+def load_examples(a, data_dir, shuffle=False, pad_bboxes=False, econder=None):
     """Create dataset pipeline.
     
     Args:
@@ -106,6 +122,7 @@ def load_examples(a, data_dir, shuffle=False, pad_bboxes=False):
     Keyword Args:
         shuffle: whether to shuffle the data.
         pad_bboxes: if True, pads truth bboxes with +/-10 pix.
+        encoder: YOLO encoder object defining parse_data method.
 
     Returns:
         TFRecordDataset of data.
@@ -121,18 +138,34 @@ def load_examples(a, data_dir, shuffle=False, pad_bboxes=False):
         raise ValueError(
             f"Data directory {data_dir} contains no TFRecords files!"
         )
-    data = tf.data.TFRecordDataset(
-        filenames=[p.as_posix() for p in data_paths]
-    )
 
-    # Specify transformations on datasets.
-    if shuffle:
-        data = data.shuffle(a.buffer_size)
-    data = data.map(
-        lambda x: _parse_example(x, a, pad_bboxes=pad_bboxes),
-        num_parallel_calls=a.num_parallel_calls
-    )
-    data = data.batch(a.batch_size, drop_remainder=True)
-    data = data.prefetch(buffer_size=a.buffer_size)
+    if encoder is not None:
+        # Use MISS DatasetGenerator instead.
+        data = DatasetGenerator(
+            data_dir,
+            parse_function=encoder.parse_data,
+            augment=False,
+            shuffle=shuffle,
+            batch_size=a.batch_size,
+            num_threads=a.num_parallel_calls,
+            buffer=a.buffer_size,
+            # encoding_function=encoder.encode_for_yolo,
+        )
+        data = data.map(_convert_batches,
+                        num_parallel_calls=a.num_parallel_calls)
+    else:
+        data = tf.data.TFRecordDataset(
+            filenames=[p.as_posix() for p in data_paths]
+        )
+
+        # Specify transformations on datasets.
+        if shuffle:
+            data = data.shuffle(a.buffer_size)
+        data = data.map(
+            lambda x: _parse_example(x, a, pad_bboxes=pad_bboxes),
+            num_parallel_calls=a.num_parallel_calls
+        )
+        data = data.batch(a.batch_size, drop_remainder=True)
+        data = data.prefetch(buffer_size=a.buffer_size)
 
     return data

@@ -16,7 +16,6 @@ from model.losses import (compute_total_loss, compute_apply_gradients,
                           calc_discriminator_loss, calc_generator_loss,
                           calc_task_loss)
 from model.utils.plot_summaries import plot_summaries
-from miss_data_generator import DatasetGenerator
 from yolo_v3 import build_yolo_model
 
 
@@ -56,83 +55,22 @@ def main(a):
         confidence_threshold=a.confidence_threshold,
     )
 
-    # Build data generators for source domain.
-    a_train_data = DatasetGenerator(
-        a.a_train_dir,
-        parse_function=encoder.parse_data,
-        augment=False,
-        shuffle=True,
-        batch_size=a.batch_size,
-        num_threads=a.num_parallel_calls,
-        buffer=a.buffer_size,
-        # encoding_function=encoder.encode_for_yolo,
-    )
-    a_val_data = DatasetGenerator(
-        a.a_valid_dir,
-        parse_function=encoder.parse_data,
-        augment=False,
-        shuffle=False,
-        batch_size=a.batch_size,
-        num_threads=a.num_parallel_calls,
-        buffer=a.buffer_size,
-        # encoding_function=encoder.encode_for_yolo,
-    )
+    a_train_data = load_examples(a, a.a_train_dir, shuffle=True,
+                                 pad_bboxes=a.pad_bboxes_a, encoder=encoder)
+    a_val_data = load_examples(a, a.a_valid_dir, pad_bboxes=a.pad_bboxes_a,
+                               encoder=encoder)
     if a.a_test_dir is not None:
-        a_test_data = DatasetGenerator(
-            a.a_test_dir,
-            parse_function=encoder.parse_data,
-            augment=False,
-            shuffle=False,
-            batch_size=a.batch_size,
-            num_threads=a.num_parallel_calls,
-            buffer=a.buffer_size,
-            # encoding_function=encoder.encode_for_yolo,
-        )
-
-    # a_train_data = load_examples(a, a.a_train_dir, shuffle=True,
-    #                              pad_bboxes=a.pad_bboxes_a)
-    # a_val_data = load_examples(a, a.a_valid_dir, pad_bboxes=a.pad_bboxes_a)
-    # if a.a_test_dir is not None:
-    #     a_test_data = load_examples(a, a.a_test_dir, pad_bboxes=a.pad_bboxes_a)
+        a_test_data = load_examples(a, a.a_test_dir, pad_bboxes=a.pad_bboxes_a,
+                                    encoder=encoder)
 
     # Build data generators for target domain.
-    b_train_data = DatasetGenerator(
-        a.b_train_dir,
-        parse_function=encoder.parse_data,
-        augment=False,
-        shuffle=True,
-        batch_size=a.batch_size,
-        num_threads=a.num_parallel_calls,
-        buffer=a.buffer_size,
-        # encoding_function=encoder.encode_for_yolo,
-    )
-    b_val_data = DatasetGenerator(
-        a.b_valid_dir,
-        parse_function=encoder.parse_data,
-        augment=False,
-        shuffle=False,
-        batch_size=a.batch_size,
-        num_threads=a.num_parallel_calls,
-        buffer=a.buffer_size,
-        # encoding_function=encoder.encode_for_yolo,
-    )
+    b_train_data = load_examples(a, a.b_train_dir, shuffle=True,
+                                 pad_bboxes=a.pad_bboxes_b, encoder=encoder)
+    b_val_data = load_examples(a, a.b_valid_dir, pad_bboxes=a.pad_bboxes_b,
+                               encoder=encoder)
     if a.b_test_dir is not None:
-        b_test_data = DatasetGenerator(
-            a.b_test_dir,
-            parse_function=encoder.parse_data,
-            augment=False,
-            shuffle=False,
-            batch_size=a.batch_size,
-            num_threads=a.num_parallel_calls,
-            buffer=a.buffer_size,
-            # encoding_function=encoder.encode_for_yolo,
-        )
-
-    # b_train_data = load_examples(a, a.b_train_dir, shuffle=True,
-    #                              pad_bboxes=a.pad_bboxes_b)
-    # b_val_data = load_examples(a, a.b_valid_dir, pad_bboxes=a.pad_bboxes_b)
-    # if a.b_test_dir is not None:
-    #     b_test_data = load_examples(a, a.b_test_dir, pad_bboxes=a.pad_bboxes_b)
+        b_test_data = load_examples(a, a.b_test_dir, pad_bboxes=a.pad_bboxes_b,
+                                    encoder=encoder)
 
     # Build the model.
     model, generator, _ = create_model(a, a_train_data.dataset,
@@ -170,15 +108,15 @@ def main(a):
                                                                b_train_data.dataset)):
 
                 # Generate noise batch for this step.
-                inputs, _, _ = a_batch
+                inputs, _ = a_batch
                 noise = tf.random.normal(shape=tf.shape(inputs), mean=0.0,
                                          stddev=1.0, dtype=tf.float32)
 
                 # Save summary images, statistics.
                 if batch_num % a.summary_freq == 0:
                     print(f'Writing outputs for epoch {epoch+1}, batch {batch_num}.')
-                    inputs, a_task_targets, _ = a_batch
-                    targets, b_task_targets, _ = b_batch
+                    inputs, a_task_targets = a_batch
+                    targets, b_task_targets = b_batch
                     inputs = tf.image.convert_image_dtype(inputs, tf.float32)
                     targets = tf.image.convert_image_dtype(targets, tf.float32)
                     gen_outputs, discrim_outputs, task_outputs = model(
@@ -229,8 +167,8 @@ def main(a):
             for m in mean_list:
                 m.reset_states()
             for a_batch, b_batch in zip(a_val_data.dataset, b_val_data.dataset):
-                inputs, a_task_targets, _ = a_batch
-                targets, b_task_targets, _ = b_batch
+                inputs, a_task_targets = a_batch
+                targets, b_task_targets = b_batch
                 noise = tf.random.normal(shape=tf.shape(inputs), mean=0.0,
                                          stddev=1.0, dtype=tf.float32)
                 gen_outputs, discrim_outputs, task_outputs = model([inputs,
@@ -286,8 +224,8 @@ def main(a):
             m.reset_states()
         if a.a_test_dir is not None and a.b_test_dir is not None:
             for a_batch, b_batch in zip(a_test_data.dataset, b_test_data.dataset):
-                inputs, a_task_targets, _ = a_batch
-                targets, b_task_targets, _ = b_batch
+                inputs, a_task_targets = a_batch
+                targets, b_task_targets = b_batch
                 noise = tf.random.normal(shape=tf.shape(inputs), mean=0.0,
                                          stddev=1.0, dtype=tf.float32)
                 gen_outputs, discrim_outputs, task_outputs = model([inputs,
