@@ -199,8 +199,7 @@ def calc_task_loss(a, model_inputs, model_outputs, step, val=False,
             # task_targets are [ymin, xmin, ymax, xmax, class]
             # task_outputs are [ymin, xmin, ymax, xmax, *class] where *class
             # is a one-hot encoded score for each class in the dataset for
-            # custom detector. For YOLO model, *class is just a scalar class
-            # score.
+            # custom detector.
             a_task_targets = model_inputs[2]  # input's objects
             b_task_targets = model_inputs[3]  # target's objects
             task_outputs = model_outputs[2]
@@ -220,8 +219,8 @@ def calc_task_loss(a, model_inputs, model_outputs, step, val=False,
             b_output_class = task_outputs[0][..., -a.num_classes:]
             a_output_class = task_outputs[1][..., -a.num_classes:]
             n_output_class = task_outputs[2][..., -a.num_classes:]
-            a_bool_mask = (a_task_targets[..., -1] > 0.)  # true objects
-            b_bool_mask = (b_task_targets[..., -1] > 0.)
+            a_bool_mask = (a_task_targets[..., -1] > 0)  # true objects
+            b_bool_mask = (b_task_targets[..., -1] > 0)
             # a_object_target = tf.cast(tf.stack([tf.logical_not(a_bool_mask),
             #                                     a_bool_mask],
             #                                    axis=-1),
@@ -240,10 +239,6 @@ def calc_task_loss(a, model_inputs, model_outputs, step, val=False,
             a_real_xy = task_outputs[1][..., :2] + a_real_wh/2.
             b_real_wh = task_outputs[0][..., 2:4] - task_outputs[0][..., :2]
             b_real_xy = task_outputs[0][..., :2] + b_real_wh/2.
-            # a_real_wh = task_outputs[1][..., 2:4]
-            # a_real_xy = task_outputs[1][..., :2]
-            # b_real_wh = task_outputs[0][..., 2:4]
-            # b_real_xy = task_outputs[0][..., :2]
             a_iou_outputs = task_outputs[1]
             b_iou_outputs = task_outputs[0]
 
