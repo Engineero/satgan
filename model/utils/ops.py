@@ -179,6 +179,7 @@ def up_resblock(x_init, filters, use_bias=True, sn=False, scope='resblock',
 
         return x + x_init
 
+
 def down_resblock(x_init, filters, to_down=True, use_bias=True, sn=False,
                   scope='resblock', separable=False, activation='lrelu'):
     """Residual block without average pooling.
@@ -250,6 +251,7 @@ def down_resblock(x_init, filters, to_down=True, use_bias=True, sn=False,
                                               padding='same')(x_init)
 
         return x + x_init
+
 
 def init_down_resblock(x_init, filters, use_bias=True, sn=False,
                        scope='resblock', activation='lrelu'):
