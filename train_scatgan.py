@@ -55,7 +55,7 @@ def train_satgan(a):
     writer = tf.summary.create_file_writer(tensorboard_path.as_posix())
 
     # Create YOLO encoder to be used in making generator.
-    if a.use_yolo:
+    if a.use_yolo_encoder:
         _, _, encoder = build_yolo_model(
             base_model_name=a.base_model_name,
             is_recurrent=a.is_recurrent,
@@ -412,6 +412,8 @@ if __name__ == '__main__':
                         help='Objectness threshold, under which a detection is ignored.')
     parser.add_argument('--use_yolo', default=False, action='store_true',
                         help='Whether to use existing YOLO SatNet for task network.')
+    parser.add_argument('--use_yolo_encoder', default=False, action='store_true',
+                        help='Whether to use MISS YOLO encoder for data import.')
     parser.add_argument('--use_sagan', default=False, action='store_true',
                         help='Whether to use self-attending GAN architecture with ResNet blocks.')
     parser.add_argument('--checkpoint_load_path', type=str,
