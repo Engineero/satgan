@@ -46,14 +46,17 @@ def main(a):
     writer = tf.summary.create_file_writer(tensorboard_path.as_posix())
 
     # Create YOLO encoder to be used in making generator.
-    _, _, encoder = build_yolo_model(
-        base_model_name=a.base_model_name,
-        is_recurrent=a.is_recurrent,
-        num_predictor_heads=a.num_pred_layers,
-        max_inferences_per_image=a.max_inferences,
-        max_bbox_overlap=a.max_bbox_overlap,
-        confidence_threshold=a.confidence_threshold,
-    )
+    if a.use_yolo:
+        _, _, encoder = build_yolo_model(
+            base_model_name=a.base_model_name,
+            is_recurrent=a.is_recurrent,
+            num_predictor_heads=a.num_pred_layers,
+            max_inferences_per_image=a.max_inferences,
+            max_bbox_overlap=a.max_bbox_overlap,
+            confidence_threshold=a.confidence_threshold,
+        )
+    else:
+        encoder = None
 
     a_train_data = load_examples(a, a.a_train_dir, shuffle=True,
                                  pad_bboxes=a.pad_bboxes_a, encoder=encoder)
