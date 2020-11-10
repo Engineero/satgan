@@ -1,3 +1,6 @@
+"""Script for training the SATGAN."""
+
+
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -23,7 +26,13 @@ from yolo_v3 import build_yolo_model
 tf.compat.v1.enable_eager_execution()
 
 
-def main(a):
+def train_satgan(a):
+    """Entry point for the training script.
+
+    Args:
+        a: argparse argument object.
+    """
+
     # Set the visible devices to those specified:
     physical_devices = tf.config.list_physical_devices('GPU')
     used_devices = [physical_devices[i] for i in a.devices]
@@ -440,4 +449,4 @@ if __name__ == '__main__':
     parser.add_argument("--output_filetype", default="png",
                         choices=["png", "jpeg"])
     args = parser.parse_args()
-    main(args)
+    train_satgan(args)

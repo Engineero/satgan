@@ -1,4 +1,4 @@
-""" Defines loss functions and helpers for calculating SCATGAN gradients."""
+"""Defines loss functions and helpers for calculating SCATGAN gradients."""
 
 
 import tensorflow as tf
@@ -9,6 +9,28 @@ from tensorflow.keras.losses import (MSE, mean_absolute_error,
 # Define model losses and helpers for computing and applying gradients.
 def compute_total_loss(a, model_inputs, model_outputs, step,
                        return_all=False, val=False):
+    """Computes all component losses and returns total loss.
+
+    Used to compute losses without applying the gradients. Called to apply the
+    gradients, but also to record losses when outputting status.
+
+    Args:
+        a: argparse argument object from training script.
+        model_inputs: tuple of (inputs, targets, a_task_targets,
+            b_task_targets, noise).
+        model_outputs: tuple of (gen_outputs, discrim_outputs, task_outputs).
+        step: a monotonically-increasing training step value.
+    
+    Keyword Args:
+        return_all: if true, return all individual losses, else only the total
+            loss. Default is False.
+        val: whether this is the validation dataset. Default is False.
+
+    Returns:
+        total loss and optionally each component loss for the generator,
+            discriminator, and task network.
+    """
+
     with tf.name_scope("compute_total_loss"):
         discrim_loss = calc_discriminator_loss(a, model_inputs,
                                                model_outputs,
@@ -81,6 +103,22 @@ def compute_apply_gradients(a, model, a_batch, b_batch, noise, optimizer_list,
 
 def calc_discriminator_loss(a, model_inputs, model_outputs, step,
                             val=False, **kwargs):
+    """Calculates the discriminator loss for the GAN.
+
+    Args:
+        a: argparse argument object from training script.
+        model_inputs: tuple of (inputs, targets, a_task_targets,
+            b_task_targets, noise).
+        model_outputs: tuple of (gen_outputs, discrim_outputs, task_outputs).
+        step: a monotonically-increasing training step value.
+
+    Keyword Args:
+        val: whether this is the validation dataset. Default is False.
+    
+    Returns:
+        Total weighted discriminator loss.
+    """
+
     with tf.device(f'/device:GPU:{a.devices[0]}'):
         with tf.name_scope("discriminator_loss"):
             # minimizing -tf.log will try to get inputs to 1
@@ -135,6 +173,22 @@ def calc_discriminator_loss(a, model_inputs, model_outputs, step,
 
 def calc_generator_loss(a, model_inputs, model_outputs, step,
                         val=False, **kwargs):
+    """Calculates the generator loss for the GAN.
+
+    Args:
+        a: argparse argument object from training script.
+        model_inputs: tuple of (inputs, targets, a_task_targets,
+            b_task_targets, noise).
+        model_outputs: tuple of (gen_outputs, discrim_outputs, task_outputs).
+        step: a monotonically-increasing training step value.
+
+    Keyword Args:
+        val: whether this is the validation dataset. Default is False.
+    
+    Returns:
+        Total weighted generator loss.
+    """
+
     with tf.device(f'/device:GPU:{a.devices[0]}'):
         with tf.name_scope("generator_loss"):
             # predict_fake => [0, 1]
@@ -177,6 +231,16 @@ def calc_generator_loss(a, model_inputs, model_outputs, step,
 
 
 def calc_iou(targets, outputs):
+    """Calculates intersection over union (IoU) of bounding boxes.
+
+    Args:
+        targets: bounding box targets (truth data).
+        outputs: bounding box predictions (network output).
+    
+    Returns:
+        IoU between targets and outputs.
+    """
+
     with tf.name_scope('task_loss'):
         y_a = tf.maximum(targets[..., 0], outputs[..., 0])
         x_a = tf.maximum(targets[..., 1], outputs[..., 1])
@@ -195,6 +259,22 @@ def calc_iou(targets, outputs):
 # @tf.function
 def calc_task_loss(a, model_inputs, model_outputs, step, val=False,
                    **kwargs):
+    """Calculates the task network loss for the GAN.
+
+    Args:
+        a: argparse argument object from training script.
+        model_inputs: tuple of (inputs, targets, a_task_targets,
+            b_task_targets, noise).
+        model_outputs: tuple of (gen_outputs, discrim_outputs, task_outputs).
+        step: a monotonically-increasing training step value.
+
+    Keyword Args:
+        val: whether this is the validation dataset. Default is False.
+    
+    Returns:
+        Total weighted task network loss.
+    """
+
     with tf.device(f'/device:GPU:{a.devices[-1]}'):
         with tf.name_scope('task_loss'):
             # task_targets are [ymin, xmin, ymax, xmax, class]

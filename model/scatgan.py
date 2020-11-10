@@ -14,6 +14,17 @@ from yolo_v3 import build_yolo_model, load_yolo_model_weights
 
 
 def create_model(a, a_train_data, b_train_data):
+    """Creates the SATGAN model.
+
+    Args:
+        a: argparse structure from training script.
+        a_train_data: A-domain training dataset object.
+        b_train_data: B-domain training dataset object.
+
+    Returns:
+        (model, generator, task_net) tuple of models used in the SATGAN
+            meta-architecture.
+    """
 
     inputs, _ = next(iter(a_train_data))
     targets, _ = next(iter(b_train_data))

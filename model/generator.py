@@ -1,3 +1,6 @@
+"""Defines the generator for the GAN."""
+
+
 from .utils import ops
 from .attention import google_attention
 

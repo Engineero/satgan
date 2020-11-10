@@ -1,3 +1,6 @@
+"""Defines general network operations and layers used in the GAN."""
+
+
 import tensorflow as tf
 from tensorflow.keras.layers import (Conv2D, Flatten, Conv2DTranspose, Dense,
                                      Reshape, Input, BatchNormalization,
