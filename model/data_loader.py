@@ -57,11 +57,10 @@ class GanDataset:
             filenames=[p.as_posix() for p in data_paths]
         )
         # Specify transformations on datasets.
-        if shuffle:
+        if self.shuffle:
             data = data.shuffle(self.a.buffer_size)
         data = data.map(
-            lambda x: self._parse_example(x, self.a,
-                                          pad_bboxes=self.pad_bboxes),
+            lambda x: self._parse_example(x),
             num_parallel_calls=self.a.num_parallel_calls
         )
         data = data.batch(self.a.batch_size, drop_remainder=True)
