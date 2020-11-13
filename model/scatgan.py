@@ -4,6 +4,7 @@
 from .generator import create_generator
 from .discriminator import create_discriminator
 from .task_net import create_task_net
+from .utils.plot_summaries import image_int_to_float
 
 from pathlib import Path
 import tensorflow as tf
@@ -53,7 +54,7 @@ def create_model(a, a_train_data, b_train_data):
                 generator = create_generator(a, input_shape, out_channels)
                 generator.summary()
                 gen_noise = generator(noise)
-                fake_img = gen_noise + inputs
+                fake_img = gen_noise + image_int_to_float(inputs)
                 gen_outputs = tf.stack([fake_img, gen_noise], axis=0,
                                        name='generator')
 
