@@ -13,7 +13,7 @@ def image_int_to_float(image):
 
 def plot_summaries(a, model_inputs, model_outputs, batches_seen):
     """Plots summary images to Tensorboard.
-    
+
     Args:
         a: arguments from training/testing script.
         model_inputs: tuple of inputs, targets, a_task_targets,
@@ -28,7 +28,7 @@ def plot_summaries(a, model_inputs, model_outputs, batches_seen):
 
     tf.summary.image(
         name='Fake image',
-        data=image_int_to_float(gen_outputs[0],
+        data=image_int_to_float(gen_outputs[0]),
         step=batches_seen,
     )
     tf.summary.image(
@@ -144,3 +144,4 @@ def plot_summaries(a, model_inputs, model_outputs, batches_seen):
         data=noise_bboxes,
         step=batches_seen,
     )
+
