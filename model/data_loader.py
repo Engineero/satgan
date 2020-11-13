@@ -190,12 +190,13 @@ def load_examples(a, data_dir, shuffle=False, pad_bboxes=False, encoder=None):
             batch_size=a.batch_size,
             num_threads=a.num_parallel_calls,
             buffer=a.buffer_size,
+            encoding_function=encoder.cast_image_to_flat,
             # encoding_function=encoder.encode_for_yolo,
         )
-        data.dataset = data.dataset.map(
-            lambda im, box, fname:_convert_batches((im, box, fname)),
-            num_parallel_calls=a.num_parallel_calls
-        )
+        # data.dataset = data.dataset.map(
+        #     lambda im, box, fname:_convert_batches((im, box, fname)),
+        #     num_parallel_calls=a.num_parallel_calls
+        # )
     else:
         data = GanDataset(a, data_dir, shuffle, pad_bboxes)
 
