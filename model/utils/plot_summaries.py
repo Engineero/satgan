@@ -22,27 +22,32 @@ def plot_summaries(a, model_inputs, model_outputs, batches_seen):
 
     tf.summary.image(
         name='Fake image',
-        data=tf.image.convert_image_dtype(gen_outputs[0], tf.float32),
+        data=tf.image.convert_image_dtype(tf.cast(gen_outputs[0], tf.uint16),
+                                          tf.float32),
         step=batches_seen,
     )
     tf.summary.image(
         name='Generated noise',
-        data=tf.image.convert_image_dtype(gen_outputs[1], tf.float32),
+        data=tf.image.convert_image_dtype(tf.cast(gen_outputs[1], tf.uint16),
+                                          tf.float32),
         step=batches_seen,
     )
     tf.summary.image(
         name='A image',
-        data=tf.image.convert_image_dtype(inputs, tf.float32),
+        data=tf.image.convert_image_dtype(tf.cast(inputs, tf.uint16),
+                                          tf.float32),
         step=batches_seen,
     )
     tf.summary.image(
         name='Input noise',
-        data=tf.image.convert_image_dtype(noise, tf.float32),
+        data=tf.image.convert_image_dtype(tf.cast(noise, tf.uint16),
+                                          tf.float32),
         step=batches_seen,
     )
     tf.summary.image(
         name='B image',
-        data=tf.image.convert_image_dtype(targets, tf.float32),
+        data=tf.image.convert_image_dtype(tf.cast(targets, tf.uint16),
+                                          tf.float32),
         step=batches_seen,
     )
     tf.summary.image(
@@ -98,7 +103,8 @@ def plot_summaries(a, model_inputs, model_outputs, batches_seen):
     # Add bounding boxes to sample images.
     target_bboxes = tf.image.draw_bounding_boxes(
         images=tf.image.grayscale_to_rgb(
-            tf.image.convert_image_dtype(targets, tf.float32)
+            tf.image.convert_image_dtype(tf.cast(targets, tf.uint16),
+                tf.float32)
         ),
         boxes=b_true_bboxes,
         colors=np.array([[1., 0., 0.]])
@@ -110,7 +116,8 @@ def plot_summaries(a, model_inputs, model_outputs, batches_seen):
     )
     generated_bboxes = tf.image.draw_bounding_boxes(
         images=tf.image.grayscale_to_rgb(
-            tf.image.convert_image_dtype(gen_outputs[0], tf.float32)
+            tf.image.convert_image_dtype(tf.cast(gen_outputs[0], tf.uint16),
+                                         tf.float32)
         ),
         boxes=a_true_bboxes,
         colors=np.array([[1., 0., 0.]])
@@ -122,7 +129,8 @@ def plot_summaries(a, model_inputs, model_outputs, batches_seen):
     )
     noise_bboxes = tf.image.draw_bounding_boxes(
         images=tf.image.grayscale_to_rgb(
-            tf.image.convert_image_dtype(gen_outputs[1], tf.float32)
+            tf.image.convert_image_dtype(tf.cast(gen_outputs[1], tf.uint16),
+                                         tf.float32)
         ),
         boxes=n_fake_bboxes,
         colors=np.array([[0., 1., 0.]])
