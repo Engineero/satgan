@@ -154,7 +154,7 @@ def _convert_batches(batch):
 
     image, bboxes, _ = batch
     # image = tf.cast(image, tf.float32)
-    image = tf.image.convert_image_dtype(image, tf.float32)
+    # image = tf.image.convert_image_dtype(image, tf.float32)
     return image, bboxes
 
 
@@ -193,10 +193,10 @@ def load_examples(a, data_dir, shuffle=False, pad_bboxes=False, encoder=None):
             encoding_function=cast_image_to_float,
             # encoding_function=encoder.encode_for_yolo,
         )
-        # data.dataset = data.dataset.map(
-        #     lambda im, box, fname:_convert_batches((im, box, fname)),
-        #     num_parallel_calls=a.num_parallel_calls
-        # )
+        data.dataset = data.dataset.map(
+            lambda im, box, fname:_convert_batches((im, box, fname)),
+            num_parallel_calls=a.num_parallel_calls
+        )
     else:
         data = GanDataset(a, data_dir, shuffle, pad_bboxes)
 
