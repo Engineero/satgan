@@ -191,7 +191,6 @@ def load_examples(a, data_dir, shuffle=False, pad_bboxes=False, encoder=None):
             num_threads=a.num_parallel_calls,
             buffer=a.buffer_size,
             encoding_function=cast_image_to_float,
-            # encoding_function=encoder.encode_for_yolo,
         )
         data.dataset = data.dataset.map(
             lambda im, box, fname:_convert_batches((im, box, fname)),
