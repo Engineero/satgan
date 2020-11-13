@@ -11,6 +11,12 @@ def image_int_to_float(image):
     return tf.image.convert_image_dtype(image, tf.float32)
 
 
+def image_float_to_int(image):
+    """Converts a float32 image in range [0, 1] to a float image in uint16 range."""
+    image = tf.image.convert_image_dtype(image, tf.uint16)
+    return tf.cast(image, tf.float32)
+
+
 def plot_summaries(a, model_inputs, model_outputs, batches_seen):
     """Plots summary images to Tensorboard.
 

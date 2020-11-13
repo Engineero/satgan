@@ -4,7 +4,7 @@
 from .generator import create_generator
 from .discriminator import create_discriminator
 from .task_net import create_task_net
-from .utils.plot_summaries import image_int_to_float
+from .utils.plot_summaries import image_int_to_float, image_float_to_int
 
 from pathlib import Path
 import tensorflow as tf
@@ -64,7 +64,7 @@ def create_model(a, a_train_data, b_train_data):
                 # TODO (NLT): figure out discriminator loss, interaction with Keras changes.
                 discriminator = create_discriminator(a, target_shape)
                 discriminator.summary()
-                predict_real = discriminator(targets)  # should -> [0, 1]
+                predict_real = discriminator(image_int_to_float(targets))  # should -> [0, 1]
                 predict_fake = discriminator(fake_img)  # should -> [1, 0]
                 discrim_outputs = tf.stack([predict_real, predict_fake], axis=0,
                                            name='discriminator')
@@ -94,8 +94,8 @@ def create_model(a, a_train_data, b_train_data):
                 else:
                     task_net = create_task_net(a, input_shape)
                 pred_task = task_net(targets)
-                pred_task_fake = task_net(fake_img)
-                pred_task_noise = task_net(gen_noise)
+                pred_task_fake = task_net(image_float_to_int(fake_img))
+                pred_task_noise = task_net(image_float_to_int(gen_noise))
             task_net.summary()
             task_outputs = tf.stack([pred_task, pred_task_fake, pred_task_noise],
                                     axis=0,
