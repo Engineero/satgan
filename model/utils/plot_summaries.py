@@ -7,7 +7,7 @@ import numpy as np
 
 def image_int_to_float(image):
     """Converts an image to uint16 and then float32 in range [0, 1]."""
-    image = tf.convert_image_dtype(image, tf.int32)
+    image = tf.image.convert_image_dtype(image, tf.int32)
     return tf.image.convert_image_dtype(image, tf.float32)
 
 
