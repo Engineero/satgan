@@ -255,11 +255,8 @@ def create_generator(a, input_shape, generator_outputs_channels):
     # Define the activation function to be used.
     if a.activation == 'lrelu':
         activation_fcn = lambda x: LeakyReLU()(x)
-    elif a.activation == 'mish':
-        from tensorflow_addons.activations import mish
-        activation_fcn = lambda x: mish(x)
     else:
-        raise ValueError("activation must be 'lrelu' or 'mish'")
+        raise ValueError("activation must be 'lrelu'")
 
     x_in = Input(shape=input_shape)
     num_filters = a.ngf
@@ -415,11 +412,8 @@ def create_discriminator(a, target_shape):
         # Define the activation function to be used.
         if a.activation == 'lrelu':
             activation_fcn = lambda x: LeakyReLU()(x)
-        elif a.activation == 'mish':
-            from tensorflow_addons.activations import mish
-            activation_fcn = lambda x: mish(x)
         else:
-            raise ValueError("activation must be 'lrelu' or 'mish'")
+            raise ValueError("activation must be 'lrelu'")
 
         with tf.name_scope('layer_1'):
             x = BatchNormalization()(x_in)
@@ -1490,7 +1484,7 @@ if __name__ == '__main__':
     parser.add_argument('--devices', nargs='+', type=int,
                         help='List of physical devices for TensorFlow to use.')
     parser.add_argument('--activation', type=str, default='lrelu',
-                        help='lrelu for leaky relu, mish for mish')
+                        help='lrelu for leaky relu')
     parser.add_argument('--freeze_task', action='store_true',
                         default=False,
                         help='If specified, do not train task network, '
