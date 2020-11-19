@@ -9,7 +9,6 @@ from tensorflow.keras.layers import (Input, Concatenate, BatchNormalization,
                                      Dropout, LeakyReLU)
 from tensorflow.keras.activations import tanh
 from tensorflow.keras.models import Model
-from tensorflow_addons.activations import mish
 
 
 def create_generator(a, input_shape, generator_outputs_channels):
@@ -28,6 +27,7 @@ def create_generator(a, input_shape, generator_outputs_channels):
     if a.activation == 'lrelu':
         activation_fcn = lambda x: LeakyReLU()(x)
     elif a.activation == 'mish':
+        from tensorflow_addons.activations import mish
         activation_fcn = lambda x: mish(x)
     else:
         raise ValueError("activation must be 'lrelu' or 'mish'")
