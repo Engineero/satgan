@@ -4,7 +4,6 @@ from tensorflow.keras.layers import (Conv2D, Flatten, Conv2DTranspose, Dense,
                                      UpSampling2D, LeakyReLU, ReLU,
                                      AveragePooling2D, MaxPooling2D,
                                      SeparableConv2D)
-from tensorflow_addons.activations import mish
 from .SpectralNormalization import SpectralNormalization
 
 
@@ -136,10 +135,8 @@ def up_resblock(x_init, filters, use_bias=True, sn=False, scope='resblock',
     # Define the activation function to be used.
     if activation == 'lrelu':
         activation_fcn = lambda x: LeakyReLU()(x)
-    elif activation == 'mish':
-        activation_fcn = lambda x: mish(x)
     else:
-        raise ValueError("activation must be 'lrelu' or 'mish'")
+        raise ValueError("activation must be 'lrelu'")
 
     with tf.name_scope(scope):
         with tf.name_scope('res1'):
@@ -202,10 +199,8 @@ def down_resblock(x_init, filters, to_down=True, use_bias=True, sn=False,
     # Define the activation function to be used.
     if activation == 'lrelu':
         activation_fcn = lambda x: LeakyReLU()(x)
-    elif activation == 'mish':
-        activation_fcn = lambda x: mish(x)
     else:
-        raise ValueError("activation must be 'lrelu' or 'mish'")
+        raise ValueError("activation must be 'lrelu'")
 
     with tf.name_scope(scope):
         init_channel = x_init.shape.as_list()[-1]
@@ -273,10 +268,8 @@ def init_down_resblock(x_init, filters, use_bias=True, sn=False,
     # Define the activation function to be used.
     if activation == 'lrelu':
         activation_fcn = lambda x: LeakyReLU()(x)
-    elif activation == 'mish':
-        activation_fcn = lambda x: mish(x)
     else:
-        raise ValueError("activation must be 'lrelu' or 'mish'")
+        raise ValueError("activation must be 'lrelu'")
 
     with tf.name_scope(scope):
         with tf.name_scope('res1'):
