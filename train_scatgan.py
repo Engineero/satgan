@@ -236,6 +236,7 @@ def train_satgan(a):
             model = load_model(output_path / 'full_model')
         for m in mean_list:
             m.reset_states()
+
         if a.a_test_dir is not None and a.b_test_dir is not None:
             for a_batch, b_batch in zip(a_test_data.dataset, b_test_data.dataset):
                 inputs, a_task_targets = a_batch

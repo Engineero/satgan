@@ -4,7 +4,7 @@
 from pathlib import Path
 import tensorflow as tf
 from miss_data_generator import DatasetGenerator
-
+from yolo_v3.model.yolo_encoder import cast_image_to_float
 
 class GanDataset:
     """Dataset class for GAN.
@@ -40,9 +40,8 @@ class GanDataset:
         """
 
         with tf.name_scope("preprocess"):
+            image = tf.cast(image, tf.float32)
             image = tf.image.per_image_standardization(image)
-            image = tf.image.convert_image_dtype(image, tf.float32)
-            # image = tf.cast(image, tf.float32)
             return image
 
     def _create_dataset(self):
@@ -153,9 +152,7 @@ def _convert_batches(batch):
     """
 
     image, bboxes, _ = batch
-    # image = tf.cast(image, tf.float32)
-    image = tf.image.convert_image_dtype(image, tf.float32)
-    return image, bboxes
+    return tf.cast(image, tf.float32), bboxes
 
 
 def load_examples(a, data_dir, shuffle=False, pad_bboxes=False, encoder=None):
@@ -190,7 +187,7 @@ def load_examples(a, data_dir, shuffle=False, pad_bboxes=False, encoder=None):
             batch_size=a.batch_size,
             num_threads=a.num_parallel_calls,
             buffer=a.buffer_size,
-            # encoding_function=encoder.encode_for_yolo,
+            encoding_function=cast_image_to_float,
         )
         data.dataset = data.dataset.map(
             lambda im, box, fname:_convert_batches((im, box, fname)),
