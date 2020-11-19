@@ -21,7 +21,6 @@ from tensorflow.keras.utils import plot_model
 from tensorflow.keras.optimizers import Adam, SGD
 from tensorflow.keras.metrics import Mean
 from yolo_v3 import build_yolo_model, load_yolo_model_weights
-from tensorflow_addons.activations import mish
 
 
 def preprocess(image, add_noise=False):
@@ -257,6 +256,7 @@ def create_generator(a, input_shape, generator_outputs_channels):
     if a.activation == 'lrelu':
         activation_fcn = lambda x: LeakyReLU()(x)
     elif a.activation == 'mish':
+        from tensorflow_addons.activations import mish
         activation_fcn = lambda x: mish(x)
     else:
         raise ValueError("activation must be 'lrelu' or 'mish'")
@@ -416,6 +416,7 @@ def create_discriminator(a, target_shape):
         if a.activation == 'lrelu':
             activation_fcn = lambda x: LeakyReLU()(x)
         elif a.activation == 'mish':
+            from tensorflow_addons.activations import mish
             activation_fcn = lambda x: mish(x)
         else:
             raise ValueError("activation must be 'lrelu' or 'mish'")

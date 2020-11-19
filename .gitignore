@@ -8,3 +8,4 @@ gan_output/
 logfiles/
 .vscode/
 outputs/
+*.DS_Store
