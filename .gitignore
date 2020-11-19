@@ -10,3 +10,4 @@ logfiles/
 outputs/
 .ipynb_checkpoints/
 nohup.out
+*.DS_Store
