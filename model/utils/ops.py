@@ -1,10 +1,12 @@
+"""Defines general network operations and layers used in the GAN."""
+
+
 import tensorflow as tf
 from tensorflow.keras.layers import (Conv2D, Flatten, Conv2DTranspose, Dense,
                                      Reshape, Input, BatchNormalization,
                                      UpSampling2D, LeakyReLU, ReLU,
                                      AveragePooling2D, MaxPooling2D,
                                      SeparableConv2D)
-from tensorflow_addons.activations import mish
 from .SpectralNormalization import SpectralNormalization
 
 
@@ -18,7 +20,7 @@ def conv(x, filters, kernel_size=(1, 1), strides=(1, 1), padding='valid',
     Args:
         x: input to the block.
         filters: number of filters in the block.
-    
+
     Keyword Args:
         kernel_size: kernel size. Default is (1, 1).
         strides: strides. Default is (1, 1).
@@ -55,7 +57,7 @@ def deconv(x, filters, kernel_size=(4, 4), strides=(2, 2), padding='same',
     Args:
         x: input to the block.
         filters: number of filters in the block.
-    
+
     Keyword Args:
         kernel_size: kernel size. Default is (4, 4).
         strides: strides. Default is (2, 2).
@@ -86,7 +88,7 @@ def fully_connected(x, units, activation=None, use_bias=True, sn=False,
 
     Args:
         units: number of units in FC output.
-    
+
     Keyword Args:
         activation: activation to use. Default is None which applies no
             activation (linear layer).
@@ -137,6 +139,7 @@ def up_resblock(x_init, filters, use_bias=True, sn=False, scope='resblock',
     if activation == 'lrelu':
         activation_fcn = lambda x: LeakyReLU()(x)
     elif activation == 'mish':
+        from tensorflow_addons.activations import mish
         activation_fcn = lambda x: mish(x)
     else:
         raise ValueError("activation must be 'lrelu' or 'mish'")
@@ -179,6 +182,7 @@ def up_resblock(x_init, filters, use_bias=True, sn=False, scope='resblock',
 
         return x + x_init
 
+
 def down_resblock(x_init, filters, to_down=True, use_bias=True, sn=False,
                   scope='resblock', separable=False, activation='lrelu'):
     """Residual block without average pooling.
@@ -198,11 +202,12 @@ def down_resblock(x_init, filters, to_down=True, use_bias=True, sn=False,
     Returns:
         Residual block output layer.
     """
-    
+
     # Define the activation function to be used.
     if activation == 'lrelu':
         activation_fcn = lambda x: LeakyReLU()(x)
     elif activation == 'mish':
+        from tensorflow_addons.activations import mish
         activation_fcn = lambda x: mish(x)
     else:
         raise ValueError("activation must be 'lrelu' or 'mish'")
@@ -251,6 +256,7 @@ def down_resblock(x_init, filters, to_down=True, use_bias=True, sn=False,
 
         return x + x_init
 
+
 def init_down_resblock(x_init, filters, use_bias=True, sn=False,
                        scope='resblock', activation='lrelu'):
     """Initial residual block with average pooling.
@@ -274,6 +280,7 @@ def init_down_resblock(x_init, filters, use_bias=True, sn=False,
     if activation == 'lrelu':
         activation_fcn = lambda x: LeakyReLU()(x)
     elif activation == 'mish':
+        from tensorflow_addons.activations import mish
         activation_fcn = lambda x: mish(x)
     else:
         raise ValueError("activation must be 'lrelu' or 'mish'")

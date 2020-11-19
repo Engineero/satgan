@@ -18,7 +18,13 @@ from model.utils.plot_summaries import plot_summaries
 tf.compat.v1.enable_eager_execution()
 
 
-def main(a):
+def test_satgan(a):
+    """Tests the SATGAN structure by passing some data through it.
+
+    Args:
+        a: argparse argument structure.
+    """
+
     # Set the visible devices to those specified:
     physical_devices = tf.config.list_physical_devices('GPU')
     used_devices = [physical_devices[i] for i in a.devices]
@@ -233,4 +239,4 @@ if __name__ == '__main__':
     parser.add_argument("--output_filetype", default="png",
                         choices=["png", "jpeg"])
     args = parser.parse_args()
-    main(args)
+    test_satgan(args)

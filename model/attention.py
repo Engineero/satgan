@@ -1,3 +1,6 @@
+"""Defines the self-attention mechanism."""
+
+
 from .utils import ops
 
 import tensorflow as tf
@@ -5,6 +8,20 @@ from tensorflow.keras.layers import MaxPooling2D
 
 
 def google_attention(x, filters, sn=False, scope='attention'):
+    """Creates a self-attention layer.
+
+    Args:
+        x: input hidden-layer activations from pervious layer.
+        filters: number of filters in the self-attention layer.
+
+    Keyword Args:
+        sn: whether to use spectral normalization. Default is False.
+        scope: name for the name_scope. Default is "attention".
+
+    Returns:
+        Input hidden-layer post-self-attention.
+    """
+
     with tf.name_scope(scope):
         _, height, width, num_channels = x.get_shape().as_list()
         f = ops.conv(x, filters // 8, kernel_size=(1, 1), strides=(1, 1),

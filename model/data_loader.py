@@ -2,192 +2,198 @@
 
 
 from pathlib import Path
-
 import tensorflow as tf
+from miss_data_generator import DatasetGenerator
+from yolo_v3.model.yolo_encoder import cast_image_to_float
 
+class GanDataset:
+    """Dataset class for GAN.
 
-def _preprocess(image, add_noise=False):
-    """Performs image standardization, optinoally adds Gaussian noise.
+    Basically just mimics the interface for the MISS DatasetGenerator for
+    downstream code consistency.
 
     Args:
-        image: the image to transform
+        a: argparse argument structure from training script.
+        data_dir: directory for the dataset.
 
     Keyword Args:
-        add_noise: whether to add Gaussian noise to the image. Default is
-            False.
-
-    Returns:
-        Image shifted to zero mean and unit standard deviation with optional
-            Gaussian noise added.
+        shuffle: whether to shuffle the dataset. Default is False.
+        pad_bboxes: whether to pad bboxes. Default is False.
     """
 
-    with tf.name_scope("preprocess"):
-        result = tf.cast(image, tf.float32)
-        result = tf.image.per_image_standardization(result)
-        if add_noise:
-            noise = tf.random.normal(shape=tf.shape(image), mean=0.0,
-                                     stddev=1.0, dtype=tf.float32)
-            return (result, noise)
-        return result
+    def __init__(self, a, data_dir, shuffle=False, pad_bboxes=False):
+        self.data_dir = data_dir
+        self.shuffle = shuffle
+        self.pad_bboxes = pad_bboxes
+        self.a = a  # args structure
+        self.dataset = self._create_dataset()
+
+    @staticmethod
+    def _preprocess(image):
+        """Performs image standardization, optinoally adds Gaussian noise.
+
+        Args:
+            image: the image to transform
+
+        Returns:
+            Image shifted to zero mean and unit standard deviation as tf.float32.
+        """
+
+        with tf.name_scope("preprocess"):
+            image = tf.cast(image, tf.float32)
+            image = tf.image.per_image_standardization(image)
+            return image
+
+    def _create_dataset(self):
+        # Crawl the data directory.
+        data_paths = list(Path(self.data_dir).resolve().glob('**/*.tfrecords'))
+        if len(data_paths) == 0:
+            raise ValueError(
+                f"Data directory {self.data_dir} contains no TFRecords files!"
+            )
+        # Create the dataset.
+        data = tf.data.TFRecordDataset(
+            filenames=[p.as_posix() for p in data_paths]
+        )
+        # Specify transformations on datasets.
+        if self.shuffle:
+            data = data.shuffle(self.a.buffer_size)
+        data = data.map(
+            lambda x: self._parse_example(x),
+            num_parallel_calls=self.a.num_parallel_calls
+        )
+        data = data.batch(self.a.batch_size, drop_remainder=True)
+        data = data.prefetch(buffer_size=self.a.buffer_size)
+        return data
+
+    def _parse_example(self, serialized_example):
+        """Parses a single TFRecord Example for one domain of the task network.
+
+        Args:
+            serialized_example: TFRecord example to load/interpret.
+            a: argparse object from training script.
+
+        Keyword Args:
+            pad_bboxes: if True, pads truth bboxes with +/-10 pix.
+
+        Returns:
+            Images, optional noise or None, and true bounding boxes with
+            classifications (objects) as:
+                (image, noise), objects
+        """
+
+        # Parse serialized example.
+        example = tf.io.parse_single_example(
+            serialized_example,
+            {
+                'images_raw': tf.io.VarLenFeature(dtype=tf.string),
+                'filename': tf.io.VarLenFeature(dtype=tf.string),
+                'height': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
+                'width': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
+                'classes': tf.io.VarLenFeature(dtype=tf.int64),
+                'ymin': tf.io.VarLenFeature(dtype=tf.float32),
+                'ymax': tf.io.VarLenFeature(dtype=tf.float32),
+                'ycenter': tf.io.VarLenFeature(dtype=tf.float32),
+                'xmin': tf.io.VarLenFeature(dtype=tf.float32),
+                'xmax': tf.io.VarLenFeature(dtype=tf.float32),
+                'xcenter': tf.io.VarLenFeature(dtype=tf.float32),
+                'magnitude': tf.io.VarLenFeature(dtype=tf.float32),
+            }
+        )
+
+        # Cast parsed objects into usable types.
+        width = tf.cast(example['width'], tf.int32)
+        height = tf.cast(example['height'], tf.int32)
+        classes = tf.cast(tf.sparse.to_dense(example['classes']), tf.float32)
+
+        if self.pad_bboxes:
+            # Pad bounding boxes. SatSim makes really tight bboxes...
+            xcenter = tf.cast(tf.sparse.to_dense(example['xcenter']), tf.float32)
+            ycenter = tf.cast(tf.sparse.to_dense(example['ycenter']), tf.float32)
+            xmin = xcenter - 10. / tf.cast(width, tf.float32)
+            xmax = xcenter + 10. / tf.cast(width, tf.float32)
+            ymin = ycenter - 10. / tf.cast(height, tf.float32)
+            ymax = ycenter + 10. / tf.cast(height, tf.float32)
+        else:
+            # Grab bboxes directly from data.
+            xmin = tf.cast(tf.sparse.to_dense(example['xmin']), tf.float32)
+            xmax = tf.cast(tf.sparse.to_dense(example['xmax']), tf.float32)
+            ymin = tf.cast(tf.sparse.to_dense(example['ymin']), tf.float32)
+            ymax = tf.cast(tf.sparse.to_dense(example['ymax']), tf.float32)
+
+        # Parse images and preprocess.
+        image = tf.sparse.to_dense(example['images_raw'], default_value='')
+        image = tf.io.decode_raw(image, tf.uint16)
+        image = tf.reshape(image, [height, width, self.a.n_channels])
+
+        # Package things up for output.
+        objects = tf.stack([ymin, xmin, ymax, xmax, classes], axis=-1)
+
+        # Need to pad objects to max inferences (not all images will have same
+        # number of objects).
+        paddings = tf.constant([[0, self.a.max_inferences], [0, 0]])
+        paddings = paddings - (tf.constant([[0, 1], [0, 0]]) * tf.shape(objects)[0])
+        objects = tf.pad(tensor=objects, paddings=paddings, constant_values=0.)
+        objects = tf.tile(objects, [self.a.num_pred_layers, 1])
+
+        # Normalize and convert the image, then return (inputs, targets) tuple.
+        image = self._preprocess(image)
+        return image, objects
 
 
-def _parse_example(serialized_example, a):
-    """Parses a single TFRecord Example for the task network."""
+def _convert_batches(batch):
+    """Converts dtype of batches from MISS DatasetGenerator object.
 
-    # Parse serialized example.
-    example = tf.io.parse_single_example(
-        serialized_example,
-        {
-            'a_raw': tf.io.VarLenFeature(dtype=tf.string),
-            'b_raw': tf.io.VarLenFeature(dtype=tf.string),
-            'a_filename': tf.io.VarLenFeature(dtype=tf.string),
-            'a_height': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
-            'a_width': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
-            'a_classes': tf.io.VarLenFeature(dtype=tf.int64),
-            'a_ymin': tf.io.VarLenFeature(dtype=tf.float32),
-            'a_ymax': tf.io.VarLenFeature(dtype=tf.float32),
-            'a_ycenter': tf.io.VarLenFeature(dtype=tf.float32),
-            'a_xmin': tf.io.VarLenFeature(dtype=tf.float32),
-            'a_xmax': tf.io.VarLenFeature(dtype=tf.float32),
-            'a_xcenter': tf.io.VarLenFeature(dtype=tf.float32),
-            'a_magnitude': tf.io.VarLenFeature(dtype=tf.float32),
-            'b_filename': tf.io.VarLenFeature(dtype=tf.string),
-            'b_height': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
-            'b_width': tf.io.FixedLenFeature(shape=(), dtype=tf.int64),
-            'b_classes': tf.io.VarLenFeature(dtype=tf.int64),
-            'b_ymin': tf.io.VarLenFeature(dtype=tf.float32),
-            'b_ymax': tf.io.VarLenFeature(dtype=tf.float32),
-            'b_ycenter': tf.io.VarLenFeature(dtype=tf.float32),
-            'b_xmin': tf.io.VarLenFeature(dtype=tf.float32),
-            'b_xmax': tf.io.VarLenFeature(dtype=tf.float32),
-            'b_xcenter': tf.io.VarLenFeature(dtype=tf.float32),
-            'b_magnitude': tf.io.VarLenFeature(dtype=tf.float32),
-        }
-    )
+    Args:
+        batch: a batch from the DatasetGenerator.
 
-    # Cast parsed objects into usable types.
-    a_width = tf.cast(example['a_width'], tf.int32)
-    a_height = tf.cast(example['a_height'], tf.int32)
-    a_xcenter = tf.cast(tf.sparse.to_dense(example['a_xcenter']), tf.float32)
-    # a_xmin = tf.cast(tf.sparse.to_dense(example['a_xmin']), tf.float32)
-    # a_xmax = tf.cast(tf.sparse.to_dense(example['a_xmax']), tf.float32)
-    a_ycenter = tf.cast(tf.sparse.to_dense(example['a_ycenter']), tf.float32)
-    # a_ymin = tf.cast(tf.sparse.to_dense(example['a_ymin']), tf.float32)
-    # a_ymax = tf.cast(tf.sparse.to_dense(example['a_ymax']), tf.float32)
-    a_classes = tf.cast(tf.sparse.to_dense(example['a_classes']), tf.float32)
-    b_width = tf.cast(example['b_width'], tf.int32)
-    b_height = tf.cast(example['b_height'], tf.int32)
-    # b_xcenter = tf.cast(tf.sparse.to_dense(example['b_xcenter']), tf.float32)
-    b_xmin = tf.cast(tf.sparse.to_dense(example['b_xmin']), tf.float32)
-    b_xmax = tf.cast(tf.sparse.to_dense(example['b_xmax']), tf.float32)
-    # b_ycenter = tf.cast(tf.sparse.to_dense(example['b_ycenter']), tf.float32)
-    b_ymin = tf.cast(tf.sparse.to_dense(example['b_ymin']), tf.float32)
-    b_ymax = tf.cast(tf.sparse.to_dense(example['b_ymax']), tf.float32)
-    b_classes = tf.cast(tf.sparse.to_dense(example['b_classes']), tf.float32)
+    Returns:
+        (image, bboxes) with image converted to tf.float32.
+    """
 
-    # Calculate bounding boxes for A images (SatSim makes really tight boxes).
-    a_xmin = a_xcenter - (10. / tf.cast(a_width, tf.float32))
-    a_xmax = a_xcenter + (10. / tf.cast(a_width, tf.float32))
-    a_ymin = a_ycenter - (10. / tf.cast(a_height, tf.float32))
-    a_ymax = a_ycenter + (10. / tf.cast(a_height, tf.float32))
-
-    # Parse images and preprocess.
-    a_image = tf.sparse.to_dense(example['a_raw'], default_value='')
-    a_image = tf.io.decode_raw(a_image, tf.uint16)
-    a_image = tf.reshape(a_image, [a_height, a_width, a.n_channels])
-    b_image = tf.sparse.to_dense(example['b_raw'], default_value='')
-    b_image = tf.io.decode_raw(b_image, tf.uint16)
-    b_image = tf.reshape(b_image, [b_height, b_width, a.n_channels])
-
-    # Package things up for output.
-    a_objects = tf.stack([a_ymin, a_xmin, a_ymax, a_xmax, a_classes], axis=-1)
-    b_objects = tf.stack([b_ymin, b_xmin, b_ymax, b_xmax, b_classes], axis=-1)
-
-    # Need to pad objects to max inferences (not all images will have same
-    # number of objects).
-    a_paddings = tf.constant([[0, a.max_inferences], [0, 0]])
-    a_paddings = a_paddings - (tf.constant([[0, 1], [0, 0]]) * tf.shape(a_objects)[0])
-    a_objects = tf.pad(tensor=a_objects, paddings=a_paddings, constant_values=0.)
-    a_objects = tf.tile(a_objects, [a.num_pred_layers, 1])
-    b_paddings = tf.constant([[0, a.max_inferences], [0, 0]])
-    b_paddings = b_paddings - (tf.constant([[0, 1], [0, 0]]) * tf.shape(b_objects)[0])
-    b_objects = tf.pad(tensor=b_objects, paddings=b_paddings, constant_values=0.)
-    b_objects = tf.tile(b_objects, [a.num_pred_layers, 1])
-
-    # task_targets = (objects, width, height)
-    if a.which_direction == 'AtoB':
-        a_image, gen_input = _preprocess(a_image, add_noise=True)
-        b_image = _preprocess(b_image, add_noise=False)
-        return ((a_image, gen_input, b_image), (b_image, a_objects, b_objects))
-    else:
-        b_image, gen_input = _preprocess(b_image, add_noise=True)
-        a_image = _preprocess(a_image, add_noise=False)
-        return ((b_image, gen_input, a_image), (a_image, b_objects, a_objects))
+    image, bboxes, _ = batch
+    return tf.cast(image, tf.float32), bboxes
 
 
-def load_examples(a):
-    """Create dataset pipelines."""
+def load_examples(a, data_dir, shuffle=False, pad_bboxes=False, encoder=None):
+    """Create dataset pipeline.
+
+    Args:
+        a: argparse object from training script.
+        data_dir: path to data TFRecords.
+
+    Keyword Args:
+        shuffle: whether to shuffle the data.
+        pad_bboxes: if True, pads truth bboxes with +/-10 pix.
+        encoder: YOLO encoder object defining parse_data method.
+
+    Returns:
+        TFRecordDataset of data.
+    """
 
     # Create data queue from training dataset.
-    if a.train_dir is None or not Path(a.train_dir).resolve().is_dir():
+    if data_dir is None or not Path(data_dir).resolve().is_dir():
         raise NotADirectoryError(
-            f"Training directory {a.train_dir} does not exist!"
+            f"Data directory {data_dir} does not exist!"
         )
-    train_paths = list(Path(a.train_dir).resolve().glob('**/*.tfrecords'))
-    if len(train_paths) == 0:
-        raise ValueError(
-            f"Training directory {a.input_dir} contains no TFRecords files!"
-        )
-    train_data = tf.data.TFRecordDataset(
-        filenames=[p.as_posix() for p in train_paths]
-    )
 
-    # Create data queue from validation dataset.
-    if a.valid_dir is None or not Path(a.valid_dir).resolve().is_dir():
-        raise NotADirectoryError(
-            f"Validation directory {a.valid_dir} does not exist!"
+    if encoder is not None:
+        # Use MISS DatasetGenerator instead.
+        data = DatasetGenerator(
+            data_dir,
+            parse_function=encoder.parse_data,
+            augment=False,
+            shuffle=shuffle,
+            batch_size=a.batch_size,
+            num_threads=a.num_parallel_calls,
+            buffer=a.buffer_size,
+            encoding_function=cast_image_to_float,
         )
-    valid_paths = list(Path(a.valid_dir).resolve().glob('**/*.tfrecords'))
-    if len(valid_paths) == 0:
-        raise ValueError(
-            f"Validation directory {a.valid_dir} contains no TFRecords files!"
-        )
-    valid_data = tf.data.TFRecordDataset(
-        filenames=[p.as_posix() for p in valid_paths]
-    )
-
-    # Create data queue from testing dataset, if given.
-    if a.test_dir is not None:
-        if not Path(a.test_dir).resolve().is_dir():
-            raise NotADirectoryError(
-                f"Testing directory {a.test_dir} does not exist!"
-            )
-        test_paths = list(Path(a.test_dir).resolve().glob('**/*.tfrecords'))
-        if len(test_paths) == 0:
-            raise ValueError(
-                f"Testing directory {a.test_dir} contains no TFRecords files!"
-            )
-        test_data = tf.data.TFRecordDataset(
-            filenames=[p.as_posix() for p in test_paths]
+        data.dataset = data.dataset.map(
+            lambda im, box, fname:_convert_batches((im, box, fname)),
+            num_parallel_calls=a.num_parallel_calls
         )
     else:
-        test_data = None
+        data = GanDataset(a, data_dir, shuffle, pad_bboxes)
 
-    # Specify transformations on datasets.
-    train_data = train_data.shuffle(a.buffer_size)
-    train_data = train_data.map(
-        lambda x: _parse_example(x, a)
-    )
-    train_data = train_data.batch(a.batch_size, drop_remainder=True)
-
-    valid_data = valid_data.map(
-        lambda x: _parse_example(x, a)
-    )
-    valid_data = valid_data.batch(a.batch_size, drop_remainder=True)
-
-    if a.test_dir is not None:
-        test_data = test_data.map(
-            lambda x: _parse_example(x, a)
-        )
-        test_data = test_data.batch(a.batch_size, drop_remainder=True)
-    return train_data, valid_data, test_data
+    return data

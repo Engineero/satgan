@@ -1,10 +1,12 @@
+"""Defines the discriminator for the GAN."""
+
+
 from .utils import ops
 from .attention import google_attention
 
 import tensorflow as tf
 from tensorflow.keras.layers import Input, BatchNormalization, LeakyReLU
 from tensorflow.keras.models import Model
-from tensorflow_addons.activations import mish
 
 
 def create_discriminator(a, target_shape):
@@ -53,6 +55,7 @@ def create_discriminator(a, target_shape):
         if a.activation == 'lrelu':
             activation_fcn = lambda x: LeakyReLU()(x)
         elif a.activation == 'mish':
+            from tensorflow_addons.activations import mish
             activation_fcn = lambda x: mish(x)
         else:
             raise ValueError("activation must be 'lrelu' or 'mish'")

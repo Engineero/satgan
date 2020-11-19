@@ -1,3 +1,6 @@
+"""Script for training the SATGAN."""
+
+
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -16,13 +19,20 @@ from model.losses import (compute_total_loss, compute_apply_gradients,
                           calc_discriminator_loss, calc_generator_loss,
                           calc_task_loss)
 from model.utils.plot_summaries import plot_summaries
+from yolo_v3 import build_yolo_model
 
 
 # Enable eager execution.
 tf.compat.v1.enable_eager_execution()
 
 
-def main(a):
+def train_satgan(a):
+    """Entry point for the training script.
+
+    Args:
+        a: argparse argument object.
+    """
+
     # Set the visible devices to those specified:
     physical_devices = tf.config.list_physical_devices('GPU')
     used_devices = [physical_devices[i] for i in a.devices]
@@ -44,11 +54,39 @@ def main(a):
     tensorboard_path.mkdir(parents=True, exist_ok=True)
     writer = tf.summary.create_file_writer(tensorboard_path.as_posix())
 
-    # Build data generators.
-    train_data, val_data, test_data = load_examples(a)
+    # Create YOLO encoder to be used in making generator.
+    if a.use_yolo_encoder:
+        _, _, encoder = build_yolo_model(
+            base_model_name=a.base_model_name,
+            is_recurrent=a.is_recurrent,
+            num_predictor_heads=a.num_pred_layers,
+            max_inferences_per_image=a.max_inferences,
+            max_bbox_overlap=a.max_bbox_overlap,
+            confidence_threshold=a.confidence_threshold,
+        )
+    else:
+        encoder = None
+
+    a_train_data = load_examples(a, a.a_train_dir, shuffle=True,
+                                 pad_bboxes=a.pad_bboxes_a, encoder=encoder)
+    a_val_data = load_examples(a, a.a_valid_dir, pad_bboxes=a.pad_bboxes_a,
+                               encoder=encoder)
+    if a.a_test_dir is not None:
+        a_test_data = load_examples(a, a.a_test_dir, pad_bboxes=a.pad_bboxes_a,
+                                    encoder=encoder)
+
+    # Build data generators for target domain.
+    b_train_data = load_examples(a, a.b_train_dir, shuffle=True,
+                                 pad_bboxes=a.pad_bboxes_b, encoder=encoder)
+    b_val_data = load_examples(a, a.b_valid_dir, pad_bboxes=a.pad_bboxes_b,
+                               encoder=encoder)
+    if a.b_test_dir is not None:
+        b_test_data = load_examples(a, a.b_test_dir, pad_bboxes=a.pad_bboxes_b,
+                                    encoder=encoder)
 
     # Build the model.
-    model, generator, _ = create_model(a, train_data)
+    model, generator, _ = create_model(a, a_train_data.dataset,
+                                       b_train_data.dataset)
     model.summary()
 
     # Define the optimizer, losses, and weights.
@@ -78,11 +116,19 @@ def main(a):
             print(f'Training epoch {epoch+1} of {a.max_epochs}...')
             epoch_start = time.time()
 
-            for batch_num, batch in enumerate(train_data):
+            for batch_num, (a_batch, b_batch) in enumerate(zip(a_train_data.dataset,
+                                                               b_train_data.dataset)):
+
+                # Generate noise batch for this step.
+                inputs, _ = a_batch
+                noise = tf.random.normal(shape=tf.shape(inputs), mean=0.0,
+                                         stddev=1.0, dtype=tf.float32)
+
                 # Save summary images, statistics.
                 if batch_num % a.summary_freq == 0:
                     print(f'Writing outputs for epoch {epoch+1}, batch {batch_num}.')
-                    (inputs, noise, targets), (_, a_task_targets, b_task_targets) = batch
+                    inputs, a_task_targets = a_batch
+                    targets, b_task_targets = b_batch
                     gen_outputs, discrim_outputs, task_outputs = model(
                         [inputs, noise, targets]
                     )
@@ -91,17 +137,23 @@ def main(a):
                     model_outputs = (gen_outputs, discrim_outputs,
                                      task_outputs)
 
+                    # print(f'\nA targets: {a_task_targets}')
+                    # print(f'\nB targets: {b_task_targets}')
+                    # print(f'\ntask net outputs: {task_outputs}')
+
                     # Plot all of the summary images.
                     plot_summaries(a, model_inputs, model_outputs,
                                    batches_seen)
 
                     # Compute batch losses.
                     total_loss, discrim_loss, gen_loss, task_loss = \
-                        compute_total_loss(a,
-                                           model_inputs,
-                                           model_outputs,
-                                           batches_seen,
-                                           return_all=True)
+                        compute_total_loss(
+                            a,
+                            model_inputs,
+                            model_outputs,
+                            batches_seen,
+                            return_all=True
+                        )
                     print(f'Batch {batch_num} performance\n',
                           f'total loss: {total_loss:.4f}\t',
                           f'discriminator loss: {discrim_loss:.4f}\t',
@@ -109,12 +161,16 @@ def main(a):
                           f'task loss: {task_loss:.4f}\t')
 
                 # Update the model.
-                compute_apply_gradients(a,
-                                        model,
-                                        batch,
-                                        optimizer_list,
-                                        loss_list,
-                                        batches_seen)
+                compute_apply_gradients(
+                    a,
+                    model,
+                    a_batch,
+                    b_batch,
+                    noise,
+                    optimizer_list,
+                    loss_list,
+                    batches_seen
+                )
                 batches_seen.assign_add(1)
                 writer.flush()
 
@@ -124,8 +180,11 @@ def main(a):
             # Eval on validation data, save best model, early stopping...
             for m in mean_list:
                 m.reset_states()
-            for batch in val_data:
-                (inputs, noise, targets), (_, a_task_targets, b_task_targets) = batch
+            for a_batch, b_batch in zip(a_val_data.dataset, b_val_data.dataset):
+                inputs, a_task_targets = a_batch
+                targets, b_task_targets = b_batch
+                noise = tf.random.normal(shape=tf.shape(inputs), mean=0.0,
+                                         stddev=1.0, dtype=tf.float32)
                 gen_outputs, discrim_outputs, task_outputs = model([inputs,
                                                                     noise,
                                                                     targets])
@@ -133,11 +192,13 @@ def main(a):
                 model_outputs = (gen_outputs, discrim_outputs, task_outputs)
 
                 total_loss, discrim_loss, gen_loss, task_loss = \
-                    compute_total_loss(a,
-                                       model_inputs,
-                                       model_outputs,
-                                       batches_seen,
-                                       return_all=True)
+                    compute_total_loss(
+                        a,
+                        model_inputs,
+                        model_outputs,
+                        batches_seen,
+                        return_all=True
+                    )
                 for m, loss in zip(mean_list, [total_loss,
                                                discrim_loss,
                                                gen_loss,
@@ -175,48 +236,71 @@ def main(a):
             model = load_model(output_path / 'full_model')
         for m in mean_list:
             m.reset_states()
-        for batch in test_data:
-            (inputs, noise, targets), (_, a_task_targets, b_task_targets) = batch
-            gen_outputs, discrim_outputs, task_outputs = model([inputs,
-                                                                noise,
-                                                                targets])
-            model_inputs = (inputs, targets, a_task_targets, b_task_targets)
-            model_outputs = (gen_outputs, discrim_outputs, task_outputs)
 
-            total_loss, discrim_loss, gen_loss, task_loss = \
-                compute_total_loss(a,
-                                   model_inputs,
-                                   model_outputs,
-                                   batches_seen,
-                                   return_all=True)
-            for m, loss in zip(mean_list, [total_loss,
-                                           discrim_loss,
-                                           gen_loss,
-                                           task_loss]):
-                m.update_state([loss])
-        print(f'Test performance\n',
-              f'total loss: {mean_list[0].result().numpy():.4f}\t',
-              f'discriminator loss: {mean_list[1].result().numpy():.4f}\t',
-              f'generator loss: {mean_list[2].result().numpy():.4f}\t',
-              f'task loss: {mean_list[3].result().numpy():.4f}\t')
+        if a.a_test_dir is not None and a.b_test_dir is not None:
+            for a_batch, b_batch in zip(a_test_data.dataset, b_test_data.dataset):
+                inputs, a_task_targets = a_batch
+                targets, b_task_targets = b_batch
+                noise = tf.random.normal(shape=tf.shape(inputs), mean=0.0,
+                                         stddev=1.0, dtype=tf.float32)
+                gen_outputs, discrim_outputs, task_outputs = model([inputs,
+                                                                    noise,
+                                                                    targets])
+                model_inputs = (inputs, targets, a_task_targets,
+                                b_task_targets)
+                model_outputs = (gen_outputs, discrim_outputs, task_outputs)
+
+                total_loss, discrim_loss, gen_loss, task_loss = \
+                    compute_total_loss(
+                        a,
+                        model_inputs,
+                        model_outputs,
+                        batches_seen,
+                        return_all=True
+                    )
+                for m, loss in zip(mean_list, [total_loss,
+                                               discrim_loss,
+                                               gen_loss,
+                                               task_loss]):
+                    m.update_state([loss])
+            print(f'Test performance\n',
+                  f'total loss: {mean_list[0].result().numpy():.4f}\t',
+                  f'discriminator loss: {mean_list[1].result().numpy():.4f}\t',
+                  f'generator loss: {mean_list[2].result().numpy():.4f}\t',
+                  f'task loss: {mean_list[3].result().numpy():.4f}\t')
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--train_dir",
+        "--a_train_dir",
         default=None,
-        help="Path to folder containing TFRecords training files."
+        help="Path to folder containing source TFRecords training files."
     )
     parser.add_argument(
-        "--valid_dir",
+        "--a_valid_dir",
         default=None,
-        help="Path to folder containing TFRecords validation files."
+        help="Path to folder containing source TFRecords validation files."
     )
     parser.add_argument(
-        "--test_dir",
+        "--a_test_dir",
         default=None,
-        help="Path to folder containing TFRecords testing files."
+        help="Path to folder containing source TFRecords testing files."
+    )
+    parser.add_argument(
+        "--b_train_dir",
+        default=None,
+        help="Path to folder containing target TFRecords training files."
+    )
+    parser.add_argument(
+        "--b_valid_dir",
+        default=None,
+        help="Path to folder containing target TFRecords validation files."
+    )
+    parser.add_argument(
+        "--b_test_dir",
+        default=None,
+        help="Path to folder containing target TFRecords testing files."
     )
     parser.add_argument("--mode", required=True,
                         choices=["train", "test", "export"])
@@ -244,8 +328,6 @@ if __name__ == '__main__':
                         help="split input image into brightness (A) and color (B)")
     parser.add_argument("--batch_size", type=int, default=1,
                         help="number of images in batch")
-    parser.add_argument("--which_direction", type=str, default="AtoB",
-                        choices=["AtoB", "BtoA"])
     parser.add_argument("--n_blocks_gen", type=int, default=8,
                         help="Number of ResNet blocks in generator. Must be even.")
     parser.add_argument("--n_layer_dsc", type=int, default=3,
@@ -331,6 +413,8 @@ if __name__ == '__main__':
                         help='Objectness threshold, under which a detection is ignored.')
     parser.add_argument('--use_yolo', default=False, action='store_true',
                         help='Whether to use existing YOLO SatNet for task network.')
+    parser.add_argument('--use_yolo_encoder', default=False, action='store_true',
+                        help='Whether to use MISS YOLO encoder for data import.')
     parser.add_argument('--use_sagan', default=False, action='store_true',
                         help='Whether to use self-attending GAN architecture with ResNet blocks.')
     parser.add_argument('--checkpoint_load_path', type=str,
@@ -357,9 +441,15 @@ if __name__ == '__main__':
                         default=False,
                         help='If specified, do not train task network, '
                              'just use its loss.')
+    parser.add_argument('--num_parallel_calls', default=None, type=int,
+                        help='Number of parallel jobs for data mapping.')
+    parser.add_argument('--pad_bboxes_a', action='store_true', default=False,
+                        help='If specified, pads A-domain bboxes.')
+    parser.add_argument('--pad_bboxes_b', action='store_true', default=False,
+                        help='If specified, pads B-domain bboxes.')
 
     # export options
     parser.add_argument("--output_filetype", default="png",
                         choices=["png", "jpeg"])
     args = parser.parse_args()
-    main(args)
+    train_satgan(args)
