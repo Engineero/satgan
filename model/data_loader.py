@@ -40,9 +40,8 @@ class GanDataset:
         """
 
         with tf.name_scope("preprocess"):
+            image = tf.cast(image, tf.float32)
             image = tf.image.per_image_standardization(image)
-            image = tf.image.convert_image_dtype(image, tf.float32)
-            # image = tf.cast(image, tf.float32)
             return image
 
     def _create_dataset(self):
@@ -153,9 +152,7 @@ def _convert_batches(batch):
     """
 
     image, bboxes, _ = batch
-    # image = tf.cast(image, tf.float32)
-    # image = tf.image.convert_image_dtype(image, tf.float32)
-    return image, bboxes
+    return tf.cast(image, tf.float32), bboxes
 
 
 def load_examples(a, data_dir, shuffle=False, pad_bboxes=False, encoder=None):

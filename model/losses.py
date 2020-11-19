@@ -4,7 +4,6 @@
 import tensorflow as tf
 from tensorflow.keras.losses import (MSE, mean_absolute_error,
                                      categorical_crossentropy)
-from .utils.plot_summaries import image_int_to_float
 
 
 # Define model losses and helpers for computing and applying gradients.
@@ -200,7 +199,7 @@ def calc_generator_loss(a, model_inputs, model_outputs, step,
                                       [discrim_fake.shape[0], -1, 2])
             targets_ones = tf.ones(shape=discrim_fake.shape[:-1])
             targets_zeros = tf.zeros(shape=discrim_fake.shape[:-1])
-            targets = image_int_to_float(model_inputs[1])
+            targets = model_inputs[1]
             gen_loss_GAN = tf.reduce_mean(
                 categorical_crossentropy(
                     tf.stack([targets_zeros, targets_ones], axis=-1),

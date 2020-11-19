@@ -11,12 +11,6 @@ def image_int_to_float(image):
     return tf.image.convert_image_dtype(image, tf.float32)
 
 
-def image_float_to_int(image):
-    """Converts a float32 image in range [0, 1] to a float image in uint16 range."""
-    image = tf.image.convert_image_dtype(image, tf.uint16)
-    return tf.cast(image, tf.float32)
-
-
 def plot_summaries(a, model_inputs, model_outputs, batches_seen):
     """Plots summary images to Tensorboard.
 
@@ -119,7 +113,7 @@ def plot_summaries(a, model_inputs, model_outputs, batches_seen):
         colors=np.array([[0., 1., 0.]])
     )
     generated_bboxes = tf.image.draw_bounding_boxes(
-        images=tf.image.grayscale_to_rgb(gen_outputs[0]),
+        images=tf.image.grayscale_to_rgb(image_int_to_float(gen_outputs[0])),
         boxes=a_true_bboxes,
         colors=np.array([[1., 0., 0.]])
     )
@@ -129,7 +123,7 @@ def plot_summaries(a, model_inputs, model_outputs, batches_seen):
         colors=np.array([[0., 1., 0.]])
     )
     noise_bboxes = tf.image.draw_bounding_boxes(
-        images=tf.image.grayscale_to_rgb(gen_outputs[1]),
+        images=tf.image.grayscale_to_rgb(image_int_to_float(gen_outputs[1])),
         boxes=n_fake_bboxes,
         colors=np.array([[0., 1., 0.]])
     )
