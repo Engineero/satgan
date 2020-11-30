@@ -273,7 +273,7 @@ class GanDataset:
 def _parse_array(sparse_tensor, sparse_shape, saved_dtype, name="parse_array"):
     # We need to pull the raw tensors from the TFRecords
     tensor_shape = tf.cast(tf.sparse.to_dense(sparse_shape), tf.int32)
-    tensor = tf.sparse.to_dense(sparse_tensor, default_value="")
+    tensor = tf.sparse.to_dense(sparse_tensor, default_value=0)
 
     # Raw decode and reshape the array
     tensor = tf.io.decode_raw(tensor, saved_dtype, name=name + "_decode_raw")
