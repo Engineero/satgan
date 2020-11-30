@@ -62,6 +62,7 @@ def train_satgan(a):
             max_inferences_per_image=a.max_inferences,
             max_bbox_overlap=a.max_bbox_overlap,
             confidence_threshold=a.confidence_threshold,
+            is_multiframe=a.is_multiframe,
         )
     else:
         encoder = None

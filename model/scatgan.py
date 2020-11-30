@@ -81,6 +81,7 @@ def create_model(a, a_train_data, b_train_data):
                         max_inferences_per_image=a.max_inferences,
                         max_bbox_overlap=a.max_bbox_overlap,
                         confidence_threshold=a.confidence_threshold,
+                        is_multiframe=a.is_multiframe,
                     )
                     task_net = load_yolo_model_weights(task_net,
                                                        a.checkpoint_load_path)
