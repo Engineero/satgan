@@ -58,7 +58,6 @@ def train_satgan(a):
     if a.use_yolo_encoder:
         _, _, encoder = build_yolo_model(
             base_model_name=a.base_model_name,
-            is_recurrent=a.is_recurrent,
             num_predictor_heads=a.num_pred_layers,
             max_inferences_per_image=a.max_inferences,
             max_bbox_overlap=a.max_bbox_overlap,
@@ -429,10 +428,10 @@ if __name__ == '__main__':
     parser.add_argument('--confidence_threshold', type=float,
                         default=0.0,
                         help='Minimum confidence required to infer a box.')
-    parser.add_argument('--is_recurrent', action='store_true',
+    parser.add_argument('--is_multiframe', action='store_true',
                         default=False,
-                        help='Should we use a recurrent (Convolutional LSTM) '
-                             'variant of the model')
+                        help='Should we use a multiframe (3D Convolutional) '
+                             'variant of the model?')
     parser.add_argument('--devices', nargs='+', type=int,
                         help='List of physical devices for TensorFlow to use.')
     parser.add_argument('--activation', type=str, default='lrelu',
