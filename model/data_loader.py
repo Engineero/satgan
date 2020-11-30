@@ -39,7 +39,7 @@ class GanDataset:
             Image shifted to zero mean and unit standard deviation as tf.float32.
         """
 
-        with tf.name_scope("preprocess"):
+        with tf.name_scope('preprocess'):
             image = tf.cast(image, tf.float32)
             image = tf.image.per_image_standardization(image)
             return image
@@ -49,7 +49,7 @@ class GanDataset:
         data_paths = list(Path(self.data_dir).resolve().glob('**/*.tfrecords'))
         if len(data_paths) == 0:
             raise ValueError(
-                f"Data directory {self.data_dir} contains no TFRecords files!"
+                f'Data directory {self.data_dir} contains no TFRecords files!'
             )
         # Create the dataset.
         data = tf.data.TFRecordDataset(
@@ -192,27 +192,27 @@ class GanDataset:
         # Cast parsed objects into usable types.
         width = tf.cast(example['width'], tf.int32)
         height = tf.cast(example['height'], tf.int32)
-        num_time_steps = tf.cast(example["num_time_steps"], tf.int32)
+        num_time_steps = tf.cast(example['num_time_steps'], tf.int32)
         classes = _parse_array(
-            example["classes"],
-            example["classes_shape"],
+            example['classes'],
+            example['classes_shape'],
             saved_dtype=tf.float64,
-            name="classes",
+            name='classes',
         )
 
         if self.pad_bboxes:
             # Pad bounding boxes. SatSim makes really tight bboxes...
             xcenter = _parse_array(
-                example["xcenter"],
-                example["xcenter_shape"],
+                example['xcenter'],
+                example['xcenter_shape'],
                 saved_dtype=tf.float64,
-                name="xcenter",
+                name='xcenter',
             )
             ycenter = _parse_array(
-                example["ycenter"],
-                example["ycenter_shape"],
+                example['ycenter'],
+                example['ycenter_shape'],
                 saved_dtype=tf.float64,
-                name="ycenter",
+                name='ycenter',
             )
             xmin = xcenter - 10. / tf.cast(width, tf.float32)
             xmax = xcenter + 10. / tf.cast(width, tf.float32)
@@ -221,28 +221,28 @@ class GanDataset:
         else:
             # Grab bboxes directly from data.
             ymin = _parse_array(
-                example["ymin"],
-                example["ymin_shape"],
+                example['ymin'],
+                example['ymin_shape'],
                 saved_dtype=tf.float64,
-                name="ymin",
+                name='ymin',
             )
             ymax = _parse_array(
-                example["ymax"],
-                example["ymax_shape"],
+                example['ymax'],
+                example['ymax_shape'],
                 saved_dtype=tf.float64,
-                name="ymax",
+                name='ymax',
             )
             xmin = _parse_array(
-                example["xmin"],
-                example["xmin_shape"],
+                example['xmin'],
+                example['xmin_shape'],
                 saved_dtype=tf.float64,
-                name="xmin",
+                name='xmin',
             )
             xmax = _parse_array(
-                example["xmax"],
-                example["xmax_shape"],
+                example['xmax'],
+                example['xmax_shape'],
                 saved_dtype=tf.float64,
-                name="xmax",
+                name='xmax',
             )
 
         # Parse images and preprocess.
@@ -270,17 +270,17 @@ class GanDataset:
         return image, objects
 
 
-def _parse_array(sparse_tensor, sparse_shape, saved_dtype, name="parse_array"):
+def _parse_array(sparse_tensor, sparse_shape, saved_dtype, name='parse_array'):
     # We need to pull the raw tensors from the TFRecords
     tensor_shape = tf.cast(tf.sparse.to_dense(sparse_shape), tf.int32)
-    tensor = tf.sparse.to_dense(sparse_tensor, default_value=0)
+    tensor = tf.sparse.to_dense(sparse_tensor, default_value='')
 
     # Raw decode and reshape the array
-    tensor = tf.io.decode_raw(tensor, saved_dtype, name=name + "_decode_raw")
-    tensor = tf.reshape(tensor, tensor_shape, name=name + "_reshape")
+    tensor = tf.io.decode_raw(tensor, saved_dtype, name=name + '_decode_raw')
+    tensor = tf.reshape(tensor, tensor_shape, name=name + '_reshape')
 
     # Cast everything to float32 when we are done
-    tensor = tf.cast(tensor, tf.float32, name=name + "_cast")
+    tensor = tf.cast(tensor, tf.float32, name=name + '_cast')
     return tensor
 
 
@@ -317,7 +317,7 @@ def load_examples(a, data_dir, shuffle=False, pad_bboxes=False, encoder=None):
     # Create data queue from training dataset.
     if data_dir is None or not Path(data_dir).resolve().is_dir():
         raise NotADirectoryError(
-            f"Data directory {data_dir} does not exist!"
+            f'Data directory {data_dir} does not exist!'
         )
 
     if encoder is not None:
