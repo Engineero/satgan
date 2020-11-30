@@ -58,7 +58,7 @@ class GanDataset:
         # Specify transformations on datasets.
         if self.shuffle:
             data = data.shuffle(self.a.buffer_size)
-        if self.a.is_recurrent:
+        if self.a.is_multiframe:
             data = data.map(
                 lambda x: self._parse_example_multiframe(x),
                 num_parallel_calls=self.a.num_parallel_calls
@@ -321,10 +321,14 @@ def load_examples(a, data_dir, shuffle=False, pad_bboxes=False, encoder=None):
         )
 
     if encoder is not None:
+        if a.is_multiframe:
+            parse_fcn = encoder.parse_data_multiframe
+        else:
+            parse_fcn = encoder.parse_data
         # Use MISS DatasetGenerator instead.
         data = DatasetGenerator(
             data_dir,
-            parse_function=encoder.parse_data,
+            parse_function=parse_fcn,
             augment=False,
             shuffle=shuffle,
             batch_size=a.batch_size,
