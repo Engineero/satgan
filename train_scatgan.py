@@ -56,6 +56,7 @@ def train_satgan(a):
 
     # Create YOLO encoder to be used in making generator.
     if a.use_yolo_encoder:
+        print('Building YOLO encoder...')
         _, _, encoder = build_yolo_model(
             base_model_name=a.base_model_name,
             num_predictor_heads=a.num_pred_layers,
@@ -67,24 +68,31 @@ def train_satgan(a):
     else:
         encoder = None
 
+    print('Building A training dataset...')
     a_train_data = load_examples(a, a.a_train_dir, shuffle=True,
                                  pad_bboxes=a.pad_bboxes_a, encoder=encoder)
+    print('Building A validation dataset...')
     a_val_data = load_examples(a, a.a_valid_dir, pad_bboxes=a.pad_bboxes_a,
                                encoder=encoder)
     if a.a_test_dir is not None:
+        print('Building A test dataset...')
         a_test_data = load_examples(a, a.a_test_dir, pad_bboxes=a.pad_bboxes_a,
                                     encoder=encoder)
 
     # Build data generators for target domain.
+    print('Building B training dataset...')
     b_train_data = load_examples(a, a.b_train_dir, shuffle=True,
                                  pad_bboxes=a.pad_bboxes_b, encoder=encoder)
+    print('Building B validation dataset...')
     b_val_data = load_examples(a, a.b_valid_dir, pad_bboxes=a.pad_bboxes_b,
                                encoder=encoder)
     if a.b_test_dir is not None:
+        print('Building B test dataset...')
         b_test_data = load_examples(a, a.b_test_dir, pad_bboxes=a.pad_bboxes_b,
                                     encoder=encoder)
 
     # Build the model.
+    print('Building SATGAN model...')
     model, generator, _ = create_model(a, a_train_data.dataset,
                                        b_train_data.dataset)
     model.summary()
@@ -433,6 +441,9 @@ if __name__ == '__main__':
                         default=False,
                         help='Should we use a multiframe (3D Convolutional) '
                              'variant of the model?')
+    # parser.add_argument('--is_recurrent', action='store_true',
+    #                     default=False,
+    #                     help='Should we use a recurrent variant of the model?')
     parser.add_argument('--devices', nargs='+', type=int,
                         help='List of physical devices for TensorFlow to use.')
     parser.add_argument('--activation', type=str, default='lrelu',
