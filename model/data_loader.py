@@ -323,6 +323,8 @@ def load_examples(a, data_dir, shuffle=False, pad_bboxes=False, encoder=None):
     if encoder is not None:
         if a.is_multiframe:
             parse_fcn = encoder.parse_data_multiframe
+        # elif a.is_recurrent:
+        #     parse_fcn = encoder.parse_data_recurrent
         else:
             parse_fcn = encoder.parse_data
         # Use MISS DatasetGenerator instead.
