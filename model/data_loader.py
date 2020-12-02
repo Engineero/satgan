@@ -106,21 +106,18 @@ class GanDataset:
         height = tf.cast(example['height'], tf.int32)
         classes = tf.cast(tf.sparse.to_dense(example['classes']), tf.float32)
 
+        # Grab bboxes directly from data.
+        xmin = tf.cast(tf.sparse.to_dense(example['xmin']), tf.float32)
+        xmax = tf.cast(tf.sparse.to_dense(example['xmax']), tf.float32)
+        ymin = tf.cast(tf.sparse.to_dense(example['ymin']), tf.float32)
+        ymax = tf.cast(tf.sparse.to_dense(example['ymax']), tf.float32)
         if self.pad_bboxes is not None:
             # Pad bounding boxes. SatSim makes really tight bboxes...
-            xcenter = tf.cast(tf.sparse.to_dense(example['xcenter']), tf.float32)
-            ycenter = tf.cast(tf.sparse.to_dense(example['ycenter']), tf.float32)
             padding = tf.cast(self.pad_bboxes, tf.float32)
-            xmin = xcenter - padding / tf.cast(width, tf.float32)
-            xmax = xcenter + padding / tf.cast(width, tf.float32)
-            ymin = ycenter + padding / tf.cast(height, tf.float32)
-            ymax = ycenter - padding / tf.cast(height, tf.float32)
-        else:
-            # Grab bboxes directly from data.
-            xmin = tf.cast(tf.sparse.to_dense(example['xmin']), tf.float32)
-            xmax = tf.cast(tf.sparse.to_dense(example['xmax']), tf.float32)
-            ymin = tf.cast(tf.sparse.to_dense(example['ymin']), tf.float32)
-            ymax = tf.cast(tf.sparse.to_dense(example['ymax']), tf.float32)
+            xmin -= padding / tf.cast(width, tf.float32)
+            xmax += padding / tf.cast(width, tf.float32)
+            ymin -= padding / tf.cast(height, tf.float32)
+            ymax += padding / tf.cast(height, tf.float32)
 
         # Parse images and preprocess.
         image = tf.sparse.to_dense(example['images_raw'], default_value='')
