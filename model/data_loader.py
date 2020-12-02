@@ -24,7 +24,7 @@ class GanDataset:
     def __init__(self, a, data_dir, shuffle=False, pad_bboxes=None):
         self.data_dir = data_dir
         self.shuffle = shuffle
-        self.pad_bboxes = pad_bboxes
+        self.pad_bboxes = tf.cast(pad_bboxes, tf.float32)
         self.a = a  # args structure
         self.dataset = self._create_dataset()
 
@@ -112,8 +112,8 @@ class GanDataset:
             ycenter = tf.cast(tf.sparse.to_dense(example['ycenter']), tf.float32)
             xmin = xcenter - self.pad_bboxes / tf.cast(width, tf.float32)
             xmax = xcenter + self.pad_bboxes / tf.cast(width, tf.float32)
-            ymin = ycenter - self.pad_bboxes / tf.cast(height, tf.float32)
-            ymax = ycenter + self.pad_bboxes / tf.cast(height, tf.float32)
+            ymin = ycenter + self.pad_bboxes / tf.cast(height, tf.float32)
+            ymax = ycenter - self.pad_bboxes / tf.cast(height, tf.float32)
         else:
             # Grab bboxes directly from data.
             xmin = tf.cast(tf.sparse.to_dense(example['xmin']), tf.float32)
