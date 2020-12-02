@@ -401,6 +401,12 @@ if __name__ == '__main__':
                         help='Relative weight of IoU task loss component.')
     parser.add_argument('--class_weight', default=1., type=float,
                         help='Relative weight of class task loss component.')
+    parser.add_argument('--a_loss_weight', default=1., type=float,
+                        help='Relative weight of domain A task loss.')
+    parser.add_argument('--b_loss_weight', default=1., type=float,
+                        help='Relative weight of domain B task loss.')
+    parser.add_argument('--n_loss_weight', default=1., type=float,
+                        help='Relative weight of generated noise task loss.')
     parser.add_argument('--obj_weight', default=1., type=float,
                         help='Relative weight of objectness task loss component.')
     parser.add_argument('--early_stop_patience', default=10, type=int,
@@ -443,10 +449,10 @@ if __name__ == '__main__':
                              'just use its loss.')
     parser.add_argument('--num_parallel_calls', default=None, type=int,
                         help='Number of parallel jobs for data mapping.')
-    parser.add_argument('--pad_bboxes_a', action='store_true', default=False,
-                        help='If specified, pads A-domain bboxes.')
-    parser.add_argument('--pad_bboxes_b', action='store_true', default=False,
-                        help='If specified, pads B-domain bboxes.')
+    parser.add_argument('--pad_bboxes_a', default=None, type=int,
+                        help='Number of pixels with which to pad domain A bboxes. Default is 0.')
+    parser.add_argument('--pad_bboxes_b', default=None, type=int,
+                        help='Number of pixels with which to pad domain B bboxes. Default is 0.')
 
     # export options
     parser.add_argument("--output_filetype", default="png",
