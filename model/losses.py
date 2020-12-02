@@ -20,7 +20,7 @@ def compute_total_loss(a, model_inputs, model_outputs, step,
             b_task_targets, noise).
         model_outputs: tuple of (gen_outputs, discrim_outputs, task_outputs).
         step: a monotonically-increasing training step value.
-    
+
     Keyword Args:
         return_all: if true, return all individual losses, else only the total
             loss. Default is False.
@@ -270,7 +270,7 @@ def calc_task_loss(a, model_inputs, model_outputs, step, val=False,
 
     Keyword Args:
         val: whether this is the validation dataset. Default is False.
-    
+
     Returns:
         Total weighted task network loss.
     """
@@ -284,16 +284,16 @@ def calc_task_loss(a, model_inputs, model_outputs, step, val=False,
             a_task_targets = model_inputs[2]  # input's objects
             b_task_targets = model_inputs[3]  # target's objects
             task_outputs = model_outputs[2]
-            a_target_classes = tf.one_hot(tf.cast(1 - a_task_targets[..., -1],
+            a_target_classes = tf.one_hot(tf.cast(a_task_targets[..., -1],
                                                   tf.int32),
                                           a.num_classes)
-            b_target_classes = tf.one_hot(tf.cast(1 - b_task_targets[..., -1],
+            b_target_classes = tf.one_hot(tf.cast(b_task_targets[..., -1],
                                                   tf.int32),
                                           a.num_classes)
             # Create noise target classes (should be no objects).
             targets_ones = tf.ones_like(a_task_targets[..., -1])
             targets_zeros = tf.zeros_like(a_task_targets[..., -1])
-            n_target_classes = tf.stack([targets_zeros, targets_ones],
+            n_target_classes = tf.stack([targets_ones, targets_zeros],
                                         axis=-1)
 
             # Grab class outputs.
@@ -337,6 +337,7 @@ def calc_task_loss(a, model_inputs, model_outputs, step, val=False,
             b_loss = a.xy_weight * b_xy_loss + a.wh_weight * b_wh_loss + \
                      a.iou_weight * b_iou_loss + \
                      a.class_weight * b_class_loss
+            task_loss = b_loss
 
             # Calculate loss on fake images.
             a_xy_loss = tf.reduce_sum(tf.where(
@@ -360,6 +361,7 @@ def calc_task_loss(a, model_inputs, model_outputs, step, val=False,
             a_loss = a.xy_weight * a_xy_loss + a.wh_weight * a_wh_loss + \
                      a.iou_weight * a_iou_loss + \
                      a.class_weight * a_class_loss
+            task_loss += a_loss
 
             # Calculate loss on generated noise.
             n_class_loss = tf.math.reduce_sum(
@@ -368,8 +370,7 @@ def calc_task_loss(a, model_inputs, model_outputs, step, val=False,
                                          label_smoothing=0.1)
             )
             n_loss = a.class_weight * n_class_loss
-
-            task_loss = a_loss + b_loss + n_loss
+            task_loss += n_loss
 
             # Write summaries.
             if val:
