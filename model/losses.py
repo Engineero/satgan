@@ -291,10 +291,13 @@ def calc_task_loss(a, model_inputs, model_outputs, step, val=False,
                                                   tf.int32),
                                           a.num_classes)
             # Create noise target classes (should be no objects).
-            targets_ones = tf.ones_like(a_task_targets[..., -1])
-            targets_zeros = tf.zeros_like(a_task_targets[..., -1])
-            n_target_classes = tf.stack([targets_zeros, targets_ones],
-                                        axis=-1)
+            # targets_ones = tf.ones_like(a_task_targets[..., -1],
+            #                             dtype=tf.int32)
+            targets_zeros = tf.zeros_like(a_task_targets[..., -1],
+                                          dtype=tf.int32)
+            n_target_classes = tf.one_hot(targets_zeros, a.num_classes)
+            # n_target_classes = tf.stack([targets_zeros, targets_ones],
+            #                             axis=-1)
 
             # Grab class outputs.
             b_output_class = task_outputs[0][..., -a.num_classes:]
