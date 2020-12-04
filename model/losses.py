@@ -133,16 +133,18 @@ def calc_discriminator_loss(a, model_inputs, model_outputs, step,
                                       [predict_fake.shape[0], -1, 2])
             targets_one = tf.ones(shape=predict_real.shape[:-1])
             targets_zero = tf.zeros(shape=predict_fake.shape[:-1])
+            real_target = tf.one_hot(targets_one, a.num_classes)
+            fake_target = tf.one_hot(targets_zero, a.num_classes)
             real_loss = tf.math.reduce_mean(
                 categorical_crossentropy(
-                    tf.stack([targets_zero, targets_one], axis=-1),
+                    real_target,
                     predict_real,
                     label_smoothing=0.1,
                 )
             )
             fake_loss = tf.math.reduce_mean(
                 categorical_crossentropy(
-                    tf.stack([targets_one, targets_zero], axis=-1),
+                    fake_target,
                     predict_fake,
                     label_smoothing=0.1,
                 )
@@ -198,11 +200,11 @@ def calc_generator_loss(a, model_inputs, model_outputs, step,
             discrim_fake = tf.reshape(discrim_fake,
                                       [discrim_fake.shape[0], -1, 2])
             targets_ones = tf.ones(shape=discrim_fake.shape[:-1])
-            targets_zeros = tf.zeros(shape=discrim_fake.shape[:-1])
+            target_domain = tf.one_hot(targets_ones, a.num_classes)
             targets = model_inputs[1]
             gen_loss_GAN = tf.reduce_mean(
                 categorical_crossentropy(
-                    tf.stack([targets_zeros, targets_ones], axis=-1),
+                    target_domain,
                     discrim_fake,
                     label_smoothing=0.1,
                 )
@@ -291,13 +293,9 @@ def calc_task_loss(a, model_inputs, model_outputs, step, val=False,
                                                   tf.int32),
                                           a.num_classes)
             # Create noise target classes (should be no objects).
-            # targets_ones = tf.ones_like(a_task_targets[..., -1],
-            #                             dtype=tf.int32)
             targets_zeros = tf.zeros_like(a_task_targets[..., -1],
                                           dtype=tf.int32)
             n_target_classes = tf.one_hot(targets_zeros, a.num_classes)
-            # n_target_classes = tf.stack([targets_zeros, targets_ones],
-            #                             axis=-1)
 
             # Grab class outputs.
             b_output_class = task_outputs[0][..., -a.num_classes:]
@@ -305,6 +303,8 @@ def calc_task_loss(a, model_inputs, model_outputs, step, val=False,
             n_output_class = task_outputs[2][..., -a.num_classes:]
             a_bool_mask = (a_task_targets[..., -1] > 0)  # true objects
             b_bool_mask = (b_task_targets[..., -1] > 0)
+            zeros_a = tf.zeros_like(a_bool_mask, dtype=tf.float32)
+            zeros_b = tf.zeros_like(b_bool_mask, dtype=tf.float32)
 
             # Grab/calculate yolo/custom network outputs.
             a_task_wh = a_task_targets[..., 2:4] - a_task_targets[..., :2]
@@ -322,12 +322,12 @@ def calc_task_loss(a, model_inputs, model_outputs, step, val=False,
             b_xy_loss = tf.reduce_sum(tf.where(
                 b_bool_mask,
                 MSE(b_task_xy, b_real_xy),
-                tf.zeros_like(b_bool_mask, dtype=tf.float32)
+                zeros_b
             ))
             b_wh_loss = tf.reduce_sum(tf.where(
                 b_bool_mask,
                 MSE(b_task_wh, b_real_wh),
-                tf.zeros_like(b_bool_mask, dtype=tf.float32)
+                zeros_b
             ))
             b_iou_loss = tf.math.reduce_mean(
                 calc_iou(b_task_targets, b_iou_outputs)
@@ -346,12 +346,12 @@ def calc_task_loss(a, model_inputs, model_outputs, step, val=False,
             a_xy_loss = tf.reduce_sum(tf.where(
                 a_bool_mask,
                 MSE(a_task_xy, a_real_xy),
-                tf.zeros_like(a_bool_mask, dtype=tf.float32)
+                zeros_a
             ))
             a_wh_loss = tf.reduce_sum(tf.where(
                 a_bool_mask,
                 MSE(a_task_wh, a_real_wh),
-                tf.zeros_like(a_bool_mask, dtype=tf.float32)
+                zeros_a
             ))
             a_iou_loss = tf.math.reduce_mean(
                 calc_iou(a_task_targets, a_iou_outputs)
