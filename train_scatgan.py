@@ -226,10 +226,11 @@ def train_satgan(a):
                   f'task loss: {mean_list[3].result().numpy():.4f}\t')
 
             # Check for early stopping.
-            if epochs_without_improvement >= a.early_stop_patience:
-                print(f'{a.early_stop_patience} epochs passed without ',
-                      'improvement. Stopping training.')
-                break
+            if a.early_stop_patience is not None:
+                if epochs_without_improvement >= a.early_stop_patience:
+                    print(f'{a.early_stop_patience} epochs passed without ',
+                          'improvement. Stopping training.')
+                    break
 
         # Test the best saved model or current model if not saving.
         if a.output_dir is not None:
@@ -409,8 +410,8 @@ if __name__ == '__main__':
                         help='Relative weight of generated noise task loss.')
     parser.add_argument('--obj_weight', default=1., type=float,
                         help='Relative weight of objectness task loss component.')
-    parser.add_argument('--early_stop_patience', default=10, type=int,
-                        help='Early stopping patience, epochs. Default 10.')
+    parser.add_argument('--early_stop_patience', default=None, type=int,
+                        help='Early stopping patience, epochs. Default is to not stop.')
     parser.add_argument('--multi_optim', default=False, action='store_true',
                         help='Whether to use separate optimizers for each loss.')
     parser.add_argument('--ams_grad', default=False, action='store_true',
