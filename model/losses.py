@@ -323,12 +323,12 @@ def calc_task_loss(a, model_inputs, model_outputs, step, val=False,
             try:
                 b_xy_loss = tf.reduce_sum(tf.where(
                     b_bool_mask,
-                    MSE(b_task_xy, b_real_xy),
+                    mean_absolute_error(b_task_xy, b_real_xy),
                     zeros_b
                 ))
                 b_wh_loss = tf.reduce_sum(tf.where(
                     b_bool_mask,
-                    MSE(b_task_wh, b_real_wh),
+                    mean_absolute_error(b_task_wh, b_real_wh),
                     zeros_b
                 ))
                 b_iou_loss = tf.math.reduce_mean(
@@ -347,12 +347,12 @@ def calc_task_loss(a, model_inputs, model_outputs, step, val=False,
                 # Calculate loss on fake images.
                 a_xy_loss = tf.reduce_sum(tf.where(
                     a_bool_mask,
-                    MSE(a_task_xy, a_real_xy),
+                    mean_absolute_error(a_task_xy, a_real_xy),
                     zeros_a
                 ))
                 a_wh_loss = tf.reduce_sum(tf.where(
                     a_bool_mask,
-                    MSE(a_task_wh, a_real_wh),
+                    mean_absolute_error(a_task_wh, a_real_wh),
                     zeros_a
                 ))
                 a_iou_loss = tf.math.reduce_mean(
