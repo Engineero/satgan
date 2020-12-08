@@ -119,6 +119,12 @@ class GanDataset:
             ymin -= padding / tf.cast(height, tf.float32)
             ymax += padding / tf.cast(height, tf.float32)
 
+        # Clip bounding boxes to be within the image.
+        xmin = tf.clip_by_value(xmin, 0., 1.)
+        xmax = tf.clip_by_value(xmax, 0., 1.)
+        ymin = tf.clip_by_value(ymin, 0., 1.)
+        ymax = tf.clip_by_value(ymax, 0., 1.)
+
         # Parse images and preprocess.
         image = tf.sparse.to_dense(example['images_raw'], default_value='')
         image = tf.io.decode_raw(image, tf.uint16)

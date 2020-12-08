@@ -131,8 +131,8 @@ def calc_discriminator_loss(a, model_inputs, model_outputs, step,
                                       [predict_real.shape[0], -1, 2])
             predict_fake = tf.reshape(predict_fake,
                                       [predict_fake.shape[0], -1, 2])
-            targets_one = tf.ones(shape=predict_real.shape[:-1])
-            targets_zero = tf.zeros(shape=predict_fake.shape[:-1])
+            targets_one = tf.ones(shape=predict_real.shape[:-1], dtype=tf.int32)
+            targets_zero = tf.zeros(shape=predict_fake.shape[:-1], dtype=tf.int32)
             real_target = tf.one_hot(targets_one, a.num_classes)
             fake_target = tf.one_hot(targets_zero, a.num_classes)
             real_loss = tf.math.reduce_mean(
@@ -199,7 +199,7 @@ def calc_generator_loss(a, model_inputs, model_outputs, step,
             discrim_fake = model_outputs[1][1]
             discrim_fake = tf.reshape(discrim_fake,
                                       [discrim_fake.shape[0], -1, 2])
-            targets_ones = tf.ones(shape=discrim_fake.shape[:-1])
+            targets_ones = tf.ones(shape=discrim_fake.shape[:-1], dtype=tf.int32)
             target_domain = tf.one_hot(targets_ones, a.num_classes)
             targets = model_inputs[1]
             gen_loss_GAN = tf.reduce_mean(
@@ -277,6 +277,7 @@ def calc_task_loss(a, model_inputs, model_outputs, step, val=False,
         Total weighted task network loss.
     """
 
+    update_plots = True
     with tf.device(f'/device:GPU:{a.devices[-1]}'):
         with tf.name_scope('task_loss'):
             # task_targets are [ymin, xmin, ymax, xmax, class]
@@ -319,61 +320,67 @@ def calc_task_loss(a, model_inputs, model_outputs, step, val=False,
             b_iou_outputs = task_outputs[0]
 
             # Calculate loss on real images.
-            b_xy_loss = tf.reduce_sum(tf.where(
-                b_bool_mask,
-                MSE(b_task_xy, b_real_xy),
-                zeros_b
-            ))
-            b_wh_loss = tf.reduce_sum(tf.where(
-                b_bool_mask,
-                MSE(b_task_wh, b_real_wh),
-                zeros_b
-            ))
-            b_iou_loss = tf.math.reduce_mean(
-                calc_iou(b_task_targets, b_iou_outputs)
-            )
-            b_class_loss = tf.math.reduce_mean(
-                categorical_crossentropy(b_target_classes,
-                                         b_output_class,
-                                         label_smoothing=0.1)
-            )
-            b_loss = a.xy_weight * b_xy_loss + a.wh_weight * b_wh_loss + \
-                     a.iou_weight * b_iou_loss + \
-                     a.class_weight * b_class_loss
-            task_loss = a.b_loss_weight * b_loss
+            try:
+                b_xy_loss = tf.reduce_sum(tf.where(
+                    b_bool_mask,
+                    MSE(b_task_xy, b_real_xy),
+                    zeros_b
+                ))
+                b_wh_loss = tf.reduce_sum(tf.where(
+                    b_bool_mask,
+                    MSE(b_task_wh, b_real_wh),
+                    zeros_b
+                ))
+                b_iou_loss = tf.math.reduce_mean(
+                    calc_iou(b_task_targets, b_iou_outputs)
+                )
+                b_class_loss = tf.math.reduce_mean(
+                    categorical_crossentropy(b_target_classes,
+                                             b_output_class,
+                                             label_smoothing=0.1)
+                )
+                b_loss = a.xy_weight * b_xy_loss + a.wh_weight * b_wh_loss + \
+                         a.iou_weight * b_iou_loss + \
+                         a.class_weight * b_class_loss
+                task_loss = a.b_loss_weight * b_loss
 
-            # Calculate loss on fake images.
-            a_xy_loss = tf.reduce_sum(tf.where(
-                a_bool_mask,
-                MSE(a_task_xy, a_real_xy),
-                zeros_a
-            ))
-            a_wh_loss = tf.reduce_sum(tf.where(
-                a_bool_mask,
-                MSE(a_task_wh, a_real_wh),
-                zeros_a
-            ))
-            a_iou_loss = tf.math.reduce_mean(
-                calc_iou(a_task_targets, a_iou_outputs)
-            )
-            a_class_loss = tf.math.reduce_mean(
-                categorical_crossentropy(a_target_classes,
-                                         a_output_class,
-                                         label_smoothing=0.1)
-            )
-            a_loss = a.xy_weight * a_xy_loss + a.wh_weight * a_wh_loss + \
-                     a.iou_weight * a_iou_loss + \
-                     a.class_weight * a_class_loss
-            task_loss += a.a_loss_weight * a_loss
+                # Calculate loss on fake images.
+                a_xy_loss = tf.reduce_sum(tf.where(
+                    a_bool_mask,
+                    MSE(a_task_xy, a_real_xy),
+                    zeros_a
+                ))
+                a_wh_loss = tf.reduce_sum(tf.where(
+                    a_bool_mask,
+                    MSE(a_task_wh, a_real_wh),
+                    zeros_a
+                ))
+                a_iou_loss = tf.math.reduce_mean(
+                    calc_iou(a_task_targets, a_iou_outputs)
+                )
+                a_class_loss = tf.math.reduce_mean(
+                    categorical_crossentropy(a_target_classes,
+                                             a_output_class,
+                                             label_smoothing=0.1)
+                )
+                a_loss = a.xy_weight * a_xy_loss + a.wh_weight * a_wh_loss + \
+                         a.iou_weight * a_iou_loss + \
+                         a.class_weight * a_class_loss
+                task_loss += a.a_loss_weight * a_loss
 
-            # Calculate loss on generated noise.
-            n_class_loss = tf.math.reduce_sum(
-                categorical_crossentropy(n_target_classes,
-                                         n_output_class,
-                                         label_smoothing=0.1)
-            )
-            n_loss = a.class_weight * n_class_loss
-            task_loss += a.n_loss_weight * n_loss
+                # Calculate loss on generated noise.
+                n_class_loss = tf.math.reduce_sum(
+                    categorical_crossentropy(n_target_classes,
+                                             n_output_class,
+                                             label_smoothing=0.1)
+                )
+                n_loss = a.class_weight * n_class_loss
+                task_loss += a.n_loss_weight * n_loss
+            except Exception as e:
+                print('A task targets:\n{a_task_targets}\n')
+                print('B task targets:\n{b_task_targets}\n')
+                print('Task network outputs:\n{task_outputs}\n')
+                raise e
 
             # Write summaries.
             if val:
