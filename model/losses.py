@@ -377,9 +377,9 @@ def calc_task_loss(a, model_inputs, model_outputs, step, val=False,
                 n_loss = a.class_weight * n_class_loss
                 task_loss += a.n_loss_weight * n_loss
             except Exception as e:
-                print('A task targets:\n{a_task_targets}\n')
-                print('B task targets:\n{b_task_targets}\n')
-                print('Task network outputs:\n{task_outputs}\n')
+                print(f'A task targets:\n{a_task_targets}\n')
+                print(f'B task targets:\n{b_task_targets}\n')
+                print(f'Task network outputs:\n{task_outputs}\n')
                 raise e
 
             # Write summaries.
