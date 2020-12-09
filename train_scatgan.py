@@ -226,10 +226,11 @@ def train_satgan(a):
                   f'task loss: {mean_list[3].result().numpy():.4f}\t')
 
             # Check for early stopping.
-            if epochs_without_improvement >= a.early_stop_patience:
-                print(f'{a.early_stop_patience} epochs passed without ',
-                      'improvement. Stopping training.')
-                break
+            if a.early_stop_patience is not None:
+                if epochs_without_improvement >= a.early_stop_patience:
+                    print(f'{a.early_stop_patience} epochs passed without ',
+                          'improvement. Stopping training.')
+                    break
 
         # Test the best saved model or current model if not saving.
         if a.output_dir is not None:
@@ -401,10 +402,16 @@ if __name__ == '__main__':
                         help='Relative weight of IoU task loss component.')
     parser.add_argument('--class_weight', default=1., type=float,
                         help='Relative weight of class task loss component.')
+    parser.add_argument('--a_loss_weight', default=1., type=float,
+                        help='Relative weight of domain A task loss.')
+    parser.add_argument('--b_loss_weight', default=1., type=float,
+                        help='Relative weight of domain B task loss.')
+    parser.add_argument('--n_loss_weight', default=1., type=float,
+                        help='Relative weight of generated noise task loss.')
     parser.add_argument('--obj_weight', default=1., type=float,
                         help='Relative weight of objectness task loss component.')
-    parser.add_argument('--early_stop_patience', default=10, type=int,
-                        help='Early stopping patience, epochs. Default 10.')
+    parser.add_argument('--early_stop_patience', default=None, type=int,
+                        help='Early stopping patience, epochs. Default is to not stop.')
     parser.add_argument('--multi_optim', default=False, action='store_true',
                         help='Whether to use separate optimizers for each loss.')
     parser.add_argument('--ams_grad', default=False, action='store_true',
@@ -443,10 +450,10 @@ if __name__ == '__main__':
                              'just use its loss.')
     parser.add_argument('--num_parallel_calls', default=None, type=int,
                         help='Number of parallel jobs for data mapping.')
-    parser.add_argument('--pad_bboxes_a', action='store_true', default=False,
-                        help='If specified, pads A-domain bboxes.')
-    parser.add_argument('--pad_bboxes_b', action='store_true', default=False,
-                        help='If specified, pads B-domain bboxes.')
+    parser.add_argument('--pad_bboxes_a', default=None, type=int,
+                        help='Number of pixels with which to pad domain A bboxes. Default is 0.')
+    parser.add_argument('--pad_bboxes_b', default=None, type=int,
+                        help='Number of pixels with which to pad domain B bboxes. Default is 0.')
 
     # export options
     parser.add_argument("--output_filetype", default="png",
