@@ -298,9 +298,9 @@ def calc_task_loss(a, model_inputs, model_outputs, step, val=False,
             n_target_classes = tf.one_hot(targets_ones, a.num_classes)
 
             # Grab class outputs.
-            b_output_class = task_outputs[0][..., -a.num_classes:]
-            a_output_class = task_outputs[1][..., -a.num_classes:]
-            n_output_class = task_outputs[2][..., -a.num_classes:]
+            b_pred_class = task_outputs[0][..., -a.num_classes:]
+            a_pred_class = task_outputs[1][..., -a.num_classes:]
+            n_pred_class = task_outputs[2][..., -a.num_classes:]
             a_bool_mask = (a_task_targets[..., -1] > 0)  # true objects
             b_bool_mask = (b_task_targets[..., -1] > 0)
 
@@ -332,7 +332,7 @@ def calc_task_loss(a, model_inputs, model_outputs, step, val=False,
             )
             b_class_loss = tf.math.reduce_mean(
                 categorical_crossentropy(b_target_classes,
-                                         b_output_class,
+                                         b_pred_class,
                                          label_smoothing=0.1)
             )
             b_loss = a.xy_weight * b_xy_loss + a.wh_weight * b_wh_loss + \
@@ -355,7 +355,7 @@ def calc_task_loss(a, model_inputs, model_outputs, step, val=False,
             )
             a_class_loss = tf.math.reduce_mean(
                 categorical_crossentropy(a_target_classes,
-                                         a_output_class,
+                                         a_pred_class,
                                          label_smoothing=0.1)
             )
             a_loss = a.xy_weight * a_xy_loss + a.wh_weight * a_wh_loss + \
@@ -365,7 +365,7 @@ def calc_task_loss(a, model_inputs, model_outputs, step, val=False,
             # Calculate loss on generated noise.
             n_class_loss = tf.math.reduce_sum(
                 categorical_crossentropy(n_target_classes,
-                                         n_output_class,
+                                         n_pred_class,
                                          label_smoothing=0.1)
             )
             n_loss = a.class_weight * n_class_loss
