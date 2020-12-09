@@ -131,18 +131,20 @@ def calc_discriminator_loss(a, model_inputs, model_outputs, step,
                                       [predict_real.shape[0], -1, 2])
             predict_fake = tf.reshape(predict_fake,
                                       [predict_fake.shape[0], -1, 2])
-            targets_one = tf.ones(shape=predict_real.shape[:-1])
-            targets_zero = tf.zeros(shape=predict_fake.shape[:-1])
+            targets_one = tf.ones(shape=predict_real.shape[:-1],
+                                  dtype=tf.int32)
+            targets_zero = tf.zeros(shape=predict_fake.shape[:-1],
+                                    dtype=tf.int32)
             real_loss = tf.math.reduce_mean(
                 categorical_crossentropy(
-                    tf.stack([targets_zero, targets_one], axis=-1),
+                    tf.one_hot(targets_one, a.num_classes),
                     predict_real,
                     label_smoothing=0.1,
                 )
             )
             fake_loss = tf.math.reduce_mean(
                 categorical_crossentropy(
-                    tf.stack([targets_one, targets_zero], axis=-1),
+                    tf.one_hot(targets_zero, a.num_classes),
                     predict_fake,
                     label_smoothing=0.1,
                 )
@@ -197,12 +199,12 @@ def calc_generator_loss(a, model_inputs, model_outputs, step,
             discrim_fake = model_outputs[1][1]
             discrim_fake = tf.reshape(discrim_fake,
                                       [discrim_fake.shape[0], -1, 2])
-            targets_ones = tf.ones(shape=discrim_fake.shape[:-1])
-            targets_zeros = tf.zeros(shape=discrim_fake.shape[:-1])
+            targets_ones = tf.ones(shape=discrim_fake.shape[:-1],
+                                   dtype=tf.int32)
             targets = model_inputs[1]
             gen_loss_GAN = tf.reduce_mean(
                 categorical_crossentropy(
-                    tf.stack([targets_zeros, targets_ones], axis=-1),
+                    tf.one_hot(targets_ones, a.num_classes),
                     discrim_fake,
                     label_smoothing=0.1,
                 )
@@ -291,10 +293,9 @@ def calc_task_loss(a, model_inputs, model_outputs, step, val=False,
                                                   tf.int32),
                                           a.num_classes)
             # Create noise target classes (should be no objects).
-            targets_ones = tf.ones_like(a_task_targets[..., -1])
-            targets_zeros = tf.zeros_like(a_task_targets[..., -1])
-            n_target_classes = tf.stack([targets_zeros, targets_ones],
-                                        axis=-1)
+            targets_ones = tf.ones_like(a_task_targets[..., -1],
+                                        dtype=tf.int32)
+            n_target_classes = tf.one_hot(targets_ones, a.num_classes)
 
             # Grab class outputs.
             b_output_class = task_outputs[0][..., -a.num_classes:]
