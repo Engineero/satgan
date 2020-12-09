@@ -87,7 +87,7 @@ def create_model(a, a_train_data, b_train_data):
                                                        a.checkpoint_load_path)
                     # task_net._set_inputs(targets)
                     if a.freeze_task:
-                        for layer in task_net.get_layer('functional_5').layers:
+                        for layer in task_net.get_layer('model_2').layers:
                             print(f'Freezing task net task net layer {layer}.')
                             layer.trainable = False
                 else:

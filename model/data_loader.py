@@ -17,11 +17,11 @@ class GanDataset:
         data_dir: directory for the dataset.
 
     Keyword Args:
-        shuffle: whether to shuffle the dataset. Default is False.
-        pad_bboxes: whether to pad bboxes. Default is False.
+        shuffle (bool): whether to shuffle the dataset. Default is False.
+        pad_bboxes (int): number of pixels with which to pad bboxes.
     """
 
-    def __init__(self, a, data_dir, shuffle=False, pad_bboxes=False):
+    def __init__(self, a, data_dir, shuffle=False, pad_bboxes=None):
         self.data_dir = data_dir
         self.shuffle = shuffle
         self.pad_bboxes = pad_bboxes
@@ -74,7 +74,7 @@ class GanDataset:
             a: argparse object from training script.
 
         Keyword Args:
-            pad_bboxes: if True, pads truth bboxes with +/-10 pix.
+            pad_bboxes (int): Number of pixels with which to pad bboxes.
 
         Returns:
             Images, optional noise or None, and true bounding boxes with
@@ -106,20 +106,24 @@ class GanDataset:
         height = tf.cast(example['height'], tf.int32)
         classes = tf.cast(tf.sparse.to_dense(example['classes']), tf.float32)
 
-        if self.pad_bboxes:
+        # Grab bboxes directly from data.
+        xmin = tf.cast(tf.sparse.to_dense(example['xmin']), tf.float32)
+        xmax = tf.cast(tf.sparse.to_dense(example['xmax']), tf.float32)
+        ymin = tf.cast(tf.sparse.to_dense(example['ymin']), tf.float32)
+        ymax = tf.cast(tf.sparse.to_dense(example['ymax']), tf.float32)
+        if self.pad_bboxes is not None:
             # Pad bounding boxes. SatSim makes really tight bboxes...
-            xcenter = tf.cast(tf.sparse.to_dense(example['xcenter']), tf.float32)
-            ycenter = tf.cast(tf.sparse.to_dense(example['ycenter']), tf.float32)
-            xmin = xcenter - 10. / tf.cast(width, tf.float32)
-            xmax = xcenter + 10. / tf.cast(width, tf.float32)
-            ymin = ycenter - 10. / tf.cast(height, tf.float32)
-            ymax = ycenter + 10. / tf.cast(height, tf.float32)
-        else:
-            # Grab bboxes directly from data.
-            xmin = tf.cast(tf.sparse.to_dense(example['xmin']), tf.float32)
-            xmax = tf.cast(tf.sparse.to_dense(example['xmax']), tf.float32)
-            ymin = tf.cast(tf.sparse.to_dense(example['ymin']), tf.float32)
-            ymax = tf.cast(tf.sparse.to_dense(example['ymax']), tf.float32)
+            padding = tf.cast(self.pad_bboxes, tf.float32)
+            xmin -= padding / tf.cast(width, tf.float32)
+            xmax += padding / tf.cast(width, tf.float32)
+            ymin -= padding / tf.cast(height, tf.float32)
+            ymax += padding / tf.cast(height, tf.float32)
+
+        # Clip bounding boxes to be within the image.
+        xmin = tf.clip_by_value(xmin, 0., 1.)
+        xmax = tf.clip_by_value(xmax, 0., 1.)
+        ymin = tf.clip_by_value(ymin, 0., 1.)
+        ymax = tf.clip_by_value(ymax, 0., 1.)
 
         # Parse images and preprocess.
         image = tf.sparse.to_dense(example['images_raw'], default_value='')
@@ -155,7 +159,7 @@ def _convert_batches(batch):
     return tf.cast(image, tf.float32), bboxes
 
 
-def load_examples(a, data_dir, shuffle=False, pad_bboxes=False, encoder=None):
+def load_examples(a, data_dir, shuffle=False, pad_bboxes=None, encoder=None):
     """Create dataset pipeline.
 
     Args:
@@ -163,8 +167,8 @@ def load_examples(a, data_dir, shuffle=False, pad_bboxes=False, encoder=None):
         data_dir: path to data TFRecords.
 
     Keyword Args:
-        shuffle: whether to shuffle the data.
-        pad_bboxes: if True, pads truth bboxes with +/-10 pix.
+        shuffle (bool): whether to shuffle the data.
+        pad_bboxes (int): number of pixels with which to pad bboxes.
         encoder: YOLO encoder object defining parse_data method.
 
     Returns:
