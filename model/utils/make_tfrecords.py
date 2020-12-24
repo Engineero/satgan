@@ -366,7 +366,7 @@ def _serialize_example_one_domain(example, pad_for_satsim=False,
         a_filtered += tf.reduce_min(a_filtered)  # push to positive values
         a_filtered /= tf.reduce_max(a_filtered)  # normalize to [0, 1)
         a_filtered = tf.image.convert_image_dtype(a_filtered, dtype=tf.uint16)
-        # a_filtered = a_filtered.numpy().astype(np.int16)
+        a_filtered = a_filtered.numpy().astype(np.int16)
         # a_filtered = tf.cast(a_filtered, dtype=tf.uin16)
 
     # Create the features for this example
