@@ -77,7 +77,6 @@ def create_model(a, a_train_data, b_train_data):
                 if a.use_yolo:
                     task_net, _, _ = build_yolo_model(
                         base_model_name=a.base_model_name,
-                        is_recurrent=a.is_recurrent,
                         num_predictor_heads=a.num_pred_layers,
                         max_inferences_per_image=a.max_inferences,
                         max_bbox_overlap=a.max_bbox_overlap,
