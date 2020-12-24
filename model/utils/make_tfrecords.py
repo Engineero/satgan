@@ -225,10 +225,14 @@ def _serialize_example(example, pad_for_satsim=False, skip_empty=False):
         b_annotations = json.load(fp)['data']
 
     # Parse annotation data.
-    (a_class_id, a_y_min, a_y_max, a_y_center, a_x_min, a_x_max, a_x_center, a_magnitude,
-     a_path_name) = _parse_annotations(a_annotations, pad_amount, skip_empty)
-    (b_class_id, b_y_min, b_y_max, b_y_center, b_x_min, b_x_max, b_x_center, b_magnitude,
-     b_path_name) = _parse_annotations(b_annotations, pad_amount, skip_empty)
+    a_parsed = _parse_annotations(a_annotations, pad_amount, skip_empty)
+    b_parsed = _parse_annotations(b_annotations, pad_amount, skip_empty)
+    if a_parsed is None or b_parsed is None:
+        return None
+    (a_class_id, a_y_min, a_y_max, a_y_center, a_x_min, a_x_max, a_x_center,
+     a_magnitude, a_path_name) = a_parsed
+    (b_class_id, b_y_min, b_y_max, b_y_center, b_x_min, b_x_max, b_x_center,
+     b_magnitude, b_path_name) = b_parsed
 
     # Load raw image data.
     a_data = _read_fits(a_path)
@@ -342,8 +346,11 @@ def _serialize_example_one_domain(example, pad_for_satsim=False,
         a_annotations = json.load(fp)['data']
 
     # Parse annotation data.
+    a_parsed = _parse_annotations(a_annotations, pad_amount, skip_empty)
+    if a_parsed is None:
+        return None
     (a_class_id, a_y_min, a_y_max, a_y_center, a_x_min, a_x_max, a_x_center, a_magnitude,
-     a_path_name) = _parse_annotations(a_annotations, pad_amount, skip_empty)
+     a_path_name) = a_parsed
 
     # Load raw image data.
     a_data = _read_fits(a_path)
