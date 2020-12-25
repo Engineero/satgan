@@ -363,9 +363,15 @@ def _serialize_example_one_domain(example, pad_for_satsim=False,
                                  dtype=tf.float32)
         gen_noise = generator(tf.expand_dims(noise, axis=0))
         a_filtered = image + tf.squeeze(gen_noise, axis=0)
+        print(f'\nImage min: {tf.reduce_min(a_filtered)}')
+        print(f'Image max: {tf.reduce_max(a_filtered)}')
         a_filtered += tf.reduce_min(a_filtered)  # push to positive values
         a_filtered /= tf.reduce_max(a_filtered)  # normalize to [0, 1)
+        print(f'\nImage norm min: {tf.reduce_min(a_filtered)}')
+        print(f'Image norm max: {tf.reduce_max(a_filtered)}')
         a_filtered = tf.image.convert_image_dtype(a_filtered, dtype=tf.uint16)
+        print(f'\nImage uint min: {tf.reduce_min(a_filtered)}')
+        print(f'Image uint max: {tf.reduce_max(a_filtered)}')
         a_filtered = a_filtered.numpy().astype(np.uint16)
         # a_filtered = tf.cast(a_filtered, dtype=tf.uin16)
 
