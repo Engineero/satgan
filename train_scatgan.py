@@ -137,10 +137,6 @@ def train_satgan(a):
                     model_outputs = (gen_outputs, discrim_outputs,
                                      task_outputs)
 
-                    # print(f'\nA targets: {a_task_targets}')
-                    # print(f'\nB targets: {b_task_targets}')
-                    # print(f'\ntask net outputs: {task_outputs}')
-
                     # Plot all of the summary images.
                     plot_summaries(a, model_inputs, model_outputs,
                                    batches_seen)
