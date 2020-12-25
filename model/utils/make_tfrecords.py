@@ -373,8 +373,10 @@ def _serialize_example_one_domain(example, pad_for_satsim=False,
         print(f'Image norm max: {tf.reduce_max(a_filtered)}')
         a_filtered = tf.image.convert_image_dtype(a_filtered, dtype=tf.uint16)
         print(f'Image uint min: {tf.reduce_min(a_filtered)}')
-        print(f'Image uint max: {tf.reduce_max(a_filtered)}\n')
+        print(f'Image uint max: {tf.reduce_max(a_filtered)}')
         a_filtered = a_filtered.numpy().astype(np.uint16)
+        print(f'Image uint numpy min: {tf.reduce_min(a_filtered)}')
+        print(f'Image uint numpy max: {tf.reduce_max(a_filtered)}\n')
         # a_filtered = tf.cast(a_filtered, dtype=tf.uin16)
 
     # Create the features for this example
