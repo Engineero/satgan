@@ -353,7 +353,7 @@ def _serialize_example_one_domain(example, pad_for_satsim=False,
      a_path_name) = a_parsed
 
     # Load raw image data.
-    a_data = _read_fits(a_path)
+    a_data = _read_fits(a_path)  # returns numpy uint16
     a_filtered = a_data  # in case generator is None
     if generator is not None:
         image = tf.cast(a_data, dtype=tf.float32)

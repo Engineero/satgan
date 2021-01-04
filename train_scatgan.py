@@ -104,6 +104,8 @@ def train_satgan(a):
 
     # Train the model.
     batches_seen = tf.Variable(0, dtype=tf.int64)
+    epochs_without_improvement = 0
+    min_loss = np.inf
     with writer.as_default():
         # Create metrics for accumulating validation, test losses.
         mean_total = Mean()
@@ -200,17 +202,18 @@ def train_satgan(a):
                                                gen_loss,
                                                task_loss]):
                     m.update_state([loss])
-                if epoch == 0:
-                    min_loss = mean_list[0].result().numpy()
-                    epochs_without_improvement = 0
             print(f'Total validation loss: {mean_list[0].result().numpy()}')
+            print(f'Saving model with total loss {min_loss:.4f} ',
+                  f'to {a.output_dir}.')
+            model.save(output_path / 'full_model')
+            generator.save(output_path / 'generator')
             if mean_list[0].result().numpy() <= min_loss \
                 and a.output_dir is not None:
                 min_loss = mean_list[0].result().numpy()
-                print(f'Saving model with total loss {min_loss:.4f} ',
-                      f'to {a.output_dir}.')
-                model.save(output_path / 'full_model')
-                generator.save(output_path / 'generator')
+                # print(f'Saving model with total loss {min_loss:.4f} ',
+                #       f'to {a.output_dir}.')
+                # model.save(output_path / 'full_model')
+                # generator.save(output_path / 'generator')
                 # task_net.save(output_path / 'task_net')
                 epochs_without_improvement = 0
             else:
