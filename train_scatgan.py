@@ -74,6 +74,8 @@ def train_satgan(a):
     if a.a_test_dir is not None:
         a_test_data = load_examples(a, a.a_test_dir, pad_bboxes=a.pad_bboxes_a,
                                     encoder=encoder)
+    else:
+        a_test_data = None
 
     # Build data generators for target domain.
     b_train_data = load_examples(a, a.b_train_dir, shuffle=True,
@@ -83,6 +85,8 @@ def train_satgan(a):
     if a.b_test_dir is not None:
         b_test_data = load_examples(a, a.b_test_dir, pad_bboxes=a.pad_bboxes_b,
                                     encoder=encoder)
+    else:
+        b_test_data = None
 
     # Build the model.
     model, generator, _ = create_model(a, a_train_data.dataset,
@@ -237,7 +241,7 @@ def train_satgan(a):
         for m in mean_list:
             m.reset_states()
 
-        if a.a_test_dir is not None and a.b_test_dir is not None:
+        if a_test_data is not None and b_test_data is not None:
             for a_batch, b_batch in zip(a_test_data.dataset, b_test_data.dataset):
                 inputs, a_task_targets = a_batch
                 targets, b_task_targets = b_batch
