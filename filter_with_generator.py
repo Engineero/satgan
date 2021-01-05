@@ -47,7 +47,7 @@ def main(a):
     writer = tf.summary.create_file_writer(tensorboard_path.as_posix())
 
     # Build data generators.
-    train_data, _, _ = load_examples(a)
+    train_data = load_examples(a, a.train_dir)
 
     # Build the model.
     model, _, _ = create_model(a, train_data)
