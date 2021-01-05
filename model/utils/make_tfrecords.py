@@ -368,7 +368,7 @@ def _serialize_example_one_domain(example, pad_for_satsim=False,
 
     # Create the features for this example
     features = {
-        'images_raw': _bytes_feature([a_filtered.tostring()]),
+        'images_raw': _bytes_feature([a_filtered.tobytes()]),
         'filename': _bytes_feature([a_path_name.encode()]),
         'height': _int64_feature([a_annotations['sensor']['height']]),
         'width': _int64_feature([a_annotations['sensor']['width']]),
