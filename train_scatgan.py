@@ -456,6 +456,9 @@ if __name__ == '__main__':
                         help='Number of pixels with which to pad domain A bboxes. Default is 0.')
     parser.add_argument('--pad_bboxes_b', default=None, type=int,
                         help='Number of pixels with which to pad domain B bboxes. Default is 0.')
+    parser.add_argument('--make_tfrecords', action='store_true',
+                        default=False,
+                        help='Whether we should output filtered TFRecords and end.')
 
     # export options
     parser.add_argument("--output_filetype", default="png",
