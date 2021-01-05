@@ -424,7 +424,7 @@ def make_filtered_tf_records(args):
     if args.checkpoint is not None:
         checkpoint = Path(args.checkpoint).resolve()
         _ = mish(0.)  # take care of lazy mish init.
-        model = create_model(args, a_data.dataset, a_data.dataset)
+        model, _, _ = create_model(args, a_data.dataset, a_data.dataset)
         model.summary()
     else:
         model = None
