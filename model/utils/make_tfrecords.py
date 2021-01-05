@@ -30,16 +30,16 @@ def _check_args(args):
     a_dir = Path(args.a_dir).resolve()
     if args.b_dir is not None:
         b_dir = Path(args.b_dir).resolve()
-    elif args.generator_path is None:
+    elif args.model_path is None:
         raise ValueError(
-            'Either B domain data or generator must be provided!'
+            'Either B domain data or model must be provided!'
         )
     else:
         b_dir = None
-    if args.generator_path is not None:
-        generator_path = Path(args.generator_path).resolve()
+    if args.model_path is not None:
+        model_path = Path(args.model_path).resolve()
     else:
-        generator_path = None
+        model_path = None
     if args.a_annotation_dir is not None:
         a_annotation_dir = Path(args.a_annotation_dir).resolve()
     else:
@@ -65,9 +65,9 @@ def _check_args(args):
         raise NotADirectoryError(
             f'Annotation path A {args.b_annotation_dir} is not a directory!'
         )
-    if generator_path is not None and not generator_path.is_dir():
+    if model_path is not None and not model_path.is_dir():
         raise NotADirectoryError(
-            f'Generator path {args.generator_path} is not a directory!'
+            f'Model path {args.model_path} is not a directory!'
         )
     if output_dir.is_dir():
         try:
@@ -318,7 +318,7 @@ def make_tf_records(args):
 
 
 def _serialize_example_one_domain(example, pad_for_satsim=False,
-                                  skip_empty=False, generator=None):
+                                  skip_empty=False, model=None):
     """Builds a TFRecords Example object from the example data.
 
     Args:
@@ -327,7 +327,7 @@ def _serialize_example_one_domain(example, pad_for_satsim=False,
     Keyword Args:
         pad_for_satsim: whether to pad images for satsim. Default is False.
         skip_empty: whether to skip frames with no object. Default is False.
-        generator: generator model used to filter inputs.
+        model: model used to filter inputs.
     """
 
     # Handle satsim offsets.
@@ -350,19 +350,21 @@ def _serialize_example_one_domain(example, pad_for_satsim=False,
 
     # Load raw image data.
     a_data = _read_fits(a_path)  # returns numpy uint16
-    if generator is not None:
+    if model is not None:
         image = tf.cast(a_data, dtype=tf.float32)
         image = tf.expand_dims(image, axis=-1)
         image = tf.image.per_image_standardization(image)
         noise = tf.random.normal(shape=tf.shape(image), mean=0.0, stddev=1.0,
                                  dtype=tf.float32)
-        gen_noise = generator(tf.expand_dims(noise, axis=0))
-        a_filtered = tf.add(image, tf.squeeze(gen_noise, axis=0))
+        model_input = [tf.expand_dims(image, axis=0),
+                       tf.expand_dims(noise, axis=0),
+                       tf.expand_dims(image, axis=0)]
+        gen_outputs, _, _ = model(model_input)
+        a_filtered = tf.squeeze(gen_outputs[0], axis=0)
         a_filtered = tf.add(a_filtered, tf.reduce_min(a_filtered))  # push to positive values
         a_filtered = tf.divide(a_filtered, tf.reduce_max(a_filtered))  # normalize to [0, 1)
         a_filtered = tf.image.convert_image_dtype(a_filtered, dtype=tf.uint16)
         a_filtered = a_filtered.numpy().astype(np.uint16)
-        # a_filtered = tf.cast(a_filtered, dtype=tf.uin16)
     else:
         a_filtered = a_data
 
@@ -412,13 +414,13 @@ def make_filtered_tf_records(args):
     a_dir = Path(args.a_dir).resolve()
     a_annotation_dir = Path(args.a_annotation_dir).resolve()
     output_dir = Path(args.output_dir).resolve()
-    if args.generator_path is not None:
-        generator_path = Path(args.generator_path).resolve()
+    if args.model_path is not None:
+        model_path = Path(args.model_path).resolve()
         _ = mish(0.)  # take care of lazy mish init.
-        generator = load_model(generator_path, compile=False)
-        generator.summary()
+        model = load_model(model_path, compile=False)
+        model.summary()
     else:
-        generator = None
+        model = None
     a_paths = sorted(a_dir.glob('**/*.fits'))
     a_annotation_paths = sorted(a_annotation_dir.glob('**/Annotations/*.json'))
     examples = list(zip(a_paths, a_annotation_paths))
@@ -440,7 +442,7 @@ def make_filtered_tf_records(args):
                         tf_example = _serialize_example_one_domain(
                             example,
                             skip_empty=args.skip_empty,
-                            generator=generator,
+                            model=model,
                         )
                         if tf_example is not None:
                             writer.write(tf_example.SerializeToString())
@@ -467,15 +469,15 @@ if __name__ == '__main__':
                         help='Name prepended to output TFRecords files.')
     parser.add_argument('--skip_empty', default=False, action='store_true',
                         help='Whether to skip empty frames in dataset.')
-    parser.add_argument('--generator_path', type=str, default=None,
-                        help='Path to generator for use in creating images.')
+    parser.add_argument('--model_path', type=str, default=None,
+                        help='Path to model for use in creating images.')
     parser.add_argument('--devices', nargs='+', type=int,
                         help='List of physical devices for TensorFlow to use.')
     args = parser.parse_args()
     _check_args(args)
-    if args.generator_path is not None:
-        gen_path = Path(args.generator_path).resolve()
-        print(f'Filtering TFRecords with generator at {gen_path.as_posix()}...')
+    if args.model_path is not None:
+        model_path = Path(args.model_path).resolve()
+        print(f'Filtering TFRecords with model at {model_path.as_posix()}...')
         make_filtered_tf_records(args)
     else:
         print('Building TFRecords files...')
