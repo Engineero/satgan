@@ -366,9 +366,12 @@ def _serialize_example_one_domain(example, pad_for_satsim=False,
                        tf.expand_dims(image, axis=0)]
         gen_outputs, _, _ = model(model_input)
         a_filtered = tf.squeeze(gen_outputs[0], axis=0)
-        a_filtered = tf.add(a_filtered, tf.reduce_min(a_filtered))  # push to positive values
-        a_filtered = tf.divide(a_filtered, tf.reduce_max(a_filtered))  # normalize to [0, 1)
-        a_filtered = tf.image.convert_image_dtype(a_filtered, dtype=tf.uint16)
+        a_filtered = tf.divide(
+            tf.subtract(a_filtered, tf.reduce_min(a_filtered)),
+            tf.subtract(tf.reduce_max(a_filtered), tf.reduce_min(a_filtered))
+        )  # normalize to [0, 1]
+        a_filtered = tf.image.convert_image_dtype(a_filtered, dtype=tf.uint16,
+                                                  saturate=True)
         a_filtered = a_filtered.numpy().astype(np.uint16)
     else:
         a_filtered = a_data
