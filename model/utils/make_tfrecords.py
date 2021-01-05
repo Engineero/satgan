@@ -412,10 +412,13 @@ def make_filtered_tf_records(args):
     a_dir = Path(args.a_dir).resolve()
     a_annotation_dir = Path(args.a_annotation_dir).resolve()
     output_dir = Path(args.output_dir).resolve()
-    generator_path = Path(args.generator_path).resolve()
-    _ = mish(0.)  # take care of lazy mish init.
-    generator = load_model(generator_path)
-    generator.summary()
+    if args.generator_path is not None:
+        generator_path = Path(args.generator_path).resolve()
+        _ = mish(0.)  # take care of lazy mish init.
+        generator = load_model(generator_path)
+        generator.summary()
+    else:
+        generator = None
     a_paths = sorted(a_dir.glob('**/*.fits'))
     a_annotation_paths = sorted(a_annotation_dir.glob('**/Annotations/*.json'))
     examples = list(zip(a_paths, a_annotation_paths))
@@ -471,6 +474,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     _check_args(args)
     if args.generator_path is not None:
+        print(f'Filtering TFRecords with generator at {args.generator_path}...')
         make_filtered_tf_records(args)
     else:
+        print('Building TFRecords files...')
         make_tf_records(args)
