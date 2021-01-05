@@ -234,6 +234,8 @@ if __name__ == '__main__':
                         default=False,
                         help='If specified, do not train task network, '
                              'just use its loss.')
+    parser.add_argument('--num_parallel_calls', default=None, type=int,
+                        help='Number of parallel jobs for data mapping.')
 
     # export options
     parser.add_argument("--output_filetype", default="png",
