@@ -478,8 +478,12 @@ if __name__ == '__main__':
                         help='Path to model for use in creating images.')
     parser.add_argument('--devices', nargs='+', type=int,
                         help='List of physical devices for TensorFlow to use.')
+    parser.add_argument('--num_parallel_calls', default=None, type=int,
+                        help='Number of parallel jobs for data mapping.')
+
     args = parser.parse_args()
     _check_args(args)
+
     if args.model_path is not None:
         model_path = Path(args.model_path).resolve()
         print(f'Filtering TFRecords with model at {model_path.as_posix()}...')
