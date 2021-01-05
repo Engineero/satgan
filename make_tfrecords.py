@@ -488,6 +488,8 @@ if __name__ == '__main__':
                         help='Number of predictor layers to use in network.')
     parser.add_argument("--batch_size", type=int, default=3,
                         help="number of images in batch")
+    parser.add_argument('--buffer_size', type=int, default=512,
+                        help='Buffer size for shuffling input data.')
 
     args = parser.parse_args()
     _check_args(args)
