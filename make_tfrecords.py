@@ -494,6 +494,8 @@ if __name__ == '__main__':
                         help="number of images in batch")
     parser.add_argument('--buffer_size', type=int, default=512,
                         help='Buffer size for shuffling input data.')
+    parser.add_argument('--activation', type=str, default='mish',
+                        help='lrelu for leaky relu, mish for mish')
 
     args = parser.parse_args()
     _check_args(args)
