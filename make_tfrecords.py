@@ -484,6 +484,8 @@ if __name__ == '__main__':
                         help="Number of channels in image.")
     parser.add_argument('--max_inferences', default=20, type=int,
                         help='Max inferences per image. Default 100.')
+    parser.add_argument('--num_pred_layers', default=1, type=int,
+                        help='Number of predictor layers to use in network.')
 
     args = parser.parse_args()
     _check_args(args)
