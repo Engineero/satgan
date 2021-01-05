@@ -292,11 +292,7 @@ def make_tf_records(args):
         b_annotation_paths = sorted(b_annotation_dir.glob('**/Annotations/*.json'))
         if a_annotation_dir is None:
             a_annotation_paths = b_annotation_paths
-    examples = []
-    for a_path, b_path, a_annotation, b_annotation in zip(a_paths, b_paths,
-                                                          a_annotation_paths,
-                                                          b_annotation_paths):
-        examples.append((a_path, b_path, a_annotation, b_annotation))
+    examples = list(zip(a_paths, b_paths, a_annotation_paths, b_annotation_paths))
     splits_dict = {'train': 0.8, 'valid': 0.1, 'test': 0.1}
     partitions = _partition_examples(examples, splits_dict)
     # Make TFRecords from partitions.
@@ -354,7 +350,6 @@ def _serialize_example_one_domain(example, pad_for_satsim=False,
 
     # Load raw image data.
     a_data = _read_fits(a_path)  # returns numpy uint16
-    a_filtered = a_data  # in case generator is None
     if generator is not None:
         image = tf.cast(a_data, dtype=tf.float32)
         image = tf.expand_dims(image, axis=-1)
@@ -368,6 +363,8 @@ def _serialize_example_one_domain(example, pad_for_satsim=False,
         a_filtered = tf.image.convert_image_dtype(a_filtered, dtype=tf.uint16)
         a_filtered = a_filtered.numpy().astype(np.uint16)
         # a_filtered = tf.cast(a_filtered, dtype=tf.uin16)
+    else:
+        a_filtered = a_data
 
     # Create the features for this example
     features = {
@@ -418,11 +415,10 @@ def make_filtered_tf_records(args):
     generator_path = Path(args.generator_path).resolve()
     _ = mish(0.)  # take care of lazy mish init.
     generator = load_model(generator_path)
+    generator.summary()
     a_paths = sorted(a_dir.glob('**/*.fits'))
     a_annotation_paths = sorted(a_annotation_dir.glob('**/Annotations/*.json'))
-    examples = []
-    for a_path, a_annotation in zip(a_paths, a_annotation_paths):
-        examples.append((a_path, a_annotation))
+    examples = list(zip(a_paths, a_annotation_paths))
     splits_dict = {'train': 0.8, 'valid': 0.1, 'test': 0.1}
     partitions = _partition_examples(examples, splits_dict)
     # Make TFRecords from partitions.
