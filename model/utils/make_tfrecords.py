@@ -415,7 +415,7 @@ def make_filtered_tf_records(args):
     if args.generator_path is not None:
         generator_path = Path(args.generator_path).resolve()
         _ = mish(0.)  # take care of lazy mish init.
-        generator = load_model(generator_path)
+        generator = load_model(generator_path, compile=False)
         generator.summary()
     else:
         generator = None
@@ -474,7 +474,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     _check_args(args)
     if args.generator_path is not None:
-        print(f'Filtering TFRecords with generator at {args.generator_path}...')
+        gen_path = Path(args.generator_path).resolve()
+        print(f'Filtering TFRecords with generator at {gen_path.as_posix()}...')
         make_filtered_tf_records(args)
     else:
         print('Building TFRecords files...')
