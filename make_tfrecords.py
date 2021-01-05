@@ -482,6 +482,8 @@ if __name__ == '__main__':
                         help='Number of parallel jobs for data mapping.')
     parser.add_argument("--n_channels", type=int, default=1,
                         help="Number of channels in image.")
+    parser.add_argument('--max_inferences', default=20, type=int,
+                        help='Max inferences per image. Default 100.')
 
     args = parser.parse_args()
     _check_args(args)
