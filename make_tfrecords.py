@@ -18,6 +18,10 @@ from model.scatgan import create_model
 from model.data_loader import load_examples
 
 
+tf.compat.v1.enable_eager_execution()
+print(f'Executing eagerly: {tf.executing_eagerly()}')
+
+
 def _check_args(args):
     """Checks whether arguments are valid.
 
@@ -31,16 +35,16 @@ def _check_args(args):
     a_dir = Path(args.a_dir).resolve()
     if args.b_dir is not None:
         b_dir = Path(args.b_dir).resolve()
-    elif args.model_path is None:
+    elif args.checkpoint is None:
         raise ValueError(
             'Either B domain data or model must be provided!'
         )
     else:
         b_dir = None
-    if args.model_path is not None:
-        model_path = Path(args.model_path).resolve()
+    if args.checkpoint is not None:
+        checkpoint = Path(args.checkpoint).resolve()
     else:
-        model_path = None
+        checkpoint = None
     if args.a_annotation_dir is not None:
         a_annotation_dir = Path(args.a_annotation_dir).resolve()
     else:
@@ -66,9 +70,9 @@ def _check_args(args):
         raise NotADirectoryError(
             f'Annotation path A {args.b_annotation_dir} is not a directory!'
         )
-    if model_path is not None and not model_path.is_dir():
+    if checkpoint is not None and not checkpoint.is_dir():
         raise NotADirectoryError(
-            f'Model path {args.model_path} is not a directory!'
+            f'Model path {args.checkpoint} is not a directory!'
         )
     if output_dir.is_dir():
         try:
@@ -417,10 +421,10 @@ def make_filtered_tf_records(args):
     a_tfrecords = Path(args.a_tfrecords).resolve()
     a_data = load_examples(args, a_tfrecords, shuffle=False)
     output_dir = Path(args.output_dir).resolve()
-    if args.model_path is not None:
-        model_path = Path(args.model_path).resolve()
+    if args.checkpoint is not None:
+        checkpoint = Path(args.checkpoint).resolve()
         _ = mish(0.)  # take care of lazy mish init.
-        model = create_model(args, a_data, a_data)
+        model = create_model(args, a_data.dataset, a_data.dataset)
         model.summary()
     else:
         model = None
@@ -474,7 +478,7 @@ if __name__ == '__main__':
                         help='Name prepended to output TFRecords files.')
     parser.add_argument('--skip_empty', default=False, action='store_true',
                         help='Whether to skip empty frames in dataset.')
-    parser.add_argument('--model_path', type=str, default=None,
+    parser.add_argument('--checkpoint', type=str, default=None,
                         help='Path to model for use in creating images.')
     parser.add_argument('--devices', nargs='+', type=int,
                         help='List of physical devices for TensorFlow to use.')
@@ -494,9 +498,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
     _check_args(args)
 
-    if args.model_path is not None:
-        model_path = Path(args.model_path).resolve()
-        print(f'Filtering TFRecords with model at {model_path.as_posix()}...')
+    if args.checkpoint is not None:
+        checkpoint = Path(args.checkpoint).resolve()
+        print(f'Filtering TFRecords with model at {checkpoint.as_posix()}...')
         make_filtered_tf_records(args)
     else:
         print('Building TFRecords files...')
