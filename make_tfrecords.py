@@ -14,8 +14,8 @@ from pathlib import Path
 from astropy.io import fits
 from itertools import zip_longest
 from tqdm import tqdm
-from .scatgan import create_model
-from .data_loader import load_examples
+from model.scatgan import create_model
+from model.data_loader import load_examples
 
 
 def _check_args(args):
