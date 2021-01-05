@@ -480,6 +480,8 @@ if __name__ == '__main__':
                         help='List of physical devices for TensorFlow to use.')
     parser.add_argument('--num_parallel_calls', default=None, type=int,
                         help='Number of parallel jobs for data mapping.')
+    parser.add_argument("--n_channels", type=int, default=1,
+                        help="Number of channels in image.")
 
     args = parser.parse_args()
     _check_args(args)
