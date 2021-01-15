@@ -14,7 +14,7 @@ from pathlib import Path
 from astropy.io import fits
 from itertools import zip_longest
 from tqdm import tqdm
-from model.scatgan import create_model
+from model.satgan import create_model
 from model.data_loader import load_examples
 
 

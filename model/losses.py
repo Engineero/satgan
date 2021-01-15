@@ -1,4 +1,4 @@
-"""Defines loss functions and helpers for calculating SCATGAN gradients."""
+"""Defines loss functions and helpers for calculating SATGAN gradients."""
 
 
 import tensorflow as tf

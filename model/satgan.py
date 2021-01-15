@@ -1,4 +1,4 @@
-"""Defines the SCATGAN network."""
+"""Defines the SATGAN network."""
 
 
 from .generator import create_generator
@@ -101,7 +101,7 @@ def create_model(a, a_train_data, b_train_data):
 
         model = Model(inputs=[inputs, noise, targets],
                       outputs=[gen_outputs, discrim_outputs, task_outputs],
-                      name='scatgan')
+                      name='satgan')
 
         # Plot the sub-models and overall model.
         if a.plot_models:

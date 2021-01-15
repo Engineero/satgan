@@ -7,7 +7,7 @@ import numpy as np
 import argparse
 from pathlib import Path
 from model.data_loader import load_examples
-from model.scatgan import create_model
+from model.satgan import create_model
 from model.losses import (compute_total_loss, compute_apply_gradients,
                           calc_discriminator_loss, calc_generator_loss,
                           calc_task_loss)

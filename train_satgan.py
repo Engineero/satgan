@@ -14,7 +14,7 @@ from tensorflow.keras.models import load_model
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.metrics import Mean
 from model.data_loader import load_examples
-from model.scatgan import create_model
+from model.satgan import create_model
 from model.losses import (compute_total_loss, compute_apply_gradients,
                           calc_discriminator_loss, calc_generator_loss,
                           calc_task_loss)
