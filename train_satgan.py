@@ -305,8 +305,6 @@ if __name__ == '__main__':
         default=None,
         help="Path to folder containing target TFRecords testing files."
     )
-    parser.add_argument("--mode", required=True,
-                        choices=["train", "test", "export"])
     parser.add_argument("--output_dir", required=True,
                         help="where to put output files")
     parser.add_argument("--tensorboard_dir", default=None,
