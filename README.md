@@ -12,15 +12,15 @@ target-domain sensor characteristics while maintaining semantic information
 in simulated scenes through the use of a task network. Example real images of
 a space domain awareness (SDA) scene from the original paper are shown below:
 
-![Real images](satgan_docs/real_images.jpg 'Real images')
+![Real images](satgan_docs/real_images.png 'Real images')
 
 Example noiseless simulated scenes used as context are below:
 
-![Context images](satgan_docs/context_images.jpg 'Context images')
+![Context images](satgan_docs/context_images.png 'Context images')
 
 Finally example simulated scenes with generated addative noise are shown below:
 
-![Fake images](satgan_docs/fake_images.jpg 'Fake images')
+![Fake images](satgan_docs/fake_images.png 'Fake images')
 
 SATGAN comprises three parts: a generator based on a U-net implementation, a
 discriminator based on PatchGAN, and a task network based on
