@@ -6,7 +6,7 @@ import numpy as np
 
 
 def image_int_to_float(image):
-    """Converts an image to uint16 and then float32 in range [0, 1]."""
+    """Converts an image to int32 and then float32 in range [0, 1]."""
     image = tf.image.convert_image_dtype(image, tf.int32)
     return tf.image.convert_image_dtype(image, tf.float32)
 
@@ -53,14 +53,18 @@ def plot_summaries(a, model_inputs, model_outputs, batches_seen):
     )
     tf.summary.image(
         name='Predict real map',
-        data=tf.expand_dims(discrim_outputs[0][..., 1],
-                            axis=-1),
+        data=image_int_to_float(
+            tf.expand_dims(discrim_outputs[0][..., 1],
+                           axis=-1)
+        ),
         step=batches_seen,
     )
     tf.summary.image(
         name='Predict fake map',
-        data=tf.expand_dims(discrim_outputs[1][..., 0],
-                            axis=-1),
+        data=image_int_to_float(
+            tf.expand_dims(discrim_outputs[1][..., 0],
+                           axis=-1)
+        ),
         step=batches_seen,
     )
 

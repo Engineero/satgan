@@ -13,7 +13,7 @@ import numpy as np
 import argparse
 from pathlib import Path
 from model.data_loader import load_examples
-from model.scatgan import create_model
+from model.satgan import create_model
 from model.losses import (compute_total_loss, compute_apply_gradients,
                           calc_discriminator_loss, calc_generator_loss,
                           calc_task_loss)
@@ -47,10 +47,10 @@ def main(a):
     writer = tf.summary.create_file_writer(tensorboard_path.as_posix())
 
     # Build data generators.
-    train_data, _, _ = load_examples(a)
+    train_data = load_examples(a, a.train_dir)
 
     # Build the model.
-    model, _, _ = create_model(a, train_data)
+    model, _, _ = create_model(a, train_data.dataset, train_data.dataset)
     model.summary()
 
     # Train the model.
@@ -62,7 +62,7 @@ def main(a):
         print(f'Starting testing...')
         epoch_start = time.time()
 
-        for _, batch in enumerate(train_data):
+        for _, batch in enumerate(train_data.dataset):
             # Save summary images, statistics.
             print(f'Writing outputs for test batch...')
             (inputs, noise, targets), (_, a_task_targets, b_task_targets) = batch
@@ -234,6 +234,8 @@ if __name__ == '__main__':
                         default=False,
                         help='If specified, do not train task network, '
                              'just use its loss.')
+    parser.add_argument('--num_parallel_calls', default=None, type=int,
+                        help='Number of parallel jobs for data mapping.')
 
     # export options
     parser.add_argument("--output_filetype", default="png",
