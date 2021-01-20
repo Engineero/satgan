@@ -1,7 +1,8 @@
 # SATGAN
 
-# TODO: update the article URL once published.
-# [Article about this implemention](https://affinelayer.com/pix2pix/)
+*TODO: update the article URL once published.*
+
+[Article about this implemention][0]
 
 The self-attentive task generative adversarial network (SATGAN) learns
 to emulate realistic target sensor noise characteristics in order to
@@ -11,26 +12,28 @@ target-domain sensor characteristics while maintaining semantic information
 in simulated scenes through the use of a task network. Example real images of
 a space domain awareness (SDA) scene from the original paper are shown below:
 
-<img src='satgan_docs/real_images.jpg' width='900px'/>
+![Real images](satgan_docs/real_images.jpg 'Real images')
 
 Example noiseless simulated scenes used as context are below:
 
-<img src='satgan_docs/context_images.jpg' width='900px'/>
+![Context images](satgan_docs/context_images.jpg 'Context images')
 
 Finally example simulated scenes with generated addative noise are shown below:
 
-<img src='satgan_docs/fake_images.jpg' width='900px'/>
+![Fake images](satgan_docs/fake_images.jpg 'Fake images')
 
 SATGAN comprises three parts: a generator based on a U-net implementation, a
 discriminator based on PatchGAN, and a task network based on
 [[Fletcher *et al.*][1]]. The SATGAN architecture is illustrated below:
 
-<img src='satgan_docs/satgan_architecture.png' width='900px'/>
+![SATGAN architecture](satgan_docs/satgan_architecture.png 'SATGAN architecture')
 
 ## Setup
 
 ### Prerequisites
 - Tensorflow >= 2.2.1
+- Tensorflow-addons >= 0.11.2 (for optional mish activation)
+- MISS YOLOv3
 
 ### Recommended
 - Linux with Tensorflow GPU edition + cuDNN
@@ -42,9 +45,6 @@ discriminator based on PatchGAN, and a task network based on
 git clone https://github.com/Engineero/satgan.git
 cd satgan
 
-# download the CMP Facades dataset (generated from http://cmp.felk.cvut.cz/~tylecr1/facade/)
-python tools/download-dataset.py facades
-
 # train the model (this may take 1-8 hours depending on GPU, on CPU you will be waiting for a bit)
 python train_satgan.py \
   --mode train \
@@ -53,14 +53,12 @@ python train_satgan.py \
   --input_dir my_data/train \
 ```
 
-The test run will output an HTML file at `facades_test/index.html` that shows input/output/target image sets.
-
 ## Citation
 
-# TODO: update paper link
+*TODO: update paper link*
 
 If you use this code for your research, please cite the paper this code is based on:
-<a href="https://arxiv.org/pdf/1611.07004v1.pdf">Self-attending task generative adversarial network for realistic satellite image creation</a>:
+[Self-attending task generative adversarial network for realistic satellite image creation][0]:
 
 ```
 @article{satgan2021,
@@ -73,5 +71,5 @@ If you use this code for your research, please cite the paper this code is based
 
 ## Acknowledgments
 
-
+[0]: https://www.google.com
 [1]: https://amostech.com/TechnicalPapers/2019/Machine-Learning-for-SSA-Applications/Fletcher.pdf
