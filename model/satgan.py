@@ -52,8 +52,8 @@ def create_model(a, a_train_data, b_train_data):
                 out_channels = target_shape[-1]
                 generator, _ = create_generator(a, input_shape, out_channels)
                 generator.summary()
-                gen_noise = generator(noise)
-                fake_img = gen_noise + inputs
+                gen_noise = inputs + noise
+                fake_img = generator(gen_noise)
                 gen_outputs = tf.stack([fake_img, gen_noise], axis=0,
                                        name='generator')
 
