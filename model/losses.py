@@ -289,7 +289,7 @@ def calc_task_loss(a, model_inputs, model_outputs, step, val=False,
 
     with tf.device(f'/device:GPU:{a.devices[-1]}'):
         with tf.name_scope('task_loss'):
-            # task_targets are [ymin, xmin, ymax, xmax, class]
+            # task_targets are [ymin, xmin, x, xmax, class]
             # task_outputs are [ymin, xmin, ymax, xmax, *class] where *class
             # is a one-hot encoded score for each class in the dataset for
             # custom detector.
@@ -380,7 +380,8 @@ def calc_task_loss(a, model_inputs, model_outputs, step, val=False,
             )
             n_loss = a.class_weight * n_class_loss
 
-            task_loss = a_loss + b_loss + n_loss
+            task_loss = a_loss + a.b_loss_weight * b_loss + \
+                a.n_loss_weight * n_loss
 
             # Write summaries.
             if val:
