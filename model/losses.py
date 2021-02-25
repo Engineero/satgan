@@ -305,7 +305,7 @@ def calc_task_loss(a, model_inputs, model_outputs, step, val=False,
             # Create noise target classes (should be no objects).
             targets_ones = tf.ones_like(a_task_targets[..., -1],
                                         dtype=tf.int32)
-            n_target_classes = tf.one_hot(targets_ones, a.num_classes)
+            # n_target_classes = tf.one_hot(targets_ones, a.num_classes)
 
             # Grab class outputs.
             b_pred_class = task_outputs[0][..., -a.num_classes:]
@@ -374,7 +374,7 @@ def calc_task_loss(a, model_inputs, model_outputs, step, val=False,
 
             # Calculate loss on generated noise.
             n_class_loss = tf.math.reduce_sum(
-                categorical_crossentropy(n_target_classes,
+                categorical_crossentropy(a_target_classes,
                                          n_pred_class,
                                          label_smoothing=0.1)
             )
