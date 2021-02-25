@@ -24,7 +24,7 @@ def plot_summaries(a, model_inputs, model_outputs, batches_seen):
     """
 
     inputs, targets, a_task_targets, b_task_targets, noise = model_inputs
-    gen_outputs, discrim_outputs, task_outputs = model_outputs
+    gen_outputs, discrim_outputs, task_outputs, discrim_hidden = model_outputs
 
     tf.summary.image(
         name='Fake image',
@@ -63,6 +63,22 @@ def plot_summaries(a, model_inputs, model_outputs, batches_seen):
         name='Predict fake map',
         data=image_int_to_float(
             tf.expand_dims(discrim_outputs[1][..., 0],
+                           axis=-1)
+        ),
+        step=batches_seen,
+    )
+    tf.summary.image(
+        name='Discriminator real hidden activations',
+        data=image_int_to_float(
+            tf.expand_dims(discrim_hidden[0][..., 0],
+                           axis=-1)
+        ),
+        step=batches_seen,
+    )
+    tf.summary.image(
+        name='Discriminator fake hidden activations',
+        data=image_int_to_float(
+            tf.expand_dims(discrim_hidden[1][..., 0],
                            axis=-1)
         ),
         step=batches_seen,

@@ -84,13 +84,14 @@ def compute_apply_gradients(a, model, a_batch, b_batch, noise, optimizer_list,
                                             loss_function_list):
             with tf.GradientTape() as tape:
                 # Run the model.
-                gen_outputs, discrim_outputs, task_outputs = \
+                gen_outputs, discrim_outputs, task_outputs, discrim_hidden = \
                     model([inputs, noise, targets])
                 model_inputs = (inputs, targets, a_task_targets,
                                 b_task_targets, noise)
                 model_outputs = (gen_outputs,
                                  discrim_outputs,
-                                 task_outputs)
+                                 task_outputs,
+                                 discrim_hidden)
                 # Compute the loss.
                 loss = loss_function(a,
                                      model_inputs,
@@ -197,8 +198,8 @@ def calc_generator_loss(a, model_inputs, model_outputs, step,
             # abs(targets - outputs) => 0
             fake_img = model_outputs[0][0]
             discrim_fake = model_outputs[1][1]
-            discrim_real_h = model_outputs[1][2]
-            discrim_fake_h = model_outputs[1][3]
+            discrim_real_h = model_outputs[3][0]
+            discrim_fake_h = model_outputs[3][1]
             discrim_fake = tf.reshape(discrim_fake,
                                       [discrim_fake.shape[0], -1, 2])
             targets_ones = tf.ones(shape=discrim_fake.shape[:-1],

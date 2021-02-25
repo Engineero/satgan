@@ -65,11 +65,12 @@ def create_model(a, a_train_data, b_train_data):
                 discriminator.summary()
                 predict_real, real_h = discriminator(targets)  # should -> [0, 1]
                 predict_fake, fake_h = discriminator(fake_img)  # should -> [1, 0]
-                discrim_outputs = tf.stack(
-                    [predict_real, predict_fake, real_h, fake_h],
-                    axis=0,
-                    name='discriminator'
-                )
+                discrim_outputs = tf.stack([predict_real, predict_fake],
+                                           axis=0,
+                                           name='discriminator')
+                discrim_hidden = tf.stack([real_h, fake_h],
+                                          axis=0,
+                                          name='discrim_hidden')
 
         # Create two copies of the task network, one for real images (targets
         # input to this method) and one for generated images (outputs from
@@ -103,7 +104,7 @@ def create_model(a, a_train_data, b_train_data):
                                     name='task_net')
 
         model = Model(inputs=[inputs, noise, targets],
-                      outputs=[gen_outputs, discrim_outputs, task_outputs],
+                      outputs=[gen_outputs, discrim_outputs, task_outputs, discrim_hidden],
                       name='satgan')
 
         # Plot the sub-models and overall model.

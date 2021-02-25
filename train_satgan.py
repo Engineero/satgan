@@ -134,13 +134,13 @@ def train_satgan(a):
                     print(f'Writing outputs for epoch {epoch+1}, batch {batch_num}.')
                     inputs, a_task_targets = a_batch
                     targets, b_task_targets = b_batch
-                    gen_outputs, discrim_outputs, task_outputs = model(
+                    gen_outputs, discrim_outputs, task_outputs, discrim_hidden = model(
                         [inputs, noise, targets]
                     )
                     model_inputs = (inputs, targets, a_task_targets,
                                     b_task_targets, noise)
                     model_outputs = (gen_outputs, discrim_outputs,
-                                     task_outputs)
+                                     task_outputs, discrim_hidden)
 
                     # Plot all of the summary images.
                     plot_summaries(a, model_inputs, model_outputs,
