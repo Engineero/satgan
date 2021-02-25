@@ -41,6 +41,7 @@ def create_discriminator(a, target_shape):
         # Add self attention layer before final down resblock.
         x = google_attention(x, out_channels, sn=a.spec_norm,
                              scope='discrim_attention')
+        hidden_activation = x
 
         # layer_5: [batch, h//16, w//16, ndf * 8] => [batch, h//16-1, w//16-1, 2]
         x = ops.down_resblock(x, filters=2, to_down=False, sn=a.spec_norm,
@@ -64,6 +65,7 @@ def create_discriminator(a, target_shape):
             x = BatchNormalization()(x_in)
             x = activation_fcn(x)
             x = discrim_conv(x, a.ndf, 2)
+        hidden_activation = x
         for i in range(a.n_layer_dsc):
             out_channels = a.ndf * min(2**(i+1), 8)
             stride = 1 if i == a.n_layer_dsc - 1 else 2  # last layer stride = 1
@@ -71,11 +73,10 @@ def create_discriminator(a, target_shape):
                 x = BatchNormalization()(x)
                 x = activation_fcn(x)
                 x = discrim_conv(x, out_channels, stride)
-        last_h = x
         with tf.name_scope('output_layer'):
             x = BatchNormalization()(x)
             x = activation_fcn(x)
             x = discrim_conv(x, 2, 1)
             x = tf.nn.softmax(x, name='discriminator')
 
-    return Model(inputs=x_in, outputs=[x, last_h], name='discriminator')
+    return Model(inputs=x_in, outputs=[x, hidden_activation], name='discriminator')
