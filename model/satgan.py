@@ -63,10 +63,13 @@ def create_model(a, a_train_data, b_train_data):
                 # TODO (NLT): figure out discriminator loss, interaction with Keras changes.
                 discriminator = create_discriminator(a, target_shape)
                 discriminator.summary()
-                predict_real = discriminator(targets)  # should -> [0, 1]
-                predict_fake = discriminator(fake_img)  # should -> [1, 0]
-                discrim_outputs = tf.stack([predict_real, predict_fake], axis=0,
-                                           name='discriminator')
+                predict_real, real_h = discriminator(targets)  # should -> [0, 1]
+                predict_fake, fake_h = discriminator(fake_img)  # should -> [1, 0]
+                discrim_outputs = tf.stack(
+                    [predict_real, predict_fake, real_h, fake_h],
+                    axis=0,
+                    name='discriminator'
+                )
 
         # Create two copies of the task network, one for real images (targets
         # input to this method) and one for generated images (outputs from

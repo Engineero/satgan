@@ -71,10 +71,11 @@ def create_discriminator(a, target_shape):
                 x = BatchNormalization()(x)
                 x = activation_fcn(x)
                 x = discrim_conv(x, out_channels, stride)
+        last_h = x
         with tf.name_scope('output_layer'):
             x = BatchNormalization()(x)
             x = activation_fcn(x)
             x = discrim_conv(x, 2, 1)
             x = tf.nn.softmax(x, name='discriminator')
 
-    return Model(inputs=x_in, outputs=x, name='discriminator')
+    return Model(inputs=x_in, outputs=[x, last_h], name='discriminator')

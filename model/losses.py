@@ -197,6 +197,8 @@ def calc_generator_loss(a, model_inputs, model_outputs, step,
             # abs(targets - outputs) => 0
             fake_img = model_outputs[0][0]
             discrim_fake = model_outputs[1][1]
+            discrim_real_h = model_outputs[1][2]
+            discrim_fake_h = model_outputs[1][3]
             discrim_fake = tf.reshape(discrim_fake,
                                       [discrim_fake.shape[0], -1, 2])
             targets_ones = tf.ones(shape=discrim_fake.shape[:-1],
@@ -209,8 +211,10 @@ def calc_generator_loss(a, model_inputs, model_outputs, step,
                     label_smoothing=0.1,
                 )
             )
-            gen_loss_L1 = tf.reduce_mean(mean_absolute_error(targets,
-                                                             fake_img))
+            # gen_loss_L1 = tf.reduce_mean(mean_absolute_error(targets,
+            #                                                  fake_img))
+            gen_loss_L1 = tf.reduce_mean(mean_absolute_error(discrim_real_h,
+                                                             discrim_fake_h))
             gen_loss = a.gan_weight * gen_loss_GAN + a.l1_weight * gen_loss_L1
 
             # Write summaries.
