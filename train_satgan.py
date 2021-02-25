@@ -127,7 +127,7 @@ def train_satgan(a):
                 # Generate noise batch for this step.
                 inputs, _ = a_batch
                 noise = tf.random.normal(shape=tf.shape(inputs), mean=0.0,
-                                         stddev=1.0, dtype=tf.float32)
+                                         stddev=0.5, dtype=tf.float32)
 
                 # Save summary images, statistics.
                 if batch_num % a.summary_freq == 0:
