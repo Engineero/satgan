@@ -50,7 +50,7 @@ def create_model(a, a_train_data, b_train_data):
             # Create the generator.
             with tf.name_scope("generator"):
                 out_channels = target_shape[-1]
-                generator = create_generator(a, input_shape, out_channels)
+                generator, _ = create_generator(a, input_shape, out_channels)
                 generator.summary()
                 gen_noise = generator(noise)
                 fake_img = gen_noise + inputs

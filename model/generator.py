@@ -51,6 +51,7 @@ def create_generator(a, input_shape, generator_outputs_channels):
 
             x = google_attention(skip_layers.pop(), filters=num_filters,
                                  scope='self_attention')
+            encoded = x
 
             # Build the back end of the generator with skip connections.
             for i in range(a.n_blocks_gen // 2, a.n_blocks_gen):
@@ -95,7 +96,7 @@ def create_generator(a, input_shape, generator_outputs_channels):
             for layer_num, out_channels in enumerate(layer_specs):
                 if layer_num == 3:
                     x = google_attention(layers[-1], out_channels, sn=True,
-                                         scope='gen_self_attention')
+                                            scope='gen_self_attention')
                 else:
                     with tf.name_scope(f'encoder_{len(layers) + 1}'):
                         x = BatchNormalization()(layers[-1])
@@ -113,6 +114,7 @@ def create_generator(a, input_shape, generator_outputs_channels):
                 (a.ngf, 0.),
             ]
 
+            encoded = x
             num_encoder_layers = len(layers) - 1  # -1 for attention layer
             for decoder_layer, (out_channels, rate) in enumerate(layer_specs):
                 skip_layer = num_encoder_layers - decoder_layer - 1
@@ -138,4 +140,6 @@ def create_generator(a, input_shape, generator_outputs_channels):
                 x = gen_deconv(x, generator_outputs_channels)
                 x = tanh(x)
 
-        return Model(inputs=x_in, outputs=x, name='generator')
+        encoder = Model(inputs=x_in, outputs=x, name='encoder')
+        generator = Model(inputs=x_in, outputs=x, name='generator')
+        return generator, encoder
