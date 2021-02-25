@@ -212,15 +212,18 @@ def calc_generator_loss(a, model_inputs, model_outputs, step,
                     label_smoothing=0.1,
                 )
             )
-            # gen_loss_L1 = tf.reduce_mean(mean_absolute_error(targets,
-            #                                                  fake_img))
-            gen_loss_L1 = tf.reduce_mean(mean_absolute_error(discrim_real_h,
-                                                             discrim_fake_h))
-            gen_loss = a.gan_weight * gen_loss_GAN + a.l1_weight * gen_loss_L1
+            gen_loss_L1 = tf.reduce_mean(mean_absolute_error(targets,
+                                                             fake_img))
+            gen_loss_L1_h = tf.reduce_mean(mean_absolute_error(discrim_real_h,
+                                                               discrim_fake_h))
+            gen_loss = a.gan_weight * gen_loss_GAN + \
+                a.l1_weight * gen_loss_L1 + a.l1h_weight * gen_loss_L1_h
 
             # Write summaries.
             if val:
                 tf.summary.scalar(name='gen_L1_loss_val', data=gen_loss_L1,
+                                  step=step)
+                tf.summary.scalar(name='gen_L1_h_loss_val', data=gen_loss_L1_h,
                                   step=step)
                 tf.summary.scalar(name='gen_GAN_loss_val',
                                   data=gen_loss_GAN,
@@ -229,6 +232,8 @@ def calc_generator_loss(a, model_inputs, model_outputs, step,
                                   step=step)
             else:
                 tf.summary.scalar(name='gen_L1_loss', data=gen_loss_L1,
+                                  step=step)
+                tf.summary.scalar(name='gen_L1_h_loss', data=gen_loss_L1_h,
                                   step=step)
                 tf.summary.scalar(name='gen_GAN_loss', data=gen_loss_GAN,
                                   step=step)

@@ -360,6 +360,8 @@ if __name__ == '__main__':
                         help="momentum term of task adam")
     parser.add_argument("--l1_weight", type=float, default=100.0,
                         help="weight on L1 term for generator gradient")
+    parser.add_argument("--l1h_weight", type=float, default=100.0,
+                        help="weight on L1 hidden activations term for generator gradient")
     parser.add_argument("--gan_weight", type=float, default=1.0,
                         help="weight on GAN term for generator gradient")
     parser.add_argument("--n_channels", type=int, default=3,
