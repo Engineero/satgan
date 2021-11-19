@@ -61,11 +61,15 @@ If you use this code for your research, please cite the paper this code is based
 [Self-attending task generative adversarial network for realistic satellite image creation][0]:
 
 ```
-@article{satgan2021,
-  title={Self-attending task generative adversarial network for realistic satellite image creation},
-  author={Toner, Nathan and Fletcher, Justin},
-  journal={arxiv},
-  year={2021}
+@article{toner_self-attending_2021,
+	title = {Self-{Attending} {Task} {Generative} {Adversarial} {Network} for {Realistic} {Satellite} {Image} {Creation}},
+	url = {https://arxiv.org/abs/2111.09463v1},
+	language = {en},
+	urldate = {2021-11-19},
+	author = {Toner, Nathan and Fletcher, Justin},
+	month = nov,
+	year = {2021},
+	file = {Snapshot:/Users/nathantoner/Zotero/storage/K7AHTQEU/2111.html:text/html},
 }
 ```
 
